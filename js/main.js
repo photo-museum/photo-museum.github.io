@@ -525,14 +525,33 @@ function openStylePanel(ri, tab = 'wall') {
   renderStylePanel();
 }
 function closeStylePanel() { stylePanel.classList.remove('open'); document.body.classList.remove('style-open'); }
+// 꾸밀 곳: 방 (0..n-1), 입구 (-1), 출구 (n). 입구·출구는 따로 정하지 않으면 첫 방·마지막 방을 따른다.
+function styleTarget(ri = styleRi) {
+  const n = museum.rooms.length;
+  if (ri < 0 || ri >= n) {
+    const lobby = ri < 0, key = lobby ? 'lobbyStyle' : 'exitStyle', base = museum.rooms[lobby ? 0 : n - 1];
+    return {
+      label: lobby ? '입구' : '출구', key, follows: !museum[key], baseName: lobby ? '첫 방' : '마지막 방',
+      room: { style: museum[key] || base.style, theme: base.theme },
+      set(st) { museum[key] = st; },
+    };
+  }
+  const room = museum.rooms[ri];
+  return room && { label: `ROOM ${String(ri + 1).padStart(2, '0')}`, room, set(st) { room.style = st; } };
+}
 function renderStylePanel() {
-  const room = museum.rooms[styleRi];
-  if (!room) return;
+  const tg = styleTarget();
+  if (!tg) return;
+  const room = tg.room;
   const st = styleOf(room);
   const W = WALL_BY[st.wall];
   const rec = recOf(st.wall);
-  stylePanel.querySelector('.ttl').textContent = `ROOM ${String(styleRi + 1).padStart(2, '0')} 꾸미기`;
-  stylePanel.querySelector('.now').textContent = `${W.label} · ${CEIL_BY[st.ceil].label} · ${FLOOR_BY[st.floor].label} · ${LIGHT_BY[st.light].label}`;
+  stylePanel.querySelector('.ttl').textContent = `${tg.label} 꾸미기`;
+  const fol = stylePanel.querySelector('.follow');
+  fol.hidden = !tg.key || tg.follows;
+  if (tg.key) fol.textContent = `${tg.baseName}과 같게`;
+  stylePanel.querySelector('.now').textContent = tg.key && tg.follows ? `지금은 ${tg.baseName}과 같아요 · 고르면 ${tg.label}만 따로 바뀌어요` : '';
+  if (!(tg.key && tg.follows)) stylePanel.querySelector('.now').textContent = `${W.label} · ${CEIL_BY[st.ceil].label} · ${FLOOR_BY[st.floor].label} · ${LIGHT_BY[st.light].label}`;
   for (const b of stylePanel.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === styleTab);
   // 추천: 바꾸지는 않고 보여 주기만. '추천대로'를 누르면 천장·바닥·조명을 한꺼번에.
   const same = st.ceil === rec.ceil && st.floor === rec.floor && st.light === rec.light;
@@ -566,25 +585,44 @@ function renderStylePanel() {
   if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.clientWidth / 2 + on.offsetWidth / 2);
 }
 function applyStyle(kind, id) {
-  const room = museum.rooms[styleRi];
-  const st = styleOf(room);
-  pushUndo('방 꾸미기');
+  const tg = styleTarget();
+  if (!tg) return;
+  const st = styleOf(tg.room);
+  pushUndo(`${tg.label} 꾸미기`);
   // 벽을 바꿔도 천장·바닥·조명은 그대로 (추천은 위에 보여 주기만)
-  room.style = { wall: st.wall, ceil: st.ceil, floor: st.floor, light: st.light, [kind]: id };
+  tg.set({ wall: st.wall, ceil: st.ceil, floor: st.floor, light: st.light, [kind]: id });
   persist();
   rebuild();
-  const keep = museum.rooms[styleRi] ? styleRi : 0;
-  styleRi = keep;
+  styleRi = Math.max(-1, Math.min(museum.rooms.length, styleRi));
   renderStylePanel();
 }
 stylePanel.querySelector('.close').addEventListener('click', () => { closeStylePanel(); controls.pitchT = 0.02; });
 stylePanel.querySelector('.reset').addEventListener('click', () => {
-  const room = museum.rooms[styleRi];
-  const wall = styleOf(room).wall;
+  const tg = styleTarget();
+  const wall = styleOf(tg.room).wall;
   pushUndo('추천대로');
-  room.style = { wall, ...recOf(wall) };
+  tg.set({ wall, ...recOf(wall) });
   persist(); rebuild(); renderStylePanel();
   toast('천장·바닥·조명을 추천대로 맞췄어요');
+});
+stylePanel.querySelector('.follow').addEventListener('click', () => {
+  const tg = styleTarget();
+  if (!tg || !tg.key) return;
+  pushUndo(`${tg.label} 꾸미기`);
+  delete museum[tg.key];
+  persist(); rebuild(); renderStylePanel();
+  toast(`${tg.label}을 ${tg.baseName}과 같게 맞췄어요`);
+});
+// 꾸밀 곳 옮기기: 입구 ‹ ROOM 01 … › 출구 (그곳으로 걸어가 보여 준다)
+for (const b of stylePanel.querySelectorAll('.pick')) b.addEventListener('click', () => {
+  const n = museum.rooms.length;
+  styleRi = Math.max(-1, Math.min(n, styleRi + (b.dataset.d === '1' ? 1 : -1)));
+  const L = museumScene.layout;
+  const r = styleRi < 0 ? L.lobby : styleRi >= n ? L.exit : L[styleRi];
+  controls.joy.x = controls.joy.y = 0;
+  const z = styleRi < 0 ? r.zEnd + 2.2 : r.zStart - (styleRi >= n ? 1.6 : 1.4);
+  controls.walkPath(route(controls.pos.x, controls.pos.z, 0, z), 0);
+  renderStylePanel();
 });
 // 탭에 맞춰 시선을 살짝: 천장은 위로, 바닥은 아래로
 const lookFor = tab => { controls.pitchT = tab === 'ceil' ? 0.6 : tab === 'floor' ? -0.5 : tab === 'light' ? 0.15 : 0.02; };
@@ -1059,7 +1097,7 @@ $('#tools').addEventListener('click', e => {
   const ri = currentRoomIndex();
   if (act === 'photos') pickPhotos({ roomIndex: ri });
   if (act === 'room') addRoom('white');
-  if (act === 'theme') openStylePanel(ri);
+  if (act === 'theme') openStylePanel(Math.max(-1, Math.min(museum.rooms.length, museumScene.roomIndexAt(controls.pos.z))));
   if (act === 'tour') startTour();
 });
 

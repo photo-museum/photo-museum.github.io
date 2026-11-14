@@ -769,3 +769,8 @@ body.touring #tools, body.touring #minimap, body.touring .nav, body.touring #got
 @media (max-width: 900px) { body:not(.rotated) #home .hbtns .lg { display: none; } body:not(.rotated) #home .hbtns .sm { display: inline; } }
 @media (max-height: 900px) { body.rotated #home .hbtns .lg { display: none; } body.rotated #home .hbtns .sm { display: inline; } }
 #home header { position: relative; z-index: 3; }
+
+/* 방 꾸미기: 꾸밀 곳 옮기기 ‹ › , 입구·출구 '첫 방과 같게' */
+#style-panel .tl { display: flex; align-items: center; gap: 6px; }
+#style-panel .pick { appearance: none; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: inherit; font: inherit; font-size: 15px; line-height: 1; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; }
+#style-panel .follow { appearance: none; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: inherit; font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }

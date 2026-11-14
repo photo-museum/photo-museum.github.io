@@ -81,8 +81,9 @@
 
   <div id="style-panel" role="dialog" aria-label="방 꾸미기">
     <div class="top">
-      <div><b class="ttl">방 꾸미기</b><span class="now"></span></div>
+      <div><span class="tl"><button class="pick" data-d="-1" aria-label="앞쪽 방 꾸미기">‹</button><b class="ttl">방 꾸미기</b><button class="pick" data-d="1" aria-label="뒤쪽 방 꾸미기">›</button></span><span class="now"></span></div>
       <div class="tabs" role="tablist"><button data-tab="wall">벽</button><button data-tab="ceil">천장</button><button data-tab="floor">바닥</button><button data-tab="light">조명</button></div>
+      <button class="follow" hidden>첫 방과 같게</button>
       <button class="reset" hidden>추천대로</button>
       <button class="close" aria-label="닫기">✕</button>
     </div>
