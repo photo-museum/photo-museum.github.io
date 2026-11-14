@@ -190,7 +190,7 @@ function makeLabel(text, light) {
   const W = Math.round(LABEL_W * LABEL_PX);
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
-  const titleF = `700 30px ${FONTS.display}`, bodyF = `400 24px ${FONTS.body}`;
+  const titleF = FONTS.strong(30), bodyF = FONTS.text(24);
   const lines = text.trim().split('\n');
   g.font = titleF;
   const title = wrapLines(g, lines[0], W).slice(0, 3);
@@ -247,17 +247,17 @@ function makeLobbyText(museum) {
   const title = (museum.title || '').trim() || '이름 없는 전시';
   const intro = (museum.intro || '').trim();
   let y = drawTextBlock(g, 0, 40, c.width, [
-    { text: 'photo-museum', font: `italic 400 44px ${FONTS.latin}`, color: sub, lh: 60, track: 3 },
-    { text: title, font: `700 112px ${FONTS.display}`, color: ink, lh: 140, gap: 26, max: 2 },
+    { text: 'photo-museum', font: FONTS.mark(42), color: sub, lh: 60, track: 3 },
+    { text: title, font: FONTS.title(112), color: ink, lh: 140, gap: 26, max: 2 },
   ]);
   g.fillStyle = 'rgba(255,217,160,0.65)';
   g.fillRect(0, y + 30, 120, 3);
   y += 66;
   drawTextBlock(g, 0, y, c.width * 0.92, intro
-    ? [{ text: intro, font: `400 40px ${FONTS.body}`, color: sub, lh: 70, max: Math.floor((c.height - y - 90) / 70) }]
-    : [{ text: '벽을 눌러 이 전시에 대한 설명을 적어 주세요.', font: `400 38px ${FONTS.body}`, color: faint, lh: 64 }]);
+    ? [{ text: intro, font: FONTS.text(40), color: sub, lh: 70, max: Math.floor((c.height - y - 90) / 70) }]
+    : [{ text: '벽을 눌러 이 전시에 대한 설명을 적어 주세요.', font: FONTS.text(38), color: faint, lh: 64 }]);
   drawTextBlock(g, 0, c.height - 60, c.width, [
-    { text: 'ROOM 01 →', font: `400 36px ${FONTS.latin}`, color: faint, lh: 50, track: 6 },
+    { text: 'ROOM 01 →', font: FONTS.mark(34), color: faint, lh: 50, track: 6 },
   ]);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -288,17 +288,17 @@ function introCanvas(room, light) {
   const sub = light ? 'rgba(62,58,52,0.85)' : 'rgba(208,200,187,0.82)';
   const faint = light ? 'rgba(62,58,52,0.42)' : 'rgba(208,200,187,0.4)';
   const pad = 0.26 * ppm, W = c.width - pad * 2;
-  const no = `Room ${String(room.index + 1).padStart(2, '0')}`;
-  const lines = [{ text: no, font: `italic 400 52px ${FONTS.latin}`, color: sub, lh: 64, track: 4 }];
-  if (room.name) lines.push({ text: room.name, font: `700 92px ${FONTS.display}`, color: ink, lh: 118, gap: 18, max: 2 });
+  const no = `ROOM ${String(room.index + 1).padStart(2, '0')}`;
+  const lines = [{ text: no, font: FONTS.mark(36), color: sub, lh: 56, track: 10 }];
+  if (room.name) lines.push({ text: room.name, font: FONTS.title(92), color: ink, lh: 118, gap: 18, max: 2 });
   let y = drawTextBlock(g, pad, pad + 10, W, lines);
   if (room.intro) {
     g.fillStyle = light ? 'rgba(150,110,60,0.55)' : 'rgba(255,217,160,0.6)';
     g.fillRect(pad, y + 26, 90, 3);
     y += 58;
-    drawTextBlock(g, pad, y, W, [{ text: room.intro, font: `400 40px ${FONTS.body}`, color: sub, lh: 68, max: Math.floor((c.height - y - pad) / 68) }]);
+    drawTextBlock(g, pad, y, W, [{ text: room.intro, font: FONTS.text(40), color: sub, lh: 68, max: Math.floor((c.height - y - pad) / 68) }]);
   } else if (!room.name) {
-    drawTextBlock(g, pad, y + 26, W, [{ text: '벽을 눌러 이 방의 이름과 설명을 적어 주세요.', font: `400 38px ${FONTS.body}`, color: faint, lh: 62 }]);
+    drawTextBlock(g, pad, y + 26, W, [{ text: '벽을 눌러 이 방의 이름과 설명을 적어 주세요.', font: FONTS.text(38), color: faint, lh: 62 }]);
   }
   return c;
 }
