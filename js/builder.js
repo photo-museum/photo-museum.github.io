@@ -1,0 +1,366 @@
+// 배치(layout) → three.js 장면. 방마다 그룹 하나 + 바닥 반사용 거울 그룹.
+import * as THREE from 'three';
+import {
+  ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, layoutMuseum,
+} from './layout.js';
+import { concreteTexture, woodSlatsTexture, plasterTexture } from './textures.js';
+import { surfaceMaterial, photoMaterial } from './materials.js';
+import { getImage } from './store.js';
+
+const SPOT_COLOR = 0xffe9cf;   // 따뜻한 할로겐 빛
+const TRACK_INSET = 1.5;       // 조명 레일: 벽에서 안쪽으로
+
+// ---------- 공용 자원 (한 번만 만든다) ----------
+let shared = null;
+function getShared(maxAniso) {
+  if (shared) return shared;
+  const wall = concreteTexture(512, 1, true);
+  const floor = concreteTexture(512, 21, false);
+  const wood = woodSlatsTexture();
+  const plaster = plasterTexture();
+  for (const t of [wall, floor, wood, plaster]) t.anisotropy = Math.min(8, maxAniso);
+  const black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+  black.needsUpdate = true;
+  shared = {
+    wall, floor, wood, plaster, black,
+    edgeTop: new THREE.MeshBasicMaterial({ color: 0x8c8274 }),
+    edgeSide: new THREE.MeshBasicMaterial({ color: 0x3e3933 }),
+    edgeBottom: new THREE.MeshBasicMaterial({ color: 0x100e0c }),
+    fixtureMat: new THREE.MeshBasicMaterial({ color: 0x141414 }),
+    fixtureGeo: new THREE.CylinderGeometry(0.055, 0.065, 0.2, 14),
+    stemGeo: new THREE.BoxGeometry(0.02, 0.12, 0.02),
+    ceilingMat: surfaceMaterial({ map: wood, tile: [1.0, 3.2], tint: 0x8c8274, lightMap: black, ambient: 0.3, lmIntensity: 0 }),
+  };
+  return shared;
+}
+
+// uv 를 미터 단위로 바꾼 평면
+function meterPlane(w, h) {
+  const g = new THREE.PlaneGeometry(w, h);
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w, uv.getY(i) * h);
+  return g;
+}
+
+// 문 구멍이 있는 끝벽 (uv = 미터, x 0..W)
+function endWallGeometry(withDoor) {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0); s.lineTo(ROOM_W, 0); s.lineTo(ROOM_W, ROOM_H); s.lineTo(0, ROOM_H); s.lineTo(0, 0);
+  if (withDoor) {
+    const x0 = (ROOM_W - DOOR_W) / 2;
+    // 문은 바닥까지 뚫려 있어야 하므로 바깥 모양 자체를 문 모양으로 파낸다
+    const s2 = new THREE.Shape();
+    s2.moveTo(0, 0); s2.lineTo(x0, 0); s2.lineTo(x0, DOOR_H); s2.lineTo(x0 + DOOR_W, DOOR_H);
+    s2.lineTo(x0 + DOOR_W, 0); s2.lineTo(ROOM_W, 0); s2.lineTo(ROOM_W, ROOM_H); s2.lineTo(0, ROOM_H); s2.lineTo(0, 0);
+    return new THREE.ShapeGeometry(s2);
+  }
+  return new THREE.ShapeGeometry(s);
+}
+
+function lightCanvas(wMeters, hMeters, ppmMax = 56) {
+  const ppm = Math.min(ppmMax, 4096 / wMeters, 4096 / hMeters);
+  const c = document.createElement('canvas');
+  c.width = Math.max(4, Math.round(wMeters * ppm));
+  c.height = Math.max(4, Math.round(hMeters * ppm));
+  const g = c.getContext('2d');
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, c.width, c.height);
+  return { c, g, ppm };
+}
+
+function lightTex(canvas) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.colorSpace = THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  return t;
+}
+
+// 타원형 빛 웅덩이 하나 (덧칠)
+function glow(g, cx, cy, rx, ry, stops) {
+  g.save();
+  g.translate(cx, cy);
+  g.scale(rx, ry);
+  const grd = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+  for (const [o, v] of stops) grd.addColorStop(o, `rgba(255,255,255,${v})`);
+  g.fillStyle = grd;
+  g.globalCompositeOperation = 'lighter';
+  g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill();
+  g.restore();
+}
+
+// 벽에 떨어지는 스포트라이트 + 판 아래 옅은 그림자를 빛 무늬에 그린다
+// u: 벽 가로 위치(m), y: 높이(m)
+function paintWallSpot(L, u, p) {
+  const { g, ppm, c } = L;
+  const X = u * ppm, Y = c.height - p.y * ppm;
+  const hw = p.w / 2, hh = p.h / 2;
+  // 넓고 옅은 번짐
+  glow(g, X, Y - 0.35 * ppm, (hw + 1.25) * ppm, (hh + 1.55) * ppm,
+    [[0, 0.62], [0.45, 0.42], [0.8, 0.12], [1, 0]]);
+  // 사진 둘레 밝은 원
+  glow(g, X, Y - 0.12 * ppm, (hw + 0.55) * ppm, (hh + 0.6) * ppm,
+    [[0, 0.62], [0.55, 0.55], [0.85, 0.2], [1, 0]]);
+  // 그림자: 판이 벽에서 떠 있어 아래쪽으로 살짝 밀린 부드러운 어둠
+  g.save();
+  g.globalCompositeOperation = 'source-over';
+  g.shadowColor = 'rgba(0,0,0,0.75)';
+  g.shadowBlur = 0.09 * ppm;
+  g.shadowOffsetY = 0.07 * ppm;
+  g.fillStyle = 'rgba(0,0,0,0.75)';
+  g.fillRect(X - hw * ppm, Y - hh * ppm, p.w * ppm, p.h * ppm);
+  g.restore();
+}
+
+export class MuseumScene {
+  constructor(renderer, scene) {
+    this.renderer = renderer;
+    this.scene = scene;
+    this.rooms = [];          // { layout, group, mirror, disposables }
+    this.colliders = [];      // [x1, z1, x2, z2]
+    this.pickables = [];
+    this.textureCache = new Map(); // imageId -> Promise<Texture>
+    this.root = new THREE.Group();
+    this.mirrorRoot = new THREE.Group();
+    this.mirrorRoot.scale.y = -1;   // 바닥 아래로 뒤집힌 세계 = 바닥 반사
+    scene.add(this.mirrorRoot, this.root);
+    this.res = getShared(renderer.capabilities.getMaxAnisotropy());
+  }
+
+  build(museum) {
+    this.clear();
+    const layout = layoutMuseum(museum);
+    this.layout = layout;
+    for (const room of layout) this.buildRoom(room);
+    return layout;
+  }
+
+  clear() {
+    for (const r of this.rooms) {
+      this.root.remove(r.group);
+      this.mirrorRoot.remove(r.mirror);
+      for (const d of r.disposables) d.dispose();
+    }
+    this.rooms = [];
+    this.colliders = [];
+    this.pickables = [];
+  }
+
+  buildRoom(room) {
+    const R = this.res;
+    const { length: Lr, zStart, zEnd } = room;
+    const zMid = (zStart + zEnd) / 2;
+    const group = new THREE.Group();
+    const mirror = new THREE.Group();
+    const disposables = [];
+    const keep = (...xs) => { disposables.push(...xs); return xs[0]; };
+    const both = (mesh, inMirror = true) => {
+      group.add(mesh);
+      if (inMirror) mirror.add(mesh.clone());
+    };
+
+    // ----- 빛 무늬 캔버스 -----
+    const lmL = lightCanvas(Lr, ROOM_H);
+    const lmR = lightCanvas(Lr, ROOM_H);
+    const lmF = lightCanvas(ROOM_W, Lr, 24);
+    for (const p of room.panels) {
+      const s = p.sAlong;
+      if (p.wall === 'L') paintWallSpot(lmL, s, p);         // 왼벽: u = 방 시작부터 거리
+      else paintWallSpot(lmR, Lr - s, p);                   // 오른벽: u 가 반대 방향
+      // 바닥: 벽 밑에 밝게 번진 띠
+      const { g, ppm, c } = lmF;
+      const fx = (p.wall === 'L' ? 0.0 : ROOM_W) * ppm;
+      const fy = c.height - s * ppm;
+      glow(g, fx, fy, 1.9 * ppm, (p.w / 2 + 1.4) * ppm, [[0, 0.62], [0.5, 0.32], [1, 0]]);
+      glow(g, fx, fy, 0.6 * ppm, (p.w / 2 + 0.7) * ppm, [[0, 0.5], [1, 0]]);
+    }
+    const texL = keep(lightTex(lmL.c)), texR = keep(lightTex(lmR.c)), texF = keep(lightTex(lmF.c));
+
+    // ----- 바닥 (반투명: 아래 거울 세계가 은은히 비친다) -----
+    const floorGeo = keep(meterPlane(ROOM_W, Lr));
+    const floorMat = keep(surfaceMaterial({
+      map: R.floor, tile: [3.2, 3.2], tint: 0x6a6866, lightMap: texF, lmSize: [ROOM_W, Lr],
+      ambient: 0.2, lmIntensity: 2.4, lightColor: SPOT_COLOR, reflectAlpha: 0.26,
+    }));
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, zMid);
+    floor.renderOrder = 10;
+    group.add(floor);
+
+    // ----- 천장 -----
+    const ceilGeo = keep(meterPlane(ROOM_W, Lr));
+    const ceil = new THREE.Mesh(ceilGeo, R.ceilingMat);
+    ceil.rotation.x = Math.PI / 2;
+    ceil.position.set(0, ROOM_H, zMid);
+    both(ceil);
+
+    // ----- 옆벽 -----
+    const wallGeo = keep(meterPlane(Lr, ROOM_H));
+    const wallOpts = { map: R.wall, tile: [3.0, 3.0], tint: 0x707274, lmSize: [Lr, ROOM_H], ambient: 0.27, lmIntensity: 3.0, lightColor: SPOT_COLOR };
+    const matL = keep(surfaceMaterial({ ...wallOpts, lightMap: texL }));
+    const matR = keep(surfaceMaterial({ ...wallOpts, lightMap: texR }));
+    const wl = new THREE.Mesh(wallGeo, matL);
+    wl.rotation.y = Math.PI / 2; wl.position.set(-ROOM_W / 2, ROOM_H / 2, zMid);
+    both(wl);
+    const wr = new THREE.Mesh(wallGeo, matR);
+    wr.rotation.y = -Math.PI / 2; wr.position.set(ROOM_W / 2, ROOM_H / 2, zMid);
+    both(wr);
+
+    // ----- 끝벽 (앞/뒤). 문이 있으면 문 주변이 은은히 밝다 -----
+    const endLight = (withDoor) => {
+      const L = lightCanvas(ROOM_W, ROOM_H, 32);
+      const { g, ppm, c } = L;
+      glow(g, ROOM_W / 2 * ppm, c.height - (withDoor ? DOOR_H + 0.2 : 1.9) * ppm, 3.2 * ppm, 2.6 * ppm,
+        [[0, withDoor ? 0.42 : 0.34], [0.6, 0.18], [1, 0]]);
+      return keep(lightTex(c));
+    };
+    const endMat = (withDoor) => keep(surfaceMaterial({
+      map: R.wall, tile: [3.0, 3.0], tint: 0x707274, lightMap: endLight(withDoor), lmSize: [ROOM_W, ROOM_H],
+      ambient: 0.19, lmIntensity: 2.2, lightColor: SPOT_COLOR,
+    }));
+    // 시작 벽 (방 안쪽을 보며 +z 쪽에 있음 → -z 를 향해야 함)
+    const startGeo = keep(endWallGeometry(room.doorIn));
+    const startWall = new THREE.Mesh(startGeo, endMat(room.doorIn));
+    startWall.rotation.y = Math.PI; startWall.position.set(ROOM_W / 2, 0, zStart);
+    both(startWall);
+    // 끝 벽 (+z 를 향함)
+    const endGeo = keep(endWallGeometry(room.doorOut));
+    const endWall = new THREE.Mesh(endGeo, endMat(room.doorOut));
+    endWall.position.set(-ROOM_W / 2, 0, zEnd);
+    both(endWall);
+
+    // ----- 문틀 (벽 두께) + 문턱 바닥 -----
+    if (room.doorOut) {
+      const jambMat = keep(surfaceMaterial({ map: R.wall, tile: [3, 3], tint: 0x6a6662, lightMap: R.black, ambient: 0.2, lmIntensity: 0 }));
+      const jambGeo = keep(meterPlane(WALL_T, DOOR_H));
+      const zc = zEnd - WALL_T / 2;
+      const jl = new THREE.Mesh(jambGeo, jambMat); jl.rotation.y = Math.PI / 2; jl.position.set(-DOOR_W / 2, DOOR_H / 2, zc); both(jl);
+      const jr = new THREE.Mesh(jambGeo, jambMat); jr.rotation.y = -Math.PI / 2; jr.position.set(DOOR_W / 2, DOOR_H / 2, zc); both(jr);
+      const topGeo = keep(meterPlane(DOOR_W, WALL_T));
+      const jt = new THREE.Mesh(topGeo, jambMat); jt.rotation.x = Math.PI / 2; jt.position.set(0, DOOR_H, zc); both(jt);
+      const thGeo = keep(meterPlane(DOOR_W, WALL_T));
+      const thMat = keep(surfaceMaterial({ map: R.floor, tile: [3.2, 3.2], tint: 0x6a6866, lightMap: R.black, ambient: 0.2, lmIntensity: 0 }));
+      const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(0, 0.0005, zc); group.add(th);
+    }
+
+    // ----- 조명 레일 -----
+    const railGeo = keep(new THREE.BoxGeometry(0.035, 0.035, Lr - 0.6));
+    for (const sx of [-1, 1]) {
+      const rail = new THREE.Mesh(railGeo, R.fixtureMat);
+      rail.position.set(sx * (ROOM_W / 2 - TRACK_INSET), ROOM_H - 0.03, zMid);
+      group.add(rail);
+    }
+
+    // ----- 사진 판 -----
+    for (const p of room.panels) this.buildPanel(room, p, group, mirror, keep);
+
+    // ----- 충돌 벽 (x,z 선분) -----
+    const hw = ROOM_W / 2, hd = DOOR_W / 2;
+    const C = this.colliders;
+    C.push([-hw, zStart, -hw, zEnd - (room.doorOut ? WALL_T : 0)]);
+    C.push([hw, zStart, hw, zEnd - (room.doorOut ? WALL_T : 0)]);
+    if (!room.doorIn) C.push([-hw, zStart, hw, zStart]);
+    if (room.doorOut) {
+      const z2 = zEnd - WALL_T;
+      C.push([-hw, zEnd, -hd, zEnd], [hd, zEnd, hw, zEnd], [-hw, z2, -hd, z2], [hd, z2, hw, z2]);
+      C.push([-hd, zEnd, -hd, z2], [hd, zEnd, hd, z2]);
+    } else {
+      C.push([-hw, zEnd, hw, zEnd]);
+    }
+
+    this.root.add(group);
+    this.mirrorRoot.add(mirror);
+    this.rooms.push({ layout: room, group, mirror, disposables });
+  }
+
+  buildPanel(room, p, group, mirror, keep) {
+    const R = this.res;
+    const geo = keep(new THREE.BoxGeometry(p.w, p.h, PANEL_D));
+    const empty = !p.photo.imageId;
+    const front = keep(photoMaterial(R.plaster, { tile: [p.w / 1.3, p.h / 1.3], intensity: 1.0, aspect: p.w / p.h }));
+    // BoxGeometry 면 순서: +x, -x, +y, -y, +z(앞), -z(뒤)
+    const mats = [R.edgeSide, R.edgeSide, R.edgeTop, R.edgeBottom, front, R.edgeBottom];
+    const mesh = new THREE.Mesh(geo, mats);
+    mesh.position.set(p.x, p.y, p.z);
+    mesh.rotation.y = p.rotY;
+    mesh.userData = { roomIndex: room.index, photoIndex: p.index, photoId: p.photo.id, panel: p, empty };
+    group.add(mesh);
+    const mm = new THREE.Mesh(geo, mats);
+    mm.position.copy(mesh.position); mm.rotation.copy(mesh.rotation);
+    mirror.add(mm);
+    this.pickables.push(mesh);
+
+    if (!empty) {
+      this.loadTexture(p.photo.imageId).then(tex => {
+        if (!tex) return;
+        front.uniforms.map.value = tex;
+        front.uniforms.tile.value.set(1, 1);
+        front.uniforms.intensity.value = 0.95;
+      });
+    }
+
+    // 천장 조명 하나: 사진을 향해 기울어진 검은 통
+    const sx = p.wall === 'L' ? -1 : 1;
+    const fx = sx * (ROOM_W / 2 - TRACK_INSET);
+    const fy = 4.2 - 0.2;
+    const fixture = new THREE.Group();
+    const body = new THREE.Mesh(R.fixtureGeo, R.fixtureMat);
+    const stem = new THREE.Mesh(R.stemGeo, R.fixtureMat);
+    stem.position.set(fx, fy + 0.12, p.z);
+    fixture.add(stem);
+    body.position.set(fx, fy, p.z);
+    // 통의 아래(-y) 방향이 사진 중심을 보도록
+    const dir = new THREE.Vector3(p.x - fx, p.y - fy, 0).normalize();
+    body.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
+    fixture.add(body);
+    group.add(fixture);
+  }
+
+  loadTexture(imageId) {
+    if (this.textureCache.has(imageId)) return this.textureCache.get(imageId);
+    const pr = getImage(imageId).then(blob => {
+      if (!blob) return null;
+      const url = URL.createObjectURL(blob);
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          const t = new THREE.Texture(img);
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+          t.minFilter = THREE.LinearMipmapLinearFilter;
+          t.needsUpdate = true;
+          URL.revokeObjectURL(url);
+          resolve(t);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+      });
+    }).catch(() => null);
+    this.textureCache.set(imageId, pr);
+    return pr;
+  }
+
+  forgetTexture(imageId) {
+    const pr = this.textureCache.get(imageId);
+    if (pr) pr.then(t => t && t.dispose());
+    this.textureCache.delete(imageId);
+  }
+
+  // 지금 방 ±1 만 그린다 (휴대폰 부담 줄이기)
+  setActiveRoom(i) {
+    for (const r of this.rooms) {
+      const v = Math.abs(r.layout.index - i) <= 1;
+      r.group.visible = v;
+      r.mirror.visible = v;
+    }
+  }
+
+  roomIndexAt(z) {
+    const L = this.layout;
+    for (let i = 0; i < L.length; i++) {
+      if (z <= L[i].zStart + 0.01 && z >= L[i].zEnd - WALL_T / 2) return i;
+    }
+    return z > 0 ? 0 : L.length - 1;
+  }
+}

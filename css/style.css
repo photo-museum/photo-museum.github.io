@@ -1,0 +1,70 @@
+:root {
+  --ink: #e9e3d8;
+  --dim: rgba(233, 227, 216, 0.55);
+  --bg: #050505;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+#app, #app canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#app canvas:active { cursor: grabbing; }
+
+/* 화면 가장자리를 살짝 어둡게: 어두운 전시실 느낌 */
+.vignette {
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 48%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.45) 100%);
+}
+
+#hud {
+  position: fixed; top: max(14px, env(safe-area-inset-top)); left: 16px; right: 16px;
+  display: flex; justify-content: space-between; align-items: center; pointer-events: none;
+  font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
+}
+#hud .brand { letter-spacing: 0.18em; text-transform: none; }
+
+#hint {
+  position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  width: min(560px, calc(100% - 32px)); margin: 0; text-align: center;
+  font-size: 13px; line-height: 1.7; color: var(--dim); pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+#hint b { color: var(--ink); font-weight: 500; }
+#hint.hide { opacity: 0; }
+@media (pointer: coarse) { #hint { bottom: calc(190px + env(safe-area-inset-bottom)); } }
+
+#joy {
+  display: none; position: fixed; left: max(10px, env(safe-area-inset-left));
+  bottom: calc(10px + env(safe-area-inset-bottom)); width: 170px; height: 170px; touch-action: none;
+}
+
+#toast {
+  position: fixed; top: 52px; left: 50%; transform: translate(-50%, -6px);
+  padding: 8px 14px; border-radius: 999px; background: rgba(20,19,17,0.85);
+  font-size: 13px; color: var(--ink); opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+#sheet {
+  position: fixed; left: 50%; bottom: 0; transform: translate(-50%, 110%);
+  width: min(420px, 100%); padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+  background: rgba(16,15,14,0.94); border-radius: 16px 16px 0 0;
+  display: flex; flex-direction: column; gap: 4px; transition: transform .28s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+#sheet.open { transform: translate(-50%, 0); }
+#sheet button {
+  appearance: none; border: 0; background: transparent; color: var(--ink);
+  font: inherit; font-size: 15px; padding: 14px 8px; border-radius: 10px; text-align: left; cursor: pointer;
+}
+#sheet button:hover { background: rgba(255,255,255,0.05); }
+#sheet button.quiet { color: var(--dim); }
+
+#loading {
+  position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg);
+  font-size: 13px; letter-spacing: 0.08em; color: var(--dim); transition: opacity 1.1s ease;
+}
+#loading.done { opacity: 0; pointer-events: none; }
