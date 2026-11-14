@@ -592,6 +592,7 @@ function updateNav() {
 }
 function goStop(s) {
   if (!s) return;
+  controls.joy.x = controls.joy.y = 0; // 조이스틱이 같이 움직이지 않게
   controls.walkPath(route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z), s.spot.yaw);
   controls.pitchT = -0.02;
   navPrev.classList.remove('show'); navNext.classList.remove('show');
@@ -1029,6 +1030,26 @@ function exhibitionStats(ex) {
 // 홈: 아코디언 (시안 F10). 전시실마다 세로 띠, 고른 하나가 넓게 펼쳐진다.
 // 접힌 띠를 누르면 펼쳐지고, 펼쳐진 띠를 누르면 들어간다.
 let homeSel = null; // 펼쳐 둔 전시실 id
+// 배경: 펼친 전시실 표지를 흐리게 깔고 두 겹을 번갈아 바꿔 스르륵 넘어가게
+let hbgFront = 'a';
+const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
+function setHomeBg(css) {
+  const back = hbgFront === 'a' ? 'b' : 'a';
+  const el = $(`#home .hbg .${back}`), old = $(`#home .hbg .${hbgFront}`);
+  el.style.background = css;
+  el.style.backgroundSize = 'cover'; el.style.backgroundPosition = 'center';
+  el.classList.add('on'); old.classList.remove('on');
+  hbgFront = back;
+}
+function homeBgFor(ex) {
+  const st = exhibitionStats(ex);
+  if (st.cover) thumbURL(st.cover, 1400).then(u => { if (u && homeSel === ex.id) setHomeBg(`url("${u}")`); });
+  else {
+    // 사진이 없으면 밝은 파스텔에 첫 방 색을 살짝
+    const T = themeOf(ex.rooms[0]);
+    setHomeBg(`radial-gradient(ellipse 70% 80% at 85% 20%, ${hexA(T.mapWall, 0.55)}, rgba(0,0,0,0) 70%), linear-gradient(135deg, #ffd9c7, #f7cfe3 35%, #d8d3f7 65%, #c9e3f7)`);
+  }
+}
 function renderHome() {
   const list = $('#home .list');
   list.innerHTML = '';
@@ -1036,6 +1057,8 @@ function renderHome() {
   if (!exs.some(ex => ex.id === homeSel)) homeSel = (exs.find(ex => ex.id === library.lastId) || exs[0] || {}).id || null;
   const select = (pn, id) => {
     homeSel = id;
+    const ex = exs.find(x => x.id === id);
+    if (ex) homeBgFor(ex);
     for (const x of list.children) x.classList.toggle('on', x === pn);
     // 펼친 띠가 보이게
     const left = pn.offsetLeft - 20, right = pn.offsetLeft + 340 - list.clientWidth;
@@ -1055,8 +1078,9 @@ function renderHome() {
     if (st.cover) thumbURL(st.cover, 1400).then(u => { if (u) pn.style.backgroundImage = `url("${u}")`; });
     else {
       // 사진이 없으면 첫 방 색으로
+      // 사진이 없으면 첫 방 색을 입힌 유리 띠
       const T = themeOf(ex.rooms[0]);
-      pn.style.background = `linear-gradient(160deg, ${T.mapWall}, ${T.mapFloor})`;
+      pn.style.background = `linear-gradient(160deg, ${hexA(T.mapWall, 0.7)}, ${hexA(T.mapFloor, 0.5)})`;
       pn.classList.add('empty');
     }
     pn.addEventListener('click', e => {
@@ -1075,6 +1099,9 @@ function renderHome() {
     });
     list.appendChild(pn);
   }
+  const cur = exs.find(x => x.id === homeSel);
+  if (cur) homeBgFor(cur);
+  else setHomeBg('linear-gradient(135deg, #ffd9c7, #f7cfe3 35%, #d8d3f7 65%, #c9e3f7)');
   const add = document.createElement('div');
   add.className = 'pn add';
   add.innerHTML = '<span class="plus">+</span><span class="lb">새 전시실</span>';
