@@ -1,7 +1,7 @@
 // 지도: 오른쪽 위 작은 지도 + 누르면 열리는 큰 평면도.
 // 평면도 방향: 방이 이어지는 쪽(-Z)이 오른쪽, 왼쪽 벽(x<0)이 위쪽. (앞을 보고 걸으면 오른쪽으로 간다)
 // 큰 지도에서 방을 누르면 그 방으로 이동, '편집'을 누르면 방을 끌어서 순서를 바꾼다.
-import { ROOM_W, DOOR_W } from './layout.js';
+import { ROOM_W, DOOR_W, INTRO_S, INTRO_W } from './layout.js';
 import { getImage } from './store.js';
 
 const COLORS = {
@@ -24,14 +24,26 @@ function drawRoom(g, r, s, ox, oy, { current = false } = {}) {
   g.beginPath();
   g.moveTo(x0, y0); g.lineTo(x1, y0);
   g.moveTo(x0, y1); g.lineTo(x1, y1);
-  const end = (x, door) => {
+  const end = (x, door, dx = 0) => {
     if (door) {
-      const d = DOOR_W / 2 * s;
-      g.moveTo(x, y0); g.lineTo(x, oy - d);
-      g.moveTo(x, oy + d); g.lineTo(x, y1);
+      const d = DOOR_W / 2 * s, c = oy + dx * s;
+      g.moveTo(x, y0); g.lineTo(x, c - d);
+      g.moveTo(x, c + d); g.lineTo(x, y1);
     } else { g.moveTo(x, y0); g.lineTo(x, y1); }
   };
-  end(x0, r.doorIn); end(x1, r.doorOut);
+  end(x0, r.doorIn, r.doorInX); end(x1, r.doorOut, r.doorOutX);
+  g.stroke();
+  // 안내벽 / 로비 소개 글
+  g.lineWidth = Math.max(1.5, s * 0.16);
+  g.strokeStyle = r.theme === 'white' ? 'rgba(90,80,68,0.7)' : 'rgba(255,217,160,0.55)';
+  g.beginPath();
+  if (r.lobby) {
+    const xe = x1 - g.lineWidth;
+    g.moveTo(xe, oy - 3.2 * s); g.lineTo(xe, oy + 0.7 * s);
+  } else if (r.introX !== undefined) {
+    const xi = ox - (r.zStart - INTRO_S) * s;
+    g.moveTo(xi, oy + (r.introX - INTRO_W / 2) * s); g.lineTo(xi, oy + (r.introX + INTRO_W / 2) * s);
+  }
   g.stroke();
 
   // 사진 판: 걸린 사진은 따뜻한 빛, 빈 판은 흐리게
@@ -81,7 +93,7 @@ function fitCanvas(c, w, h) {
 
 // 지도에 쓸 작은 사진 (돌린 방향 그대로). imageId+rot 별로 기억.
 const thumbs = new Map();
-function thumbURL(photo) {
+export function thumbURL(photo) {
   const key = photo.imageId + '|' + (photo.rot || 0);
   if (!thumbs.has(key)) thumbs.set(key, makeThumb(photo.imageId, photo.rot || 0).catch(() => null));
   return thumbs.get(key);
@@ -150,14 +162,14 @@ export class MuseumMap {
     const key = `${c.pos.x.toFixed(2)},${c.pos.z.toFixed(2)},${c.yaw.toFixed(3)},${this._ver || 0}`;
     if (key === this._last) return;
     this._last = key;
-    const W = 150, H = 92, s = 6.2;
+    const W = 104, H = 56, s = 4.2;
     const g = fitCanvas(this.miniCanvas, W, H);
     const ox = W / 2 + c.pos.z * s, oy = H / 2;
-    for (const r of layout) {
+    for (const r of [layout.lobby, ...layout]) {
       if (ox - r.zStart * s > W || ox - r.zEnd * s < 0) continue;
       drawRoom(g, r, s, ox, oy);
     }
-    drawPlayer(g, W / 2, oy + c.pos.x * s, c.yaw, 6);
+    drawPlayer(g, W / 2, oy + c.pos.x * s, c.yaw, 4.5);
   }
   invalidate() { this._ver = (this._ver || 0) + 1; }
 
@@ -204,7 +216,7 @@ export class MuseumMap {
     const rh = this.row.clientHeight || 260;
     const pad = 8;
     const maxLen = Math.max(...layout.map(r => r.length));
-    const sH = (rh - 92 - pad * 2) / ROOM_W;
+    const sH = (rh - 112 - pad * 2) / ROOM_W;
     const sW = (rw - 60 - pad * 2) / maxLen;
     const s = Math.max(9, Math.min(36, sH, sW));
     const wallPx = Math.max(1.5, s * 0.14);
@@ -242,10 +254,15 @@ export class MuseumMap {
       const hung = room.photos.filter(p => p.imageId).length;
       const cap = document.createElement('div');
       cap.className = 'cap';
-      cap.innerHTML = `<b>${label(i)}</b><span>${r.theme === 'white' ? '하얀 방' : '어두운 방'} · 사진 ${hung}${i === here ? ' · 지금 여기' : ''}</span>`;
+      const nm = document.createElement('i');
+      nm.textContent = room.name || '이름 없음';
+      if (!room.name) nm.className = 'none';
+      cap.innerHTML = `<b>${label(i)}</b>`;
+      cap.firstChild.after(nm);
+      cap.insertAdjacentHTML('beforeend', `<span>${r.theme === 'white' ? '하얀 방' : '어두운 방'} · 사진 ${hung}${i === here ? ' · 지금 여기' : ''}</span>`);
       const acts = document.createElement('div');
       acts.className = 'acts';
-      acts.innerHTML = `<button data-act="fill">+ 사진 넣기</button>`
+      acts.innerHTML = `<button data-act="rename">이름·설명</button><button data-act="fill">+ 사진 넣기</button>`
         + `<button data-act="clear" class="quiet"${hung ? '' : ' disabled'}>모두 내리기</button>`
         + `<button data-act="delete" class="quiet"${layout.length > 1 ? '' : ' disabled'}>방 지우기</button>`;
       card.append(plan, cap, acts);

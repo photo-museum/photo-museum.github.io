@@ -9,13 +9,14 @@
 
 | 파일 | 하는 일 |
 | --- | --- |
-| `js/store.js` | 전시 데이터(방 목록 → 사진 목록)와 IndexedDB 저장 |
+| `js/store.js` | 전시 데이터(전시실 → 방 → 사진)와 IndexedDB 저장 |
 | `js/layout.js` | 데이터 → 방 길이·사진 위치 계산 (순수 함수) |
 | `js/builder.js` | 배치 → three.js 장면, 빛 무늬, 충돌 벽 |
 | `js/materials.js` | 빛 무늬를 곱하는 가벼운 셰이더 |
 | `js/textures.js` | 콘크리트·나무 살·석고 무늬 (캔버스로 생성) |
 | `js/controls.js` | 걷기, 시선, 충돌 |
-| `js/map.js` | 작은 지도, 큰 평면도, 방 이동과 순서 바꾸기 |
+| `js/map.js` | 작은 지도, 큰 평면도, 방 이동·순서, 사진 자리 바꾸기 |
+| `js/fonts.js` | 벽 글씨·제목 글씨체 (바꿀 때 index.html 링크와 함께) |
 | `js/main.js` | 시작, 화면 조작, 사진 넣기 |
 | `vendor/` | three.js 0.170.0, nipplejs 0.10.2 |
 

@@ -6,6 +6,10 @@
   <meta name="theme-color" content="#050505">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>photo-museum</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- 글씨체: js/fonts.js 와 같이 바꾼다 -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap">
   <link rel="stylesheet" href="css/style.css">
   <script type="importmap">
     { "imports": { "three": "./vendor/three.module.min.js" } }
@@ -17,8 +21,9 @@
   <div class="vignette"></div>
 
   <header id="hud">
-    <span class="brand">photo-museum</span>
-    <span id="room">ROOM 01</span>
+    <button id="home-btn" aria-label="홈으로">‹ 홈</button>
+    <span id="ex-title"></span>
+    <span id="room">입구</span>
   </header>
 
   <button id="minimap" aria-label="전시장 지도 열기"><canvas></canvas></button>
@@ -43,6 +48,15 @@
   </div>
 
   <div id="sheet" role="dialog" aria-label="메뉴"></div>
+  <section id="home" aria-label="전시실 고르기">
+    <header>
+      <span class="eyebrow">photo-museum</span>
+      <h1>나의 전시실</h1>
+      <p>들어갈 전시실을 고르거나, 새 전시실을 만들어요.</p>
+    </header>
+    <div class="list"></div>
+  </section>
+
   <div id="loading">전시장을 준비하고 있어요</div>
   </div>
 
@@ -52,8 +66,11 @@
 
   <div id="editor" role="dialog" aria-label="설명 쓰기">
     <div class="box">
-      <label for="caption">사진 설명</label>
-      <textarea id="caption" maxlength="300" rows="5" placeholder="첫 줄은 제목처럼 보여요&#10;예) 제주, 겨울 바다&#10;2025. 1. 아침 7시"></textarea>
+      <p class="head" id="ed-head">사진 설명</p>
+      <label for="ed-title" id="ed-title-label" class="t">이름</label>
+      <input id="ed-title" class="t" maxlength="60" autocomplete="off">
+      <label for="caption" id="ed-body-label">사진 설명</label>
+      <textarea id="caption" maxlength="600" rows="5"></textarea>
       <div class="row">
         <button id="editor-cancel" class="quiet">취소</button>
         <button id="editor-save">저장</button>

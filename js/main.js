@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { MuseumScene, THEMES } from './builder.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot } from './layout.js';
-import { MuseumMap } from './map.js';
+import { MuseumMap, thumbURL } from './map.js';
+import { loadFonts } from './fonts.js';
 import {
-  loadMuseum, saveMuseum, putImage, deleteImage, prepareImage, requestPersistence, uid,
-  newPhoto, newRoom, EMPTY_ASPECT,
+  loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid,
+  newPhoto, newRoom, newExhibition, EMPTY_ASPECT,
 } from './store.js';
 
 const $ = s => document.querySelector(s);
@@ -91,22 +92,23 @@ function makeJoystick() {
 }
 
 // ---------- 데이터 ----------
-let museum = null;
-let currentRoom = -1;
+let library = null;   // 전시실 목록
+let museum = null;    // 지금 들어와 있는 전시실 (rooms 를 가진다)
+let currentRoom = -2;
 
 // 다시 짓기. 앞쪽 방 길이가 바뀌거나 방 순서가 바뀌어도, 서 있던 방의 같은 자리에 그대로 있게 한다.
 // 서 있던 방이 사라졌으면 fallbackRi 방 입구로.
-function rebuild(fallbackRi = 0) {
-  const old = museumScene.layout;
+// fresh: 다른 전시실로 들어올 때 (자리 맞추기 없음)
+function rebuild(fallbackRi = 0, fresh = false) {
+  const old = fresh ? null : museumScene.layout;
   let hereId = null, local = 0;
   if (old && old.length) {
-    const ri = Math.max(0, museumScene.roomIndexAt(controls.pos.z));
-    hereId = old[ri]?.id;
-    local = controls.pos.z - old[ri].zStart;
+    const ri = museumScene.roomIndexAt(controls.pos.z);
+    if (ri >= 0) { hereId = old[ri]?.id; local = controls.pos.z - old[ri].zStart; }
   }
   const layout = museumScene.build(museum);
   controls.colliders = museumScene.colliders;
-  currentRoom = -1;
+  currentRoom = -2;
   if (hereId) {
     const ni = layout.findIndex(r => r.id === hereId);
     if (ni >= 0) {
@@ -125,14 +127,15 @@ function rebuild(fallbackRi = 0) {
   return layout;
 }
 
-function persist() { return saveMuseum(museum); }
+function persist() { return saveLibrary(library); }
 
-// 마지막 위치 기억 (이 브라우저에서만, 편의용)
+// 전시실마다 마지막 위치 기억 (이 브라우저에서만, 편의용)
 function savePose() {
-  try { localStorage.setItem('pm-pose', JSON.stringify({ x: controls.pos.x, z: controls.pos.z, yaw: controls.yawT })); } catch (e) {}
+  if (!museum || homeOpen) return;
+  try { localStorage.setItem('pm-pose-' + museum.id, JSON.stringify({ x: controls.pos.x, z: controls.pos.z, yaw: controls.yawT })); } catch (e) {}
 }
-function loadPose() {
-  try { return JSON.parse(localStorage.getItem('pm-pose')); } catch (e) { return null; }
+function loadPose(id) {
+  try { return JSON.parse(localStorage.getItem('pm-pose-' + id)); } catch (e) { return null; }
 }
 
 // ---------- 사진 넣기 (여러 장) ----------
@@ -219,35 +222,82 @@ function removePanel(t) {
   toast('판을 뗐어요');
 }
 
-// ---------- 설명 쓰기 ----------
+// ---------- 글 쓰기 창 (사진 설명, 방 이름·설명, 전시실 이름·설명) ----------
 // 휴대폰 키보드 때문에 편집 창은 돌린 화면 밖에 둔다 (세로로 들고 쓰면 된다)
 const editor = $('#editor');
-const editorText = $('#editor textarea');
-let editTarget = null;
-function openEditor(t) {
-  const photo = museum.rooms[t.roomIndex]?.photos.find(p => p.id === t.photoId);
-  if (!photo) return;
-  editTarget = t;
-  editorText.value = photo.caption || '';
+const editorText = $('#caption');
+const editorTitle = $('#ed-title');
+let editJob = null;
+// job: { head, title?: { label, value, placeholder }, body: { label, value, placeholder }, onSave(title, body) }
+function openText(job) {
+  editJob = job;
+  $('#ed-head').textContent = job.head;
+  const hasTitle = !!job.title;
+  editor.classList.toggle('with-title', hasTitle);
+  if (hasTitle) {
+    $('#ed-title-label').textContent = job.title.label;
+    editorTitle.value = job.title.value || '';
+    editorTitle.placeholder = job.title.placeholder || '';
+  }
+  $('#ed-body-label').textContent = job.body.label;
+  editorText.value = job.body.value || '';
+  editorText.placeholder = job.body.placeholder || '';
   editor.classList.add('open');
   controls.enabled = false;
-  setTimeout(() => editorText.focus(), 50);
+  setTimeout(() => (hasTitle ? editorTitle : editorText).focus(), 50);
 }
 function closeEditor(save) {
-  if (save && editTarget) {
-    const photo = museum.rooms[editTarget.roomIndex]?.photos.find(p => p.id === editTarget.photoId);
-    if (photo) {
-      const v = editorText.value.replace(/\s+$/, '');
+  const job = editJob;
+  editJob = null;
+  editor.classList.remove('open');
+  editorText.blur(); editorTitle.blur();
+  controls.enabled = !map.isOpen && !homeOpen;
+  if (save && job) job.onSave(editorTitle.value.trim(), editorText.value.replace(/\s+$/, ''));
+}
+function openEditor(t) {
+  const photo = findPhoto(t.photoId)?.room.photos.find(p => p.id === t.photoId);
+  if (!photo) return;
+  openText({
+    head: '사진 설명',
+    body: { label: '사진 옆 벽에 적혀요', value: photo.caption, placeholder: '첫 줄은 제목처럼 보여요\n예) 제주, 겨울 바다\n2025. 1. 아침 7시' },
+    onSave: (_, v) => {
       if (v) photo.caption = v; else delete photo.caption;
       persist();
       rebuild();
       toast(v ? '설명을 붙였어요' : '설명을 지웠어요');
-    }
-  }
-  editTarget = null;
-  editor.classList.remove('open');
-  editorText.blur();
-  controls.enabled = true;
+    },
+  });
+}
+function editRoomText(ri) {
+  const room = museum.rooms[ri];
+  if (!room) return;
+  openText({
+    head: `ROOM ${String(ri + 1).padStart(2, '0')} 안내벽`,
+    title: { label: '방 이름', value: room.name, placeholder: '예) 바다, 아침 7시' },
+    body: { label: '방 설명 (문 들어서 정면 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
+    onSave: (name, intro) => {
+      if (name) room.name = name; else delete room.name;
+      if (intro) room.intro = intro; else delete room.intro;
+      persist();
+      rebuild();
+      toast('안내벽을 고쳤어요');
+    },
+  });
+}
+function editExhibitionText(ex, after) {
+  openText({
+    head: '전시실',
+    title: { label: '전시 이름', value: ex.title, placeholder: '예) 제주, 겨울의 빛' },
+    body: { label: '전시 설명 (입구 정면 벽에 적혀요)', value: ex.intro, placeholder: '이 전시가 무엇을 담고 있는지 적어 주세요' },
+    onSave: (title, intro) => {
+      ex.title = title || '이름 없는 전시';
+      ex.intro = intro;
+      persist();
+      if (ex === museum && !homeOpen) { rebuild(); $('#ex-title').textContent = ex.title; }
+      if (homeOpen) renderHome();
+      if (after) after();
+    },
+  });
 }
 $('#editor-save').addEventListener('click', () => closeEditor(true));
 $('#editor-cancel').addEventListener('click', () => closeEditor(false));
@@ -343,6 +393,7 @@ function roomAction(act, ri) {
   const name = `ROOM ${String(ri + 1).padStart(2, '0')}`;
   const hung = room.photos.filter(p => p.imageId).length;
   if (act === 'fill') pickPhotos({ roomIndex: ri });
+  if (act === 'rename') editRoomText(ri);
   if (act === 'clear') {
     openSheet([
       { title: true, label: `${name}의 사진 ${hung}장을 모두 내릴까요? 빈 판 4개만 남아요` },
@@ -396,8 +447,11 @@ controls.onTap = (sx, sy) => {
   raycaster.far = 30;
   const hits = raycaster.intersectObject(museumScene.root, true).filter(h => visibleChain(h.object));
   const hit = hits[0];
-  if (!hit || !hit.object.userData.photoId) return;
+  if (!hit) return;
   const ud = hit.object.userData;
+  if (ud.wallText === 'room') { editRoomText(ud.roomIndex); return; }
+  if (ud.wallText === 'exhibition') { editExhibitionText(museum); return; }
+  if (!ud.photoId) return;
   const t = { roomIndex: ud.roomIndex, photoId: ud.photoId, panel: ud.panel };
   if (ud.label) { openEditor(t); return; }
   openPanelSheet(t);
@@ -529,13 +583,9 @@ function hideHint() {
 // ---------- 시작 ----------
 async function start() {
   requestPersistence();
-  museum = await loadMuseum();
+  [library] = await Promise.all([loadLibrary(), loadFonts()]);
   persist();
-  const layout = rebuild();
-  const pose = loadPose();
-  const last = layout[layout.length - 1];
-  if (pose && pose.z <= 0.5 && pose.z >= last.zEnd && Math.abs(pose.x) < 3.4) controls.setPose(pose.x, pose.z, pose.yaw);
-  else controls.setPose(0, -1.4, 0);
+  openHome();
   $('#loading').classList.add('done');
   setTimeout(() => $('#loading').remove(), 1200);
   setInterval(savePose, 2000);
@@ -543,17 +593,115 @@ async function start() {
   requestAnimationFrame(loop);
 }
 
+// ---------- 홈: 전시실 고르기 ----------
+let homeOpen = false;
+const home = $('#home');
+
+function openHome() {
+  savePose();
+  if (map.isOpen) map.close();
+  closeSheet();
+  homeOpen = true;
+  controls.enabled = false;
+  controls.joy.x = controls.joy.y = 0;
+  controls.keys.clear();
+  document.body.classList.add('home-open');
+  renderHome();
+}
+
+function enterExhibition(ex) {
+  museum = ex;
+  homeOpen = false;
+  document.body.classList.remove('home-open');
+  controls.enabled = true;
+  controls.auto = null;
+  const layout = rebuild(0, true);
+  const pose = loadPose(ex.id);
+  const last = layout[layout.length - 1];
+  if (pose && pose.z <= 0 && pose.z >= last.zEnd && Math.abs(pose.x) < 3.4) controls.setPose(pose.x, pose.z, pose.yaw);
+  else { controls.setPose(0, -1.0, 0); controls.pitchT = controls.pitch = 0.04; }
+  $('#ex-title').textContent = ex.title;
+}
+
+function exhibitionStats(ex) {
+  const photos = ex.rooms.flatMap(r => r.photos).filter(p => p.imageId);
+  return { rooms: ex.rooms.length, photos: photos.length, cover: photos[0] };
+}
+
+function renderHome() {
+  const list = $('#home .list');
+  list.innerHTML = '';
+  for (const ex of library.exhibitions) {
+    const st = exhibitionStats(ex);
+    const card = document.createElement('div');
+    card.className = 'excard';
+    card.innerHTML = `<div class="cover"></div><div class="info"><b></b><p></p><span>방 ${st.rooms} · 사진 ${st.photos}</span></div><button class="more" aria-label="전시실 메뉴">⋯</button>`;
+    card.querySelector('b').textContent = ex.title || '이름 없는 전시';
+    card.querySelector('p').textContent = (ex.intro || '').split('\n')[0] || '설명이 아직 없어요';
+    const cover = card.querySelector('.cover');
+    if (st.cover) thumbURL(st.cover).then(u => { if (u) cover.style.backgroundImage = `url("${u}")`; });
+    else cover.classList.add('empty');
+    card.addEventListener('click', e => {
+      if (e.target.closest('.more')) {
+        openSheet([
+          { title: true, label: ex.title },
+          { label: '들어가기', fn: () => enterExhibition(ex) },
+          { label: '이름·설명 고치기', fn: () => editExhibitionText(ex) },
+          { label: '전시실 지우기', danger: true, fn: () => confirmDeleteExhibition(ex) },
+          { label: '닫기', quiet: true },
+        ]);
+        return;
+      }
+      enterExhibition(ex);
+    });
+    list.appendChild(card);
+  }
+  const add = document.createElement('button');
+  add.className = 'excard add';
+  add.innerHTML = '<span class="plus">+</span><b>새 전시실</b><span>이름을 정하고 바로 들어가요</span>';
+  add.addEventListener('click', () => {
+    const ex = newExhibition('');
+    editExhibitionText(ex, () => {
+      library.exhibitions.push(ex);
+      persist();
+      enterExhibition(ex);
+    });
+  });
+  list.appendChild(add);
+}
+
+function confirmDeleteExhibition(ex) {
+  const st = exhibitionStats(ex);
+  openSheet([
+    { title: true, label: `'${ex.title}' 전시실을 지울까요? 방 ${st.rooms}개와 사진 ${st.photos}장이 모두 지워져요` },
+    { label: '전시실 지우기', danger: true, fn: () => {
+      for (const r of ex.rooms) forgetPhotos(r.photos);
+      library.exhibitions = library.exhibitions.filter(x => x !== ex);
+      if (museum === ex) museum = null;
+      try { localStorage.removeItem('pm-pose-' + ex.id); } catch (e) {}
+      persist();
+      renderHome();
+      toast('전시실을 지웠어요');
+    } },
+    { label: '취소', quiet: true },
+  ]);
+}
+
+$('#home-btn').addEventListener('click', () => openHome());
+
 let lastT = performance.now();
 function loop(t) {
   const dt = (t - lastT) / 1000;
   lastT = t;
+  if (homeOpen || !museum) { requestAnimationFrame(loop); return; } // 홈에서는 그리지 않는다
   controls.update(dt);
   if (Math.hypot(controls.vel.x, controls.vel.z) > 0.2) hideHint();
   const ri = museumScene.roomIndexAt(controls.pos.z);
   if (ri !== currentRoom) {
     currentRoom = ri;
     museumScene.setActiveRoom(ri);
-    $('#room').textContent = `ROOM ${String(ri + 1).padStart(2, '0')}`;
+    const nm = museum.rooms[ri]?.name;
+    $('#room').textContent = ri < 0 ? '입구' : `ROOM ${String(ri + 1).padStart(2, '0')}${nm ? ' · ' + nm : ''}`;
     document.body.classList.toggle('light-room', (museum.rooms[ri]?.theme) === 'white');
   }
   map.update();
@@ -568,4 +716,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom };
+window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };

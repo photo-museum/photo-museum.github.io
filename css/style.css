@@ -1,4 +1,6 @@
 :root {
+  --display: "Gowun Batang", "Apple SD Gothic Neo", serif;
+  --latin: "Cormorant Garamond", "Gowun Batang", serif;
   --ink: #e9e3d8;
   --dim: rgba(233, 227, 216, 0.55);
   --bg: #050505;
@@ -26,7 +28,17 @@ html, body {
   display: flex; justify-content: space-between; align-items: center; pointer-events: none;
   font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
 }
-#hud .brand { letter-spacing: 0.18em; text-transform: none; }
+#hud #ex-title {
+  flex: 1; min-width: 0; margin-left: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--display); font-size: 13px; letter-spacing: 0.04em; text-transform: none;
+}
+#hud #room { text-transform: none; letter-spacing: 0.16em; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#home-btn {
+  pointer-events: auto; appearance: none; border: 1px solid rgba(233,227,216,0.18); background: rgba(14,13,12,0.5);
+  color: var(--ink); font: inherit; font-size: 12px; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+body.light-room #home-btn { color: #2a2826; border-color: rgba(40,38,35,0.25); background: rgba(255,255,255,0.35); }
 
 #hint {
   position: absolute; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -84,8 +96,8 @@ body.light-room #hint b { color: #222; }
 #sheet button.quiet { color: var(--dim); }
 #sheet button.danger { color: #ff9b8a; }
 #sheet .title { margin: 6px 8px 4px; font-size: 13px; line-height: 1.5; color: var(--dim); }
-#sheet { z-index: 12; }
-#toast { z-index: 15; }
+#sheet { z-index: 45; }
+#toast { z-index: 50; }
 
 #loading {
   position: absolute; inset: 0; display: grid; place-items: center; background: var(--bg);
@@ -108,6 +120,15 @@ body.light-room .vignette { opacity: 0.3; }
   border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
 }
 #editor label { font-size: 12px; letter-spacing: 0.08em; color: var(--dim); }
+#editor .head { margin: 0 0 2px; font-family: var(--display); font-size: 17px; }
+#editor .t { display: none; }
+#editor.with-title .t { display: block; }
+#editor input {
+  width: 100%; background: #0c0b0a; color: var(--ink); border: 1px solid rgba(233,227,216,0.15);
+  border-radius: 10px; padding: 10px 12px; font: inherit; font-family: var(--display); font-size: 17px;
+  -webkit-user-select: text; user-select: text;
+}
+#editor input:focus { outline: none; border-color: rgba(233,227,216,0.4); }
 #editor textarea {
   width: 100%; resize: none; background: #0c0b0a; color: var(--ink); border: 1px solid rgba(233,227,216,0.15);
   border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 16px; line-height: 1.5;
@@ -123,14 +144,14 @@ body.light-room .vignette { opacity: 0.3; }
 
 /* 작은 지도 (오른쪽 위) */
 #minimap {
-  position: absolute; top: max(36px, calc(env(safe-area-inset-top) + 22px)); right: max(14px, env(safe-area-inset-right));
-  padding: 0; border: 1px solid rgba(233,227,216,0.16); border-radius: 10px; overflow: hidden;
-  background: rgba(10,9,8,0.55); cursor: pointer; z-index: 2;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  position: absolute; top: max(40px, calc(env(safe-area-inset-top) + 26px)); right: max(14px, env(safe-area-inset-right));
+  padding: 0; border: 1px solid rgba(233,227,216,0.1); border-radius: 8px; overflow: hidden;
+  background: rgba(10,9,8,0.28); cursor: pointer; z-index: 2; opacity: 0.6; transition: opacity .2s;
 }
+#minimap:hover, #minimap:focus-visible { opacity: 0.95; }
 #minimap canvas { display: block; }
 #minimap:active { transform: scale(0.97); }
-body.rotated #minimap { top: 36px; right: 14px; }
+body.rotated #minimap { top: 40px; right: 14px; }
 @media (pointer: coarse) { #hint { width: min(520px, calc(100% - 360px)); } }
 
 /* 큰 지도 (팝업) */
@@ -190,6 +211,8 @@ body.rotated #map { padding: 14px 16px; }
 #map.editing .acts { visibility: hidden; }
 #map .mroom .cap { display: flex; flex-direction: column; gap: 2px; padding-left: 4px; }
 #map .mroom .cap b { font-weight: 500; font-size: 12px; letter-spacing: 0.18em; }
+#map .mroom .cap i { font-style: normal; font-family: var(--display); font-size: 15px; color: var(--ink); }
+#map .mroom .cap i.none { color: var(--dim); font-size: 13px; }
 #map .mroom .cap span { font-size: 11px; color: var(--dim); }
 #map .mroom:not(:last-child)::after {
   /* 방 사이 문 */
@@ -202,3 +225,56 @@ body.rotated #map { padding: 14px 16px; }
 #map .mroom.drag { animation: none !important; transition: none; z-index: 2; cursor: grabbing; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.6)); }
 @keyframes wiggle { from { transform: rotate(-0.6deg); } to { transform: rotate(0.6deg); } }
 body.map-open #joy { visibility: hidden; }
+
+/* 홈: 전시실 고르기 */
+#home {
+  position: absolute; inset: 0; z-index: 40; display: none; flex-direction: column; gap: 18px;
+  padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  background:
+    radial-gradient(ellipse 60% 70% at 18% -10%, rgba(255,214,160,0.16), rgba(0,0,0,0) 70%),
+    radial-gradient(ellipse 50% 60% at 90% 120%, rgba(255,214,160,0.06), rgba(0,0,0,0) 70%),
+    #0b0a09;
+  overflow: hidden;
+}
+body.rotated #home { padding: 24px 24px 18px; }
+body.home-open #home { display: flex; }
+body.home-open #joy, body.home-open #hud, body.home-open #minimap, body.home-open #tools, body.home-open #hint { visibility: hidden; }
+#home header { display: flex; flex-direction: column; gap: 4px; }
+#home .eyebrow { font-family: var(--latin); font-style: italic; font-size: 17px; letter-spacing: 0.08em; color: var(--dim); }
+#home h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(26px, 4.4vw, 40px); letter-spacing: 0.01em; }
+#home header p { margin: 2px 0 0; font-size: 13px; color: var(--dim); }
+#home .list {
+  flex: 1; min-height: 0; display: flex; gap: 16px; align-items: stretch; overflow-x: auto; overflow-y: hidden;
+  padding: 4px 2px 10px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+}
+#home .excard {
+  position: relative; flex: none; width: clamp(200px, 26vw, 280px); max-height: 340px; display: flex; flex-direction: column;
+  background: #151412; border: 1px solid rgba(233,227,216,0.1); border-radius: 12px; overflow: hidden; cursor: pointer;
+  scroll-snap-align: start; text-align: left; color: var(--ink); font: inherit; padding: 0;
+  transition: transform .2s ease, border-color .2s;
+}
+#home .excard:hover { border-color: rgba(255,217,160,0.35); transform: translateY(-2px); }
+#home .excard .cover {
+  flex: 1; min-height: 90px; background: #1f1d1b center / cover no-repeat;
+  box-shadow: inset 0 -40px 50px -30px rgba(0,0,0,0.6);
+}
+#home .excard .cover.empty {
+  background: radial-gradient(ellipse 50% 70% at 50% 0%, rgba(255,217,160,0.22), rgba(0,0,0,0) 70%), #1c1b19;
+}
+#home .excard .info { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; }
+#home .excard .info b { font-family: var(--display); font-weight: 700; font-size: 17px; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#home .excard .info p { margin: 0; font-family: var(--display); font-size: 12.5px; color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#home .excard .info span { font-size: 11px; letter-spacing: 0.06em; color: rgba(233,227,216,0.45); margin-top: 2px; }
+#home .excard .more {
+  position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 50%; border: 0;
+  background: rgba(10,9,8,0.55); color: var(--ink); font-size: 16px; cursor: pointer; line-height: 1;
+}
+#home .excard.add {
+  align-items: center; justify-content: center; gap: 6px; background: transparent;
+  border: 1px dashed rgba(233,227,216,0.28); padding: 20px; text-align: center;
+}
+#home .excard.add .plus { font-family: var(--latin); font-size: 44px; line-height: 1; color: rgba(255,217,160,0.8); }
+#home .excard.add b { font-family: var(--display); font-size: 17px; }
+#home .excard.add span:last-child { font-size: 12px; color: var(--dim); }

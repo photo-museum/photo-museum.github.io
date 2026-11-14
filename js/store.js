@@ -1,17 +1,21 @@
-// 전시 데이터(방 목록, 방마다 사진 목록)와 IndexedDB 저장.
-// 서버 없이 이 기기에만 저장된다.
+// 전시 데이터와 IndexedDB 저장. 서버 없이 이 기기에만 저장된다.
 //
-// museum = {
-//   version: 1,
-//   rooms: [
-//     { id, photos: [ { id, imageId: string|null, aspect: number } ] }
+// library = {
+//   version: 2,
+//   exhibitions: [                              // 전시실 여러 개
+//     { id, title, intro, created,
+//       rooms: [                                // 전시실 안에서 문으로 이어진 방들
+//         { id, theme, name?, intro?,
+//           photos: [ { id, imageId: string|null, aspect, rot?, caption? } ] }
+//       ] }
 //   ]
 // }
-// imageId 가 가리키는 사진 원본(축소본)은 'images' 저장소에 Blob 으로 따로 둔다.
+// imageId 가 가리키는 사진(축소본)은 'images' 저장소에 바이트로 따로 둔다.
 
 const DB_NAME = 'photo-museum';
 const DB_VERSION = 1;
-const STATE_KEY = 'museum';
+const OLD_KEY = 'museum';     // version 1: 전시실 하나
+const LIB_KEY = 'library';
 
 export const EMPTY_ASPECT = 1.2 / 1.6; // 빈 판: 세로로 긴 판 (가로/세로)
 
@@ -27,8 +31,8 @@ export function newRoom(photoCount = 4, theme = 'dark') {
   return { id: uid('r_'), theme, photos: Array.from({ length: photoCount }, () => newPhoto()) };
 }
 
-export function defaultMuseum() {
-  return { version: 1, rooms: [newRoom(4)] };
+export function newExhibition(title = '새 전시') {
+  return { id: uid('x_'), title, intro: '', created: Date.now(), rooms: [newRoom(4)] };
 }
 
 let dbPromise = null;
@@ -61,19 +65,25 @@ function tx(store, mode, fn) {
   }));
 }
 
-export async function loadMuseum() {
+export async function loadLibrary() {
   try {
-    const m = await tx('kv', 'readonly', s => s.get(STATE_KEY));
-    if (m && Array.isArray(m.rooms) && m.rooms.length) return m;
+    const lib = await tx('kv', 'readonly', s => s.get(LIB_KEY));
+    if (lib && Array.isArray(lib.exhibitions)) return lib;
+    // 예전 방식(전시실 하나)은 첫 전시실로 옮긴다
+    const old = await tx('kv', 'readonly', s => s.get(OLD_KEY));
+    if (old && Array.isArray(old.rooms) && old.rooms.length) {
+      const ex = newExhibition('나의 첫 전시');
+      ex.rooms = old.rooms;
+      return { version: 2, exhibitions: [ex] };
+    }
   } catch (e) {
-    console.warn('불러오기 실패, 새 전시로 시작', e);
+    console.warn('불러오기 실패, 새로 시작', e);
   }
-  return defaultMuseum();
+  return { version: 2, exhibitions: [newExhibition('나의 첫 전시')] };
 }
 
-export function saveMuseum(museum) {
-  // 구조화 복제로 저장 (Blob 은 따로)
-  return tx('kv', 'readwrite', s => s.put(JSON.parse(JSON.stringify(museum)), STATE_KEY))
+export function saveLibrary(lib) {
+  return tx('kv', 'readwrite', s => s.put(JSON.parse(JSON.stringify(lib)), LIB_KEY))
     .catch(e => console.warn('저장 실패', e));
 }
 

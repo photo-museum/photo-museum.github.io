@@ -2,7 +2,9 @@
 import * as THREE from 'three';
 import {
   ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, PANEL_GAP, layoutMuseum,
+  INTRO_S, INTRO_W, INTRO_H, INTRO_D,
 } from './layout.js';
+import { FONTS } from './fonts.js';
 import { concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture } from './textures.js';
 import { surfaceMaterial, photoMaterial } from './materials.js';
 import { getImage } from './store.js';
@@ -83,11 +85,12 @@ function meterPlane(w, h) {
 }
 
 // 문 구멍이 있는 끝벽 (uv = 미터, x 0..W)
-function endWallGeometry(withDoor) {
+// doorU: 벽 모양 안에서 문 가운데 위치 (0 ~ ROOM_W)
+function endWallGeometry(withDoor, doorU = ROOM_W / 2) {
   const s = new THREE.Shape();
   s.moveTo(0, 0); s.lineTo(ROOM_W, 0); s.lineTo(ROOM_W, ROOM_H); s.lineTo(0, ROOM_H); s.lineTo(0, 0);
   if (withDoor) {
-    const x0 = (ROOM_W - DOOR_W) / 2;
+    const x0 = doorU - DOOR_W / 2;
     // 문은 바닥까지 뚫려 있어야 하므로 바깥 모양 자체를 문 모양으로 파낸다
     const s2 = new THREE.Shape();
     s2.moveTo(0, 0); s2.lineTo(x0, 0); s2.lineTo(x0, DOOR_H); s2.lineTo(x0 + DOOR_W, DOOR_H);
@@ -187,8 +190,7 @@ function makeLabel(text, light) {
   const W = Math.round(LABEL_W * LABEL_PX);
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
-  const font = 'system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-  const titleF = `600 30px ${font}`, bodyF = `400 24px ${font}`;
+  const titleF = `700 30px ${FONTS.display}`, bodyF = `400 24px ${FONTS.body}`;
   const lines = text.trim().split('\n');
   g.font = titleF;
   const title = wrapLines(g, lines[0], W).slice(0, 3);
@@ -215,6 +217,90 @@ function makeLabel(text, light) {
   );
   mesh.userData.h = h;
   return mesh;
+}
+
+// ---------- 벽에 적힌 글: 전시 소개(로비), 방 안내벽 ----------
+// lines: [{ text, font, color, lh(줄 높이 px), gap(위 여백 px), max(최대 줄), track(자간 px) }]
+function drawTextBlock(g, x, y, maxW, lines) {
+  for (const L of lines) {
+    if (!L || !L.text) continue;
+    y += L.gap || 0;
+    g.font = L.font;
+    g.fillStyle = L.color;
+    if ('letterSpacing' in g) g.letterSpacing = (L.track || 0) + 'px';
+    const rows = wrapLines(g, L.text, maxW).slice(0, L.max || 99);
+    for (const r of rows) { g.fillText(r, x, y); y += L.lh; }
+    if ('letterSpacing' in g) g.letterSpacing = '0px';
+  }
+  return y;
+}
+
+// 로비 정면 벽의 전시 소개 (투명 바탕, 벽 위에 붙임)
+const LOBBY_TEXT = { w: 3.9, h: 2.9, x: -1.25, y: 1.75 };
+function makeLobbyText(museum) {
+  const ppm = 300;
+  const c = document.createElement('canvas');
+  c.width = Math.round(LOBBY_TEXT.w * ppm); c.height = Math.round(LOBBY_TEXT.h * ppm);
+  const g = c.getContext('2d');
+  g.textBaseline = 'top';
+  const ink = 'rgba(238,231,219,0.95)', sub = 'rgba(214,206,193,0.8)', faint = 'rgba(214,206,193,0.42)';
+  const title = (museum.title || '').trim() || '이름 없는 전시';
+  const intro = (museum.intro || '').trim();
+  let y = drawTextBlock(g, 0, 40, c.width, [
+    { text: 'photo-museum', font: `italic 400 44px ${FONTS.latin}`, color: sub, lh: 60, track: 3 },
+    { text: title, font: `700 112px ${FONTS.display}`, color: ink, lh: 140, gap: 26, max: 2 },
+  ]);
+  g.fillStyle = 'rgba(255,217,160,0.65)';
+  g.fillRect(0, y + 30, 120, 3);
+  y += 66;
+  drawTextBlock(g, 0, y, c.width * 0.92, intro
+    ? [{ text: intro, font: `400 40px ${FONTS.body}`, color: sub, lh: 70, max: Math.floor((c.height - y - 90) / 70) }]
+    : [{ text: '벽을 눌러 이 전시에 대한 설명을 적어 주세요.', font: `400 38px ${FONTS.body}`, color: faint, lh: 64 }]);
+  drawTextBlock(g, 0, c.height - 60, c.width, [
+    { text: 'ROOM 01 →', font: `400 36px ${FONTS.latin}`, color: faint, lh: 50, track: 6 },
+  ]);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(LOBBY_TEXT.w, LOBBY_TEXT.h),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }),
+  );
+}
+
+// 방 안내벽 앞면: 벽 색 바탕 + 위에서 비추는 빛 + 글
+function introCanvas(room, light) {
+  const ppm = 400;
+  const c = document.createElement('canvas');
+  c.width = Math.round(INTRO_W * ppm); c.height = Math.round(INTRO_H * ppm);
+  const g = c.getContext('2d');
+  g.fillStyle = light ? '#d6cfc3' : '#232220';
+  g.fillRect(0, 0, c.width, c.height);
+  const grd = g.createRadialGradient(c.width / 2, -c.height * 0.15, 0, c.width / 2, -c.height * 0.15, c.height * 1.25);
+  grd.addColorStop(0, light ? 'rgba(255,246,230,0.5)' : 'rgba(255,226,180,0.22)');
+  grd.addColorStop(1, 'rgba(255,226,180,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, c.width, c.height);
+  const sh = g.createLinearGradient(0, c.height * 0.8, 0, c.height);
+  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, light ? 'rgba(60,45,30,0.16)' : 'rgba(0,0,0,0.35)');
+  g.fillStyle = sh; g.fillRect(0, 0, c.width, c.height);
+  g.textBaseline = 'top';
+  const ink = light ? 'rgba(36,33,30,0.94)' : 'rgba(236,229,217,0.94)';
+  const sub = light ? 'rgba(62,58,52,0.85)' : 'rgba(208,200,187,0.82)';
+  const faint = light ? 'rgba(62,58,52,0.42)' : 'rgba(208,200,187,0.4)';
+  const pad = 0.26 * ppm, W = c.width - pad * 2;
+  const no = `Room ${String(room.index + 1).padStart(2, '0')}`;
+  const lines = [{ text: no, font: `italic 400 52px ${FONTS.latin}`, color: sub, lh: 64, track: 4 }];
+  if (room.name) lines.push({ text: room.name, font: `700 92px ${FONTS.display}`, color: ink, lh: 118, gap: 18, max: 2 });
+  let y = drawTextBlock(g, pad, pad + 10, W, lines);
+  if (room.intro) {
+    g.fillStyle = light ? 'rgba(150,110,60,0.55)' : 'rgba(255,217,160,0.6)';
+    g.fillRect(pad, y + 26, 90, 3);
+    y += 58;
+    drawTextBlock(g, pad, y, W, [{ text: room.intro, font: `400 40px ${FONTS.body}`, color: sub, lh: 68, max: Math.floor((c.height - y - pad) / 68) }]);
+  } else if (!room.name) {
+    drawTextBlock(g, pad, y + 26, W, [{ text: '벽을 눌러 이 방의 이름과 설명을 적어 주세요.', font: `400 38px ${FONTS.body}`, color: faint, lh: 62 }]);
+  }
+  return c;
 }
 
 // 위 천장에서 내려오는 빛: 벽 위쪽이 조금 더 밝다
@@ -292,6 +378,8 @@ export class MuseumScene {
     this.clear();
     const layout = layoutMuseum(museum);
     this.layout = layout;
+    this.museum = museum;
+    this.buildRoom(layout.lobby);
     for (const room of layout) this.buildRoom(room);
     return layout;
   }
@@ -391,46 +479,64 @@ export class MuseumScene {
     both(wr);
 
     // ----- 끝벽 (앞/뒤). 문이 있으면 문 주변이 은은히 밝다 -----
-    const endLight = (withDoor) => {
+    // u0: 빛 가운데 (벽 모양 좌표, 0 ~ ROOM_W)
+    const endLight = (withDoor, u0 = ROOM_W / 2, lobbyText = false) => {
       const L = lightCanvas(ROOM_W, ROOM_H, 32);
       const { g, ppm, c } = L;
       if (T.skyGlow) paintSkyGlow(L);
-      glow(g, ROOM_W / 2 * ppm, c.height - (withDoor ? DOOR_H + 0.2 : 1.9) * ppm, 3.2 * ppm, 2.6 * ppm,
+      if (lobbyText) {
+        // 전시 소개 글을 비추는 넓은 빛 + 문 위 은은한 빛
+        const tu = LOBBY_TEXT.x + ROOM_W / 2;
+        glow(g, tu * ppm, c.height - (LOBBY_TEXT.y + 0.6) * ppm, 3.0 * ppm, 2.6 * ppm, [[0, 0.62], [0.55, 0.3], [1, 0]]);
+        glow(g, u0 * ppm, c.height - (DOOR_H + 0.2) * ppm, 1.6 * ppm, 1.4 * ppm, [[0, 0.3], [1, 0]]);
+      } else
+      glow(g, u0 * ppm, c.height - (withDoor ? DOOR_H + 0.2 : 1.9) * ppm, 3.2 * ppm, 2.6 * ppm,
         [[0, withDoor ? 0.42 : 0.34], [0.6, 0.18], [1, 0]]);
       if (T.ao) paintEdgeAO(L, { l: [0.9, 0.4], r: [0.9, 0.4], b: [0.55, 0.42], t: [0.45, 0.3] });
       return keep(lightTex(c));
     };
-    const endMat = (withDoor) => keep(surfaceMaterial({
-      map: R[T.wallMap], tile: [3.0, 3.0], tint: T.wallTint, lightMap: endLight(withDoor), lmSize: [ROOM_W, ROOM_H],
+    const endMat = (withDoor, u0, lobbyText) => keep(surfaceMaterial({
+      map: R[T.wallMap], tile: [3.0, 3.0], tint: T.wallTint, lightMap: endLight(withDoor, u0, lobbyText), lmSize: [ROOM_W, ROOM_H],
       ambient: T.endAmb, lmIntensity: T.endLm, lightColor: SPOT_COLOR,
     }));
     // 시작 벽 (방 안쪽을 보며 +z 쪽에 있음 → -z 를 향해야 함)
-    const startGeo = keep(endWallGeometry(room.doorIn));
-    const startWall = new THREE.Mesh(startGeo, endMat(room.doorIn));
+    // 시작 벽은 180도 돌아 있어서 벽 모양 좌표 u = ROOM_W/2 - x
+    const inU = ROOM_W / 2 - (room.doorInX || 0), outU = ROOM_W / 2 + (room.doorOutX || 0);
+    const startGeo = keep(endWallGeometry(room.doorIn, inU));
+    const startWall = new THREE.Mesh(startGeo, endMat(room.doorIn, inU));
     startWall.rotation.y = Math.PI; startWall.position.set(ROOM_W / 2, 0, zStart);
     both(startWall);
     // 끝 벽 (+z 를 향함)
-    const endGeo = keep(endWallGeometry(room.doorOut));
-    const endWall = new THREE.Mesh(endGeo, endMat(room.doorOut));
+    const endGeo = keep(endWallGeometry(room.doorOut, outU));
+    const endWall = new THREE.Mesh(endGeo, endMat(room.doorOut, outU, !!room.lobby));
     endWall.position.set(-ROOM_W / 2, 0, zEnd);
     both(endWall);
+    if (room.lobby) {
+      const t = makeLobbyText(this.museum);
+      keep(t.geometry, t.material, t.material.map);
+      t.position.set(LOBBY_TEXT.x, LOBBY_TEXT.y, zEnd + 0.004);
+      t.userData = { wallText: 'exhibition' };
+      group.add(t);
+      this.pickables.push(t);
+    }
 
     // ----- 문틀 (벽 두께) + 문턱 바닥 -----
     if (room.doorOut) {
       const jambMat = keep(surfaceMaterial({ map: R[T.wallMap], tile: [3, 3], tint: T.jambTint, lightMap: R.black, ambient: T.jambAmb, lmIntensity: 0 }));
       const jambGeo = keep(meterPlane(WALL_T, DOOR_H));
       const zc = zEnd - WALL_T / 2;
-      const jl = new THREE.Mesh(jambGeo, jambMat); jl.rotation.y = Math.PI / 2; jl.position.set(-DOOR_W / 2, DOOR_H / 2, zc); both(jl);
-      const jr = new THREE.Mesh(jambGeo, jambMat); jr.rotation.y = -Math.PI / 2; jr.position.set(DOOR_W / 2, DOOR_H / 2, zc); both(jr);
+      const dx = room.doorOutX || 0;
+      const jl = new THREE.Mesh(jambGeo, jambMat); jl.rotation.y = Math.PI / 2; jl.position.set(dx - DOOR_W / 2, DOOR_H / 2, zc); both(jl);
+      const jr = new THREE.Mesh(jambGeo, jambMat); jr.rotation.y = -Math.PI / 2; jr.position.set(dx + DOOR_W / 2, DOOR_H / 2, zc); both(jr);
       const topGeo = keep(meterPlane(DOOR_W, WALL_T));
-      const jt = new THREE.Mesh(topGeo, jambMat); jt.rotation.x = Math.PI / 2; jt.position.set(0, DOOR_H, zc); both(jt);
+      const jt = new THREE.Mesh(topGeo, jambMat); jt.rotation.x = Math.PI / 2; jt.position.set(dx, DOOR_H, zc); both(jt);
       const thGeo = keep(meterPlane(DOOR_W, WALL_T));
       const thMat = keep(surfaceMaterial({ map: R[T.floorMap], tile: [3.2, 3.2], tint: T.floorTint, lightMap: R.black, ambient: T.floorAmb, lmIntensity: 0 }));
-      const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(0, 0.0005, zc); group.add(th);
+      const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(dx, 0.0005, zc); group.add(th);
     }
 
     // ----- 조명 레일 (스포트라이트 방만) -----
-    if (T.spots) {
+    if (T.spots && !room.lobby) {
       const railGeo = keep(new THREE.BoxGeometry(0.035, 0.035, Lr - 0.6));
       for (const sx of [-1, 1]) {
         const rail = new THREE.Mesh(railGeo, R.fixtureMat);
@@ -452,19 +558,43 @@ export class MuseumScene {
       this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
     }
 
+    // ----- 방 안내벽 (문 들어서 정면, 홀로 선 벽) -----
+    if (!room.lobby) {
+      const light = room.theme === 'white';
+      const tex = keep(new THREE.CanvasTexture(introCanvas(room, light)));
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      const front = keep(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+      const sideC = light ? 0xc9c1b4 : 0x1d1c1b;
+      const side = keep(new THREE.MeshBasicMaterial({ color: sideC }));
+      const back = keep(new THREE.MeshBasicMaterial({ color: light ? 0xcfc8bb : 0x222120 }));
+      const geo = keep(new THREE.BoxGeometry(INTRO_W, INTRO_H, INTRO_D));
+      // 면 순서: +x, -x, +y, -y, +z(앞: 문 쪽), -z
+      const wall = new THREE.Mesh(geo, [side, side, side, side, front, back]);
+      const iz = zStart - INTRO_S;
+      wall.position.set(room.introX, INTRO_H / 2, iz);
+      wall.userData = { wallText: 'room', roomIndex: room.index };
+      both(wall);
+      this.pickables.push(wall);
+      const x0 = room.introX - INTRO_W / 2, x1 = room.introX + INTRO_W / 2;
+      const z0 = iz - INTRO_D / 2, z1 = iz + INTRO_D / 2;
+      this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
+    }
+
     // ----- 사진 판 -----
     for (const p of room.panels) this.buildPanel(room, p, group, mirror, keep, T);
 
     // ----- 충돌 벽 (x,z 선분) -----
-    const hw = ROOM_W / 2, hd = DOOR_W / 2;
+    const hw = ROOM_W / 2;
     const C = this.colliders;
     C.push([-hw, zStart, -hw, zEnd - (room.doorOut ? WALL_T : 0)]);
     C.push([hw, zStart, hw, zEnd - (room.doorOut ? WALL_T : 0)]);
     if (!room.doorIn) C.push([-hw, zStart, hw, zStart]);
     if (room.doorOut) {
       const z2 = zEnd - WALL_T;
-      C.push([-hw, zEnd, -hd, zEnd], [hd, zEnd, hw, zEnd], [-hw, z2, -hd, z2], [hd, z2, hw, z2]);
-      C.push([-hd, zEnd, -hd, z2], [hd, zEnd, hd, z2]);
+      const a = (room.doorOutX || 0) - DOOR_W / 2, b = (room.doorOutX || 0) + DOOR_W / 2;
+      C.push([-hw, zEnd, a, zEnd], [b, zEnd, hw, zEnd], [-hw, z2, a, z2], [b, z2, hw, z2]);
+      C.push([a, zEnd, a, z2], [b, zEnd, b, z2]);
     } else {
       C.push([-hw, zEnd, hw, zEnd]);
     }
@@ -580,6 +710,7 @@ export class MuseumScene {
   }
 
   // 지금 방 ±1 만 그린다 (휴대폰 부담 줄이기)
+  // i = -1 은 로비
   setActiveRoom(i) {
     for (const r of this.rooms) {
       const v = Math.abs(r.layout.index - i) <= 1;
@@ -588,11 +719,13 @@ export class MuseumScene {
     }
   }
 
+  // 로비면 -1
   roomIndexAt(z) {
     const L = this.layout;
+    if (z >= L.lobby.zEnd - WALL_T / 2) return -1;
     for (let i = 0; i < L.length; i++) {
       if (z <= L[i].zStart + 0.01 && z >= L[i].zEnd - WALL_T / 2) return i;
     }
-    return z > 0 ? 0 : L.length - 1;
+    return L.length - 1;
   }
 }

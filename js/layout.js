@@ -1,5 +1,6 @@
 // 전시 데이터 → 공간 배치 계산 (순수 함수, three.js 몰라도 됨)
-// 방은 -Z 방향으로 일렬로 이어진다. 방 사이에는 두께 WALL_T 인 벽과 문.
+// 맨 앞(z=0)에 입구 로비, 그 뒤로 방들이 -Z 방향으로 일렬로 이어진다. 방 사이에는 두께 WALL_T 인 벽과 문.
+// 방마다 문 들어서 정면에 안내벽(이름과 설명)이 홀로 서 있다.
 
 export const ROOM_W = 7.0;      // 방 폭 (m)
 export const ROOM_H = 4.2;      // 천장 높이
@@ -14,6 +15,11 @@ export const EDGE_GAP = 3.0;    // 같은 벽 판 사이 여백 (넉넉하게)
 export const END_MARGIN = 2.6;  // 방 끝 벽에서 첫 판까지
 export const STAGGER = 2.1;     // 오른쪽 벽은 이만큼 늦게 시작 (서로 엇갈리게)
 export const MIN_LEN = 14;      // 최소 방 길이
+export const LOBBY_L = 6.5;     // 입구 로비 길이
+export const LOBBY_DOOR_X = 1.9; // 로비 정면 벽의 문 위치 (오른쪽). 왼쪽엔 전시 설명.
+export const INTRO_S = 2.3;     // 방 시작에서 안내벽까지
+export const INTRO_W = 2.8, INTRO_H = 2.5, INTRO_D = 0.18; // 방 안내벽 크기
+const START_MARGIN = 4.6;       // 방 시작에서 첫 사진까지 (안내벽 뒤)
 
 const PANEL_AREA = 1.92;
 const MAX_W = 2.6, MAX_H = 1.75;
@@ -33,7 +39,11 @@ export function displayAspect(photo) {
 
 export function layoutMuseum(museum) {
   const rooms = [];
-  let z = 0;
+  const lobby = {
+    index: -1, id: 'lobby', lobby: true, theme: 'dark', zStart: 0, zEnd: -LOBBY_L, length: LOBBY_L, panels: [],
+    doorIn: false, doorOut: museum.rooms.length > 0, doorInX: 0, doorOutX: LOBBY_DOOR_X,
+  };
+  let z = -LOBBY_L - WALL_T;
   museum.rooms.forEach((room, ri) => {
     const walls = { L: [], R: [] };
     room.photos.forEach((photo, pi) => {
@@ -45,8 +55,8 @@ export function layoutMuseum(museum) {
       for (const p of list) { p.s = s + p.w / 2; s += p.w + EDGE_GAP; }
       return list.length ? s - EDGE_GAP : start;
     };
-    const endL = place(walls.L, END_MARGIN);
-    const endR = place(walls.R, END_MARGIN + STAGGER);
+    const endL = place(walls.L, START_MARGIN);
+    const endR = place(walls.R, START_MARGIN + STAGGER);
     const content = Math.max(endL, walls.R.length ? endR : 0) + END_MARGIN;
     const length = Math.max(MIN_LEN, content);
     const shift = (length - content) / 2; // 방이 남으면 가운데로
@@ -70,11 +80,15 @@ export function layoutMuseum(museum) {
     panels.sort((a, b) => a.index - b.index);
     rooms.push({
       index: ri, id: room.id, theme: room.theme || 'dark', zStart, zEnd, length, panels,
-      doorIn: ri > 0,
+      name: room.name || '', intro: room.intro || '',
+      doorIn: true,
       doorOut: ri < museum.rooms.length - 1,
+      doorInX: ri === 0 ? LOBBY_DOOR_X : 0, doorOutX: 0,
+      introX: Math.max(-1.3, Math.min(1.3, ri === 0 ? LOBBY_DOOR_X : 0)),
     });
     z = zEnd - WALL_T;
   });
+  rooms.lobby = lobby;
   return rooms;
 }
 
