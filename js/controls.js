@@ -2,8 +2,9 @@
 // 걷는 느낌을 위해 속도/시선은 바로 바뀌지 않고 부드럽게 따라간다.
 import { EYE_H } from './layout.js';
 
-const WALK = 1.35;      // m/s  미술관에서 천천히 걷는 속도
-const FAST = 2.4;       // Shift
+const WALK = 1.6;       // m/s  미술관에서 걷는 속도
+const FAST = 3.4;       // 달리기: Shift, 또는 조이스틱을 끝까지 밀 때
+const RUN_FROM = 0.8;   // 조이스틱을 이만큼 넘게 밀면 달리기 시작
 const ACCEL = 5.0;      // 속도가 목표에 다가가는 빠르기
 const LOOK_DAMP = 18;   // 시선이 따라가는 빠르기
 const RADIUS = 0.35;    // 몸 반지름 (벽과 거리)
@@ -99,7 +100,13 @@ export class WalkControls {
     if (mag > 0.05) this.auto = null;
     this.yawT += turn * 1.6 * dt;
 
-    const speed = (k.has('ShiftLeft') || k.has('ShiftRight')) ? FAST : WALK;
+    let speed = (k.has('ShiftLeft') || k.has('ShiftRight')) ? FAST : WALK;
+    // 조이스틱: 조금 밀면 천천히, 끝까지 밀면 달리기
+    const jm = Math.min(1, Math.hypot(this.joy.x, this.joy.y));
+    if (jm > RUN_FROM) {
+      const t = (jm - RUN_FROM) / (1 - RUN_FROM);
+      speed = Math.max(speed, WALK + (FAST - WALK) * t * t * (3 - 2 * t));
+    }
     // 바라보는 방향 기준 → 월드 방향 (yaw 0 = -z)
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     let tx = (-sy * f + cy * s) * speed;
