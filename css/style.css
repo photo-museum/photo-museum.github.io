@@ -92,3 +92,27 @@ body.light-room #hint b { color: #222; }
 body.sheet-open #joy { visibility: hidden; }
 body.light-room .vignette { opacity: 0.35; }
 .vignette { transition: opacity .6s; }
+
+/* 설명 쓰기 창 (돌린 화면 밖, 항상 똑바로) */
+#editor {
+  position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(0,0,0,0.55);
+}
+#editor.open { display: flex; }
+#editor .box {
+  width: min(420px, 100%); background: #151413; border: 1px solid rgba(233,227,216,0.12);
+  border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+}
+#editor label { font-size: 12px; letter-spacing: 0.08em; color: var(--dim); }
+#editor textarea {
+  width: 100%; resize: none; background: #0c0b0a; color: var(--ink); border: 1px solid rgba(233,227,216,0.15);
+  border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 16px; line-height: 1.5;
+  -webkit-user-select: text; user-select: text;
+}
+#editor textarea:focus { outline: none; border-color: rgba(233,227,216,0.4); }
+#editor .row { display: flex; justify-content: flex-end; gap: 8px; }
+#editor button {
+  appearance: none; border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 14px; cursor: pointer;
+  background: var(--ink); color: #111;
+}
+#editor button.quiet { background: transparent; color: var(--dim); }

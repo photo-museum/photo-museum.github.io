@@ -1,7 +1,7 @@
 // 배치(layout) → three.js 장면. 방마다 그룹 하나 + 바닥 반사용 거울 그룹.
 import * as THREE from 'three';
 import {
-  ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, layoutMuseum,
+  ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, PANEL_GAP, layoutMuseum,
 } from './layout.js';
 import { concreteTexture, woodSlatsTexture, plasterTexture } from './textures.js';
 import { surfaceMaterial, photoMaterial } from './materials.js';
@@ -138,6 +138,59 @@ function paintWallSpot(L, u, p) {
   g.fillStyle = 'rgba(0,0,0,0.75)';
   g.fillRect(X - hw * ppm, Y - hh * ppm, p.w * ppm, p.h * ppm);
   g.restore();
+}
+
+// ---------- 설명판: 사진 옆 벽에 붙는 작은 글씨 ----------
+const LABEL_W = 0.4;           // m
+const LABEL_PX = 1150;         // 1m 당 픽셀 (작을수록 글씨가 커짐)
+function wrapLines(g, text, maxW) {
+  const out = [];
+  for (const para of text.split('\n')) {
+    let line = '';
+    for (const ch of para) {
+      if (g.measureText(line + ch).width > maxW && line) {
+        // 한글은 글자 단위, 영어는 가능하면 띄어쓰기에서 자르기
+        const sp = line.lastIndexOf(' ');
+        if (sp > line.length * 0.5 && /[A-Za-z0-9]/.test(ch)) { out.push(line.slice(0, sp)); line = line.slice(sp + 1) + ch; }
+        else { out.push(line); line = ch === ' ' ? '' : ch; }
+      } else line += ch;
+    }
+    out.push(line);
+  }
+  return out;
+}
+function makeLabel(text, light) {
+  const W = Math.round(LABEL_W * LABEL_PX);
+  const c = document.createElement('canvas');
+  const g = c.getContext('2d');
+  const font = 'system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+  const titleF = `600 30px ${font}`, bodyF = `400 24px ${font}`;
+  const lines = text.trim().split('\n');
+  g.font = titleF;
+  const title = wrapLines(g, lines[0], W).slice(0, 3);
+  g.font = bodyF;
+  const body = lines.length > 1 ? wrapLines(g, lines.slice(1).join('\n'), W).slice(0, 14) : [];
+  const H = Math.round(title.length * 40 + (body.length ? 14 + body.length * 34 : 0) + 8);
+  c.width = W; c.height = H;
+  const ink = light ? 'rgba(38,36,33,0.92)' : 'rgba(226,219,206,0.9)';
+  const sub = light ? 'rgba(70,67,62,0.85)' : 'rgba(200,193,181,0.78)';
+  g.textBaseline = 'top';
+  let y = 2;
+  g.font = titleF; g.fillStyle = ink;
+  for (const l of title) { g.fillText(l, 0, y); y += 40; }
+  y += 14;
+  g.font = bodyF; g.fillStyle = sub;
+  for (const l of body) { g.fillText(l, 0, y); y += 34; }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const h = H / LABEL_PX;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(LABEL_W, h),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }),
+  );
+  mesh.userData.h = h;
+  return mesh;
 }
 
 export class MuseumScene {
@@ -316,6 +369,14 @@ export class MuseumScene {
     mesh.rotation.y = p.rotY;
     mesh.userData = { roomIndex: room.index, photoIndex: p.index, photoId: p.photo.id, panel: p, empty };
     group.add(mesh);
+    if (p.photo.caption && p.photo.caption.trim()) {
+      const label = makeLabel(p.photo.caption, room.theme === 'white');
+      keep(label.geometry, label.material, label.material.map);
+      // 판 기준 오른쪽(보는 사람 오른쪽) 벽 위, 아래 끝을 사진 아래 끝에 맞춤
+      label.position.set(p.w / 2 + 0.22 + LABEL_W / 2, -p.h / 2 + label.userData.h / 2, -(PANEL_D / 2 + PANEL_GAP) + 0.003);
+      label.userData = { ...mesh.userData, label: true };
+      mesh.add(label);
+    }
     const mm = new THREE.Mesh(geo, mats);
     mm.position.copy(mesh.position); mm.rotation.copy(mesh.rotation);
     mirror.add(mm);

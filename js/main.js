@@ -192,6 +192,44 @@ function removePanel(t) {
   toast('판을 뗐어요');
 }
 
+// ---------- 설명 쓰기 ----------
+// 휴대폰 키보드 때문에 편집 창은 돌린 화면 밖에 둔다 (세로로 들고 쓰면 된다)
+const editor = $('#editor');
+const editorText = $('#editor textarea');
+let editTarget = null;
+function openEditor(t) {
+  const photo = museum.rooms[t.roomIndex]?.photos.find(p => p.id === t.photoId);
+  if (!photo) return;
+  editTarget = t;
+  editorText.value = photo.caption || '';
+  editor.classList.add('open');
+  controls.enabled = false;
+  setTimeout(() => editorText.focus(), 50);
+}
+function closeEditor(save) {
+  if (save && editTarget) {
+    const photo = museum.rooms[editTarget.roomIndex]?.photos.find(p => p.id === editTarget.photoId);
+    if (photo) {
+      const v = editorText.value.replace(/\s+$/, '');
+      if (v) photo.caption = v; else delete photo.caption;
+      persist();
+      rebuild();
+      toast(v ? '설명을 붙였어요' : '설명을 지웠어요');
+    }
+  }
+  editTarget = null;
+  editor.classList.remove('open');
+  editorText.blur();
+  controls.enabled = true;
+}
+$('#editor-save').addEventListener('click', () => closeEditor(true));
+$('#editor-cancel').addEventListener('click', () => closeEditor(false));
+editor.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Escape') closeEditor(false);
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) closeEditor(true);
+});
+
 // ---------- 방 ----------
 function addRoom(theme) {
   museum.rooms.push(newRoom(3, theme));
@@ -230,15 +268,19 @@ controls.onTap = (sx, sy) => {
   if (!hit || !hit.object.userData.photoId) return;
   const ud = hit.object.userData;
   const t = { roomIndex: ud.roomIndex, photoId: ud.photoId, panel: ud.panel };
+  const capLabel = ud.panel.photo.caption ? '설명 고치기' : '설명 쓰기';
+  if (ud.label) { openEditor(t); return; }
   if (ud.empty) {
     openSheet([
       { label: '사진 걸기 (여러 장 가능)', fn: () => pickPhotos({ roomIndex: t.roomIndex, startPhotoId: t.photoId }) },
+      { label: capLabel, fn: () => openEditor(t) },
       { label: '판 떼기', quiet: true, fn: () => removePanel(t) },
       { label: '닫기', quiet: true },
     ]);
   } else {
     openSheet([
       { label: '앞에 가서 보기', fn: () => { const v = viewingSpot(t.panel); controls.walkTo(v.x, v.z, v.yaw); } },
+      { label: capLabel, fn: () => openEditor(t) },
       { label: '사진 바꾸기', fn: () => pickPhotos({ roomIndex: t.roomIndex, startPhotoId: t.photoId, replace: true }) },
       { label: '사진 내리기 (빈 판으로)', quiet: true, fn: () => removePhoto(t) },
       { label: '판 떼기', quiet: true, fn: () => removePanel(t) },
