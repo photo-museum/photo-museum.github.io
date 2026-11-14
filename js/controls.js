@@ -80,31 +80,50 @@ export class WalkControls {
       this.zoomHold = true;
     };
     // 두 손가락으로 벌릴 때 손가락 하나가 왼쪽 조이스틱에 걸쳐도 걷지 않고 확대로 본다.
-    // (조이스틱과 화면을 0.35초 안에 같이 짚으면 '벌리기'로 판단)
+    // 하지만 '걸으면서 둘러보기'(조이스틱 + 화면을 같이 짚기)와 헷갈리면 안 된다.
+    // 그래서 같이 짚었다고 바로 확대로 정하지 않고, 손가락이 움직이는 모양을 보고 정한다:
+    // 두 손가락이 서로 반대쪽으로 멀어지고(사이가 30% 넘게 벌어짐) 조이스틱 손가락이 조이스틱 밖까지 나가면 = 벌리기(확대).
+    // 그 전까지는 그냥 걷기 + 둘러보기.
     this.joyBlocked = false;
-    const T = new Map(); // 터치 id -> { x, y, t, onJoy }
-    let jp = null;
+    const T = new Map(); // 터치 id -> { x, y, x0, y0, t, onJoy }
+    let jp = null, pend = null;
     const onJoy = n => !!(n && n.closest && n.closest('#joy'));
     document.addEventListener('touchstart', e => {
       const now = performance.now();
       for (const t of e.changedTouches) {
         const j = onJoy(t.target);
-        if (j || t.target === el) T.set(t.identifier, { x: t.clientX, y: t.clientY, t: now, onJoy: j });
+        if (j || t.target === el) T.set(t.identifier, { x: t.clientX, y: t.clientY, x0: t.clientX, y0: t.clientY, t: now, onJoy: j });
       }
-      if (jp || !this.enabled) return;
+      if (jp || pend || !this.enabled) return;
       const recent = [...T.entries()].filter(([, v]) => now - v.t < 350);
       const J = recent.find(([, v]) => v.onJoy), C = recent.find(([, v]) => !v.onJoy);
       if (!J || !C) return;
       const a = J[1], b = C[1];
       const [mx, my] = this.toNorm((a.x + b.x) / 2, (a.y + b.y) / 2);
-      jp = { ids: [J[0], C[0]], d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: this.zoom, P: this._pointAt(mx, my) };
-      a.blocked = true;
-      this.joyBlocked = true;
-      this.joy.x = this.joy.y = 0;
-      this.zoomHold = true;
+      pend = { ids: [J[0], C[0]], d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, P: this._pointAt(mx, my), z0: this.zoom, yawT: this.yawT, pitchT: this.pitchT, pos: { x: this.pos.x, z: this.pos.z } };
     }, { capture: true, passive: true });
     document.addEventListener('touchmove', e => {
       for (const t of e.changedTouches) { const v = T.get(t.identifier); if (v) { v.x = t.clientX; v.y = t.clientY; } }
+      if (pend && !jp) {
+        const a = T.get(pend.ids[0]), b = T.get(pend.ids[1]);
+        if (!a || !b) { pend = null; return; }
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        // 처음 두 손가락을 잇는 방향 (조이스틱 → 화면 손가락)
+        const ux = (b.x0 - a.x0) / pend.d0, uy = (b.y0 - a.y0) / pend.d0;
+        const ja = -((a.x - a.x0) * ux + (a.y - a.y0) * uy); // 조이스틱 손가락이 바깥으로 간 거리
+        const cb = (b.x - b.x0) * ux + (b.y - b.y0) * uy;    // 화면 손가락이 바깥으로 간 거리
+        const jMoved = Math.hypot(a.x - a.x0, a.y - a.y0);
+        if (d > pend.d0 * 1.3 && ja > 45 && cb > 20 && jMoved > 60) {
+          jp = pend; pend = null;
+          a.blocked = true;
+          this.joyBlocked = true;
+          this.joy.x = this.joy.y = 0;
+          this.zoomHold = true;
+          // 정하기 전 잠깐 돌아간 시선은 되돌린다 (확대하려던 것이었으니)
+          this.yawT = jp.yawT; this.pitchT = jp.pitchT;
+          this.pos.x = jp.pos.x; this.pos.z = jp.pos.z; this.vel.x = this.vel.z = 0;
+        } else return;
+      }
       if (!jp) return;
       const a = T.get(jp.ids[0]), b = T.get(jp.ids[1]);
       if (!a || !b) return;
@@ -117,6 +136,7 @@ export class WalkControls {
       for (const t of e.changedTouches) {
         T.delete(t.identifier);
         if (jp && jp.ids.includes(t.identifier)) { jp = null; this.zoomHold = false; }
+        if (pend && pend.ids.includes(t.identifier)) pend = null;
       }
       // 조이스틱 손가락을 뗄 때까지는 걷기 막아 둔다
       this.joyBlocked = [...T.values()].some(v => v.blocked);

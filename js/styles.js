@@ -105,7 +105,7 @@ export const LIGHTS = [
   { id: 'theater', label: '어둠 속 스포트', spots: true, color: 0xffe2c0, amb: 0.36, lm: 2.1, sw: ['#ffd9a8', '#0d0c0b'] },
   { id: 'daylight', label: '천창 자연광', sky: true, wash: true, color: 0xf2f6ff, tint: 0.1, amb: 1.08, lm: 0.85, sw: ['#ffffff', '#c9d6e6'] },
   { id: 'cove', label: '간접 조명 띠', cove: true, color: 0xfff1da, tint: 0.05, amb: 0.78, lm: 1, sw: ['#fff1da', '#6b6156'] },
-  { id: 'uplight', label: '바닥 업라이트', up: true, wash: true, color: 0xffd9a6, tint: 0.12, amb: 0.7, lm: 1.1, sw: ['#3b3128', '#ffd9a6'] },
+  { id: 'uplight', label: '바닥 업라이트', up: true, wash: true, color: 0xffd9a6, tint: 0.12, amb: 0.62, lm: 1.7, sw: ['#3b3128', '#ffd9a6'] },
   { id: 'sunset', label: '노을빛', sky: true, wash: true, color: 0xffa66b, tint: 0.4, amb: 0.9, lm: 1.1, sw: ['#ffc48f', '#b5654a'] },
   { id: 'candle', label: '촛불 저녁', spots: true, color: 0xffa04f, tint: 0.35, amb: 0.48, lm: 1.6, sw: ['#ffb46b', '#2a1d14'] },
 ];

@@ -649,7 +649,7 @@ function bestSpot() {
     const iz = r.zStart - INTRO_S;
     cands.push({ kind: '안내벽', cx: r.introX, cz: iz, spot: { x: r.introX, z: iz + 3.4, yaw: 0 } });
   }
-  if (ri < 0) cands.push({ kind: '전시 소개', cx: -1.25, cz: -LOBBY_L, spot: { x: -1.25, z: -LOBBY_L + 3.0, yaw: 0 } });
+  if (ri < 0) cands.push({ kind: '전시 소개', cx: -1.25, cz: -LOBBY_L, spot: { x: -1.25, z: -LOBBY_L + 4.9, yaw: 0 } });
   if (L.exit && ri >= L.length) cands.push(...exitSpots(L.exit));
   let best = null, bestScore = Infinity;
   for (const c of cands) {
@@ -732,7 +732,7 @@ gb.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape
 function museumStops() {
   const L = museumScene.layout;
   if (!L) return [];
-  const out = [{ kind: '전시 소개', spot: { x: -1.25, z: -LOBBY_L + 3.0, yaw: 0 } }];
+  const out = [{ kind: '전시 소개', spot: { x: -1.25, z: -LOBBY_L + 4.9, yaw: 0 } }];
   for (const r of L) {
     const iz = r.zStart - INTRO_S;
     out.push({ kind: '안내벽', spot: { x: r.introX, z: iz + 3.4, yaw: 0 } });
