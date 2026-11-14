@@ -441,3 +441,45 @@ body.light-room #goto i { color: #b0763a; }
 #nav-next { right: max(10px, env(safe-area-inset-right)); }
 body.light-room .nav { color: rgba(40,34,28,0.8); background: rgba(255,255,255,0.18); }
 body.home-open .nav { display: none; }
+
+/* ---------- 홈: 아코디언 (시안 F10) ---------- */
+#home { background: #101318; gap: 14px; }
+#home header { flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 12px; }
+#home header .eyebrow { display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .28em; color: rgba(233,227,216,.7); }
+#home header h1 { margin: 3px 0 0; font-size: clamp(22px, 3.4vw, 28px); font-weight: 800; letter-spacing: -.02em; }
+#home .hbtns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+#home .hbtns button {
+  appearance: none; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06); color: #eef0f4;
+  font: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+}
+#home .hbtns button.main { background: rgba(255,255,255,.9); color: #24324c; border-color: transparent; }
+#home .list { gap: 10px; align-items: stretch; padding: 2px 0 4px; }
+#home .pn {
+  position: relative; flex: 1 1 0; min-width: 64px; border-radius: 18px; overflow: hidden; cursor: pointer;
+  background: #1d222b center / cover no-repeat; transition: flex-grow .45s cubic-bezier(.2,.8,.2,1), min-width .45s cubic-bezier(.2,.8,.2,1), box-shadow .3s;
+}
+#home .pn::before { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.6), rgba(0,0,0,0) 58%); pointer-events: none; }
+#home .pn .lb {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); writing-mode: vertical-rl; white-space: nowrap;
+  max-height: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis;
+  font-size: 14px; font-weight: 700; letter-spacing: .02em; text-shadow: 0 1px 8px rgba(0,0,0,.55); z-index: 1;
+  transition: opacity .25s;
+}
+#home .pn .info { position: absolute; left: 18px; right: 18px; bottom: 16px; z-index: 1; display: flex; flex-direction: column; gap: 3px;
+  opacity: 0; transform: translateY(6px); transition: opacity .3s .12s, transform .3s .12s; pointer-events: none; }
+#home .pn .info b { font-size: 22px; font-weight: 800; letter-spacing: -.02em; text-shadow: 0 2px 12px rgba(0,0,0,.5);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#home .pn .info .st { font-size: 11.5px; font-weight: 500; opacity: .9; }
+#home .pn .info p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#home .pn .acts { display: flex; gap: 8px; margin-top: 8px; }
+#home .pn .acts button { appearance: none; border: 0; border-radius: 999px; padding: 8px 15px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+#home .pn .acts .go { background: #fff; color: #1d2433; }
+#home .pn .acts .more { background: rgba(0,0,0,.35); color: #fff; padding: 8px 12px; }
+#home .pn.on { flex-grow: 4.2; min-width: min(340px, 60%); box-shadow: 0 0 0 2px rgba(255,255,255,.85); }
+#home .pn.on .lb { opacity: 0; }
+#home .pn.on .info { opacity: 1; transform: none; pointer-events: auto; }
+#home .pn.add { flex: 0 0 64px; min-width: 64px; background: transparent; border: 1.5px dashed rgba(255,255,255,.3); display: grid; place-items: center; }
+#home .pn.add::before { content: none; }
+#home .pn.add .plus { font-size: 30px; font-weight: 300; color: rgba(255,255,255,.8); margin-bottom: 40px; }
+#home .pn.add .lb { color: rgba(255,255,255,.7); font-weight: 600; text-shadow: none; }
+@media (prefers-reduced-motion: reduce) { #home .pn, #home .pn .info { transition: none; } }

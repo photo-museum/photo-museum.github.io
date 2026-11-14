@@ -91,18 +91,18 @@ function fitCanvas(c, w, h) {
 
 // 지도에 쓸 작은 사진 (돌린 방향 그대로). imageId+rot 별로 기억.
 const thumbs = new Map();
-export function thumbURL(photo) {
-  const key = photo.imageId + '|' + (photo.rot || 0);
-  if (!thumbs.has(key)) thumbs.set(key, makeThumb(photo.imageId, photo.rot || 0).catch(() => null));
+export function thumbURL(photo, size = 220) {
+  const key = photo.imageId + '|' + (photo.rot || 0) + '|' + size;
+  if (!thumbs.has(key)) thumbs.set(key, makeThumb(photo.imageId, photo.rot || 0, size).catch(() => null));
   return thumbs.get(key);
 }
-async function makeThumb(imageId, rot) {
+async function makeThumb(imageId, rot, size = 220) {
   const blob = await getImage(imageId);
   if (!blob) return null;
   const url = URL.createObjectURL(blob);
   try {
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-    const k = 220 / Math.max(img.naturalWidth, img.naturalHeight);
+    const k = Math.min(1, size / Math.max(img.naturalWidth, img.naturalHeight));
     const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
     const c = document.createElement('canvas');
     const odd = rot % 2 === 1;

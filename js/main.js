@@ -964,6 +964,7 @@ function openHome() {
 
 function enterExhibition(ex) {
   museum = ex;
+  if (!ex.showcase && !ex.tutorial) { library.lastId = ex.id; persist(); }
   homeOpen = false;
   document.body.classList.remove('home-open');
   controls.enabled = true;
@@ -1025,37 +1026,43 @@ function exhibitionStats(ex) {
   }, { passive: false });
 })();
 
+// 홈: 아코디언 (시안 F10). 전시실마다 세로 띠, 고른 하나가 넓게 펼쳐진다.
+// 접힌 띠를 누르면 펼쳐지고, 펼쳐진 띠를 누르면 들어간다.
+let homeSel = null; // 펼쳐 둔 전시실 id
 function renderHome() {
   const list = $('#home .list');
   list.innerHTML = '';
-  const tour = document.createElement('button');
-  tour.className = 'excard tour';
-  tour.innerHTML = '<span class="eyebrow">처음이라면</span><b>사용법 둘러보기</b><span>제주 여행 예시 전시실을 걸으며<br>하나씩 따라 해 봐요</span><span class="go">시작하기 →</span>';
-  tour.addEventListener('click', () => startTutorial());
-  list.appendChild(tour);
-  const styles = document.createElement('button');
-  styles.className = 'excard tour styles';
-  styles.innerHTML = `<span class="eyebrow">방 고르기</span><b>방 스타일 둘러보기</b><span>${THEME_ORDER.length}가지 방을 이어 붙인 전시실을<br>걸으며 비교해 봐요</span><span class="go">들어가기 →</span>`;
-  styles.addEventListener('click', () => startShowcase());
-  list.appendChild(styles);
-  for (const ex of library.exhibitions) {
-    if (ex.showcase) continue; // 방 스타일 둘러보기는 위 카드로
+  const exs = library.exhibitions.filter(ex => !ex.showcase);
+  if (!exs.some(ex => ex.id === homeSel)) homeSel = (exs.find(ex => ex.id === library.lastId) || exs[0] || {}).id || null;
+  const select = (pn, id) => {
+    homeSel = id;
+    for (const x of list.children) x.classList.toggle('on', x === pn);
+    // 펼친 띠가 보이게
+    const left = pn.offsetLeft - 20, right = pn.offsetLeft + 340 - list.clientWidth;
+    if (list.scrollLeft > left) list.scrollLeft = left;
+    else if (list.scrollLeft < right) list.scrollLeft = right;
+  };
+  for (const ex of exs) {
     const st = exhibitionStats(ex);
-    const card = document.createElement('div');
-    card.className = 'excard';
-    card.innerHTML = `<div class="cover"></div><div class="info"><b></b><p></p><span>방 ${st.rooms} · 사진 ${st.photos}</span></div><button class="more" aria-label="전시실 메뉴">⋯</button>`;
-    const tb = card.querySelector('b');
-    tb.textContent = ex.title || '이름 없는 전시';
-    tb.style.fontFamily = fontFamily(ex.font);
-    if (ex.font) ensureFont(ex.font);
-    card.querySelector('p').textContent = (ex.intro || '').split('\n')[0] || '설명이 아직 없어요';
-    const cover = card.querySelector('.cover');
-    if (st.cover) thumbURL(st.cover).then(u => { if (u) cover.style.backgroundImage = `url("${u}")`; });
-    else cover.classList.add('empty');
-    card.addEventListener('click', e => {
+    const pn = document.createElement('div');
+    pn.className = 'pn' + (ex.id === homeSel ? ' on' : '');
+    pn.innerHTML = `<span class="lb"></span><div class="info"><b></b><span class="st">방 ${st.rooms} · 사진 ${st.photos}</span><p></p>`
+      + `<div class="acts"><button class="go">들어가기 →</button><button class="more" aria-label="전시실 메뉴">⋯</button></div></div>`;
+    const title = ex.title || '이름 없는 전시';
+    pn.querySelector('.lb').textContent = title;
+    pn.querySelector('b').textContent = title;
+    pn.querySelector('p').textContent = (ex.intro || '').split('\n')[0] || '';
+    if (st.cover) thumbURL(st.cover, 1400).then(u => { if (u) pn.style.backgroundImage = `url("${u}")`; });
+    else {
+      // 사진이 없으면 첫 방 색으로
+      const T = themeOf(ex.rooms[0]);
+      pn.style.background = `linear-gradient(160deg, ${T.mapWall}, ${T.mapFloor})`;
+      pn.classList.add('empty');
+    }
+    pn.addEventListener('click', e => {
       if (e.target.closest('.more')) {
         openSheet([
-          { title: true, label: ex.title },
+          { title: true, label: title },
           { label: '들어가기', fn: () => enterExhibition(ex) },
           { label: '이름·설명 고치기', fn: () => editExhibitionText(ex) },
           { label: '전시실 지우기', danger: true, fn: () => confirmDeleteExhibition(ex) },
@@ -1063,13 +1070,14 @@ function renderHome() {
         ]);
         return;
       }
+      if (!pn.classList.contains('on')) { select(pn, ex.id); return; }
       enterExhibition(ex);
     });
-    list.appendChild(card);
+    list.appendChild(pn);
   }
-  const add = document.createElement('button');
-  add.className = 'excard add';
-  add.innerHTML = '<span class="plus">+</span><b>새 전시실</b><span>이름을 정하고 바로 들어가요</span>';
+  const add = document.createElement('div');
+  add.className = 'pn add';
+  add.innerHTML = '<span class="plus">+</span><span class="lb">새 전시실</span>';
   add.addEventListener('click', () => {
     const ex = newExhibition('');
     editExhibitionText(ex, () => {
@@ -1080,6 +1088,8 @@ function renderHome() {
   });
   list.appendChild(add);
 }
+$('#h-tour').addEventListener('click', () => startTutorial());
+$('#h-styles').addEventListener('click', () => startShowcase());
 
 function confirmDeleteExhibition(ex) {
   const st = exhibitionStats(ex);
