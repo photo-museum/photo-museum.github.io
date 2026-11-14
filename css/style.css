@@ -688,3 +688,14 @@ body.style-open #tools, body.style-open #joy, body.style-open .nav, body.style-o
 #style-panel .sw.on i { box-shadow: 0 0 0 2.5px #fff, 0 0 0 4.5px rgba(120,170,255,.9); }
 #style-panel .sw.on span { opacity: 1; font-weight: 700; }
 #style-panel .sw em { position: absolute; top: -4px; right: 0; font-style: normal; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 999px; background: #fff; color: #1d2026; }
+
+/* 처음 준비하는 동안에는 화면 버튼을 숨긴다 */
+body:has(#loading:not(.done)) #tools, body:has(#loading:not(.done)) #minimap, body:has(#loading:not(.done)) #joy,
+body:has(#loading:not(.done)) #hud, body:has(#loading:not(.done)) #hint { visibility: hidden; }
+#loading { z-index: 70; }
+/* 가로 휴대폰처럼 낮은 화면: 메뉴를 촘촘하게 */
+@media (max-height: 460px) {
+  #sheet button { padding: 9px 8px; font-size: 14px; }
+  #sheet { gap: 0; padding-top: 6px; }
+  #sheet .title { margin: 2px 8px; }
+}

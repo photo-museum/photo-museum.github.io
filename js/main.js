@@ -1301,7 +1301,7 @@ async function buildShowcase() {
   }
   const ex = newExhibition('방 스타일 둘러보기');
   ex.intro = `방 스타일 ${SHOWCASE.length}가지를 차례로 이어 붙인 전시실이에요.\n`
-    + '걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 색에서 바꿀 수 있어요.';
+    + '걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 꾸미기에서 벽·천장·바닥을 고를 수 있어요.';
   ex.showcase = true;
   ex.rooms = SHOWCASE.map((id, k) => {
     const room = newRoom(0, 'white');
@@ -1389,7 +1389,7 @@ async function startShowcase() {
         for (let n = 0; n < 4; n++) { const P = pics[(k * 2 + n) % pics.length]; room.photos.push({ ...newPhoto(P.imageId, P.aspect), caption: P.caption }); }
         return room;
       });
-      ex.intro = `방 스타일 ${SHOWCASE.length}가지를 차례로 이어 붙인 전시실이에요.\n걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 색에서 바꿀 수 있어요.`;
+      ex.intro = `방 스타일 ${SHOWCASE.length}가지를 차례로 이어 붙인 전시실이에요.\n걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 꾸미기에서 벽·천장·바닥을 고를 수 있어요.`;
     }
   }
   persist();
@@ -1455,7 +1455,7 @@ function tutorialSteps() {
       task: '방 아래 <b>이름·설명</b> → 글씨체 고르고 <b>저장</b>',
       editorTip: '맨 아래 <b>글씨체</b>에서 마음에 드는 글씨를 고르고 <b>저장</b>해 보세요.',
       done: () => { if (editorOpen()) seen.ed = true; return seen.ed && !editorOpen(); } },
-    { title: '나만의 전시 꾸미기', text: '지도를 닫으면(✕) 오른쪽 아래에 버튼이 있어요.<br><b>+ 사진</b> 여러 장 한 번에 걸기 · <b>+ 방</b> 새 방 만들기 · <b>◐ 방 색</b> 어두운 방과 하얀 방.' },
+    { title: '나만의 전시 꾸미기', text: '지도를 닫으면(✕) 오른쪽 아래에 버튼이 있어요.<br><b>+ 사진</b> 여러 장 한 번에 걸기 · <b>+ 방</b> 새 방 만들기 · <b>◐ 방 꾸미기</b> 벽·천장·바닥 고르기.' },
     { title: '출구와 방명록', text: '마지막 방 끝에는 <b>출구</b>가 있어요. 방명록 책상을 누르면 한마디를 남길 수 있고, 남긴 글은 벽에 쪽지로 붙어요. 초록 <b>출구</b> 문을 누르면 홈으로 나가요.' },
     { title: '다 됐어요 ✦', text: '이제 왼쪽 위 <b>‹ 홈</b>에서 나만의 전시실을 만들어 보세요.<br>이 예시 전시실은 홈에서 지울 수 있고, <b>사용법 둘러보기</b>로 언제든 다시 볼 수 있어요.' },
   ];
