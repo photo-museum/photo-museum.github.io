@@ -111,6 +111,7 @@ function makeJoystick() {
   joystick.on('start', () => zone.classList.add('active'));
   joystick.on('end', () => zone.classList.remove('active'));
   joystick.on('move', (e, d) => {
+    if (controls.joyBlocked) { controls.joy.x = controls.joy.y = 0; return; } // 두 손가락 벌리는 중
     const f = Math.min(1, d.force || 0);
     const vx = d.vector.x * f, vy = d.vector.y * f; // 화면 기준, y 위쪽 +
     if (rotated) { controls.joy.x = -vy; controls.joy.y = -vx; }

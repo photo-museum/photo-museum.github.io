@@ -75,6 +75,52 @@ export class WalkControls {
       pinch = { d0, z0: this.zoom, P: this._pointAt(mx, my) };
       this.zoomHold = true;
     };
+    // 두 손가락으로 벌릴 때 손가락 하나가 왼쪽 조이스틱에 걸쳐도 걷지 않고 확대로 본다.
+    // (조이스틱과 화면을 0.35초 안에 같이 짚으면 '벌리기'로 판단)
+    this.joyBlocked = false;
+    const T = new Map(); // 터치 id -> { x, y, t, onJoy }
+    let jp = null;
+    const onJoy = n => !!(n && n.closest && n.closest('#joy'));
+    document.addEventListener('touchstart', e => {
+      const now = performance.now();
+      for (const t of e.changedTouches) {
+        const j = onJoy(t.target);
+        if (j || t.target === el) T.set(t.identifier, { x: t.clientX, y: t.clientY, t: now, onJoy: j });
+      }
+      if (jp || !this.enabled) return;
+      const recent = [...T.entries()].filter(([, v]) => now - v.t < 350);
+      const J = recent.find(([, v]) => v.onJoy), C = recent.find(([, v]) => !v.onJoy);
+      if (!J || !C) return;
+      const a = J[1], b = C[1];
+      const [mx, my] = this.toNorm((a.x + b.x) / 2, (a.y + b.y) / 2);
+      jp = { ids: [J[0], C[0]], d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: this.zoom, P: this._pointAt(mx, my) };
+      a.blocked = true;
+      this.joyBlocked = true;
+      this.joy.x = this.joy.y = 0;
+      this.zoomHold = true;
+    }, { capture: true, passive: true });
+    document.addEventListener('touchmove', e => {
+      for (const t of e.changedTouches) { const v = T.get(t.identifier); if (v) { v.x = t.clientX; v.y = t.clientY; } }
+      if (!jp) return;
+      const a = T.get(jp.ids[0]), b = T.get(jp.ids[1]);
+      if (!a || !b) return;
+      const [mx, my] = this.toNorm((a.x + b.x) / 2, (a.y + b.y) / 2);
+      this.zoom = this.zoomGoal = Math.max(1, Math.min(ZOOM_MAX, jp.z0 * Math.hypot(a.x - b.x, a.y - b.y) / jp.d0));
+      this.zoomFocus = { x: jp.P.x, y: jp.P.y };
+      this.zoomAt = { x: mx, y: my };
+    }, { capture: true, passive: true });
+    const tend = e => {
+      for (const t of e.changedTouches) {
+        T.delete(t.identifier);
+        if (jp && jp.ids.includes(t.identifier)) { jp = null; this.zoomHold = false; }
+      }
+      // 조이스틱 손가락을 뗄 때까지는 걷기 막아 둔다
+      this.joyBlocked = [...T.values()].some(v => v.blocked);
+      if (this.joyBlocked) this.joy.x = this.joy.y = 0;
+    };
+    document.addEventListener('touchend', tend, { capture: true, passive: true });
+    document.addEventListener('touchcancel', tend, { capture: true, passive: true });
+
     el.addEventListener('pointerdown', e => {
       if (!this.enabled) return;
       el.setPointerCapture(e.pointerId);
@@ -116,6 +162,7 @@ export class WalkControls {
         this.zoomAt = { x: mx, y: my };
         return;
       }
+      if (jp) p.pinched = true; // 조이스틱 쪽과 같이 벌리는 중
       if (p.pinched) return; // 확대하던 손가락 하나가 남아 있으면 둘러보기 안 함
       if (p.right) { const [nx, ny] = this.toNorm(rawX, rawY); this.zoomAt = { x: nx, y: ny }; return; }
       const touch = e.pointerType === 'touch';
@@ -157,6 +204,7 @@ export class WalkControls {
     }
     const k = this.enabled ? this.keys : new Set();
     let f = 0, s = 0, turn = 0;
+    if (this.joyBlocked) this.joy.x = this.joy.y = 0;
     if (k.has('KeyW') || k.has('ArrowUp')) f += 1;
     if (k.has('KeyS') || k.has('ArrowDown')) f -= 1;
     if (k.has('KeyD')) s += 1;
