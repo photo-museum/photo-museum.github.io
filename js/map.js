@@ -291,6 +291,7 @@ export class MuseumMap {
     let d = null;
     const row = this.row;
     row.addEventListener('pointerdown', e => {
+      cancelAnimationFrame(this._glide); // 흘러가던 것을 잡으면 멈춘다
       if (e.target.closest('button')) return;
       if (this.isBlocked()) { d = null; return; }
       // 카드 밖 빈 곳이나 방 아래 글씨 쪽을 끌면 좌우로 넘겨 보기만 한다.
@@ -315,7 +316,12 @@ export class MuseumMap {
       if (d.mode === 'photo') { this._moveGhost(d); return; }
       if (d.thumb && (e.pointerType === 'mouse' || this.editing) && d.moved > 4) { this._lift(d); return; }
       if (d.timer && d.moved > 10) { clearTimeout(d.timer); d.timer = null; }
-      if (!this.editing || !d.card || !d.onPlan) { row.scrollLeft -= mx; return; } // 넘겨 보기
+      if (!this.editing || !d.card || !d.onPlan) { // 넘겨 보기 (손 뗀 뒤 흘러가도록 빠르기를 기억)
+        row.scrollLeft -= mx;
+        const now = performance.now(), dt = Math.max(1, now - (d.vt || now - 16));
+        d.v = (d.v || 0) * 0.5 + (-mx / dt) * 0.5; d.vt = now; d.scrolled = true;
+        return;
+      }
       d.dx += mx;
       if (!d.started && d.moved > 4) {
         d.started = true; d.card.classList.add('drag');
@@ -332,6 +338,22 @@ export class MuseumMap {
       clearTimeout(dd.timer);
       cancelAnimationFrame(this._auto);
       if (dd.mode === 'photo') { this._drop(dd); return; }
+      // 손을 뗀 뒤에도 조금 더 흘러가다 천천히 멈춘다
+      if (dd.scrolled && dd.v && performance.now() - dd.vt < 150) {
+        // 아이폰 스크롤처럼: 손 뗀 빠르기로 미끄러지다 0.35초 시간 상수로 잦아든다 (화면 빠르기와 상관없이 같은 거리)
+        let v = Math.max(-5, Math.min(5, dd.v)); // px/ms
+        let last = performance.now();
+        const glide = now => {
+          const dt = Math.min(50, now - last); last = now;
+          v *= Math.exp(-dt / 350);
+          if (Math.abs(v) < 0.02) return;
+          const prev = row.scrollLeft;
+          row.scrollLeft += v * dt;
+          if (row.scrollLeft === prev && dt > 0) return; // 끝에 닿음
+          this._glide = requestAnimationFrame(glide);
+        };
+        this._glide = requestAnimationFrame(glide);
+      }
       if (dd.started) {
         dd.card.classList.remove('drag');
         dd.card.style.transform = '';
