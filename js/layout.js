@@ -25,13 +25,19 @@ export function panelSize(aspect) {
   return { w: w * k, h: h * k };
 }
 
+// 화면에 보이는 비율. rot = 시계 방향 90도 몇 번 (0~3). 홀수면 가로세로가 바뀐다.
+export function displayAspect(photo) {
+  const r = ((photo.rot || 0) % 4 + 4) % 4;
+  return r % 2 ? 1 / photo.aspect : photo.aspect;
+}
+
 export function layoutMuseum(museum) {
   const rooms = [];
   let z = 0;
   museum.rooms.forEach((room, ri) => {
     const walls = { L: [], R: [] };
     room.photos.forEach((photo, pi) => {
-      walls[pi % 2 === 0 ? 'L' : 'R'].push({ photo, index: pi, ...panelSize(photo.aspect) });
+      walls[pi % 2 === 0 ? 'L' : 'R'].push({ photo, index: pi, ...panelSize(displayAspect(photo)) });
     });
     // 벽마다 차례로 쌓기
     const place = (list, start) => {

@@ -156,6 +156,7 @@ async function hangPhotos(job, files) {
       const old = photo.imageId;
       photo.imageId = imageId;
       photo.aspect = aspect;
+      delete photo.rot;
       await persist();
       if (old) { deleteImage(old); museumScene.forgetTexture(old); }
       rebuild();
@@ -176,6 +177,7 @@ function removePhoto(t) {
   const old = photo.imageId;
   photo.imageId = null;
   photo.aspect = EMPTY_ASPECT;
+  delete photo.rot;
   persist();
   deleteImage(old); museumScene.forgetTexture(old);
   rebuild();
@@ -278,16 +280,37 @@ controls.onTap = (sx, sy) => {
       { label: '닫기', quiet: true },
     ]);
   } else {
-    openSheet([
-      { label: '앞에 가서 보기', fn: () => { const v = viewingSpot(t.panel); controls.walkTo(v.x, v.z, v.yaw); } },
-      { label: capLabel, fn: () => openEditor(t) },
-      { label: '사진 바꾸기', fn: () => pickPhotos({ roomIndex: t.roomIndex, startPhotoId: t.photoId, replace: true }) },
-      { label: '사진 내리기 (빈 판으로)', quiet: true, fn: () => removePhoto(t) },
-      { label: '판 떼기', quiet: true, fn: () => removePanel(t) },
-      { label: '닫기', quiet: true },
-    ]);
+    openPhotoSheet(t);
   }
 };
+
+// 사진이 걸린 판 메뉴. 돌리기 뒤에는 다시 열어서 계속 돌릴 수 있게.
+function panelFor(photoId) {
+  for (const r of museumScene.layout) for (const p of r.panels) if (p.photo.id === photoId) return p;
+  return null;
+}
+function openPhotoSheet(t) {
+  const panel = panelFor(t.photoId) || t.panel;
+  const capLabel = panel.photo.caption ? '설명 고치기' : '설명 쓰기';
+  openSheet([
+    { label: '앞에 가서 보기', fn: () => { const v = viewingSpot(panelFor(t.photoId) || panel); controls.walkTo(v.x, v.z, v.yaw); } },
+    { label: '↻ 90° 돌리기', fn: () => { rotatePhoto(t); openPhotoSheet(t); } },
+    { label: capLabel, fn: () => openEditor(t) },
+    { label: '사진 바꾸기', fn: () => pickPhotos({ roomIndex: t.roomIndex, startPhotoId: t.photoId, replace: true }) },
+    { label: '사진 내리기 (빈 판으로)', quiet: true, fn: () => removePhoto(t) },
+    { label: '판 떼기', quiet: true, fn: () => removePanel(t) },
+    { label: '닫기', quiet: true },
+  ]);
+}
+
+function rotatePhoto(t) {
+  const photo = museum.rooms[t.roomIndex]?.photos.find(p => p.id === t.photoId);
+  if (!photo) return;
+  photo.rot = ((photo.rot || 0) + 1) % 4;
+  if (!photo.rot) delete photo.rot;
+  persist();
+  rebuild();
+}
 
 // ---------- 아래 시트 (버튼 목록) ----------
 const sheet = $('#sheet');

@@ -81,9 +81,14 @@ const photoFrag = /* glsl */`
   uniform float intensity;
   uniform vec3 lightColor;
   uniform float aspect;
+  uniform float rot;          // 시계 방향 90도 몇 번 (사진만)
   varying vec2 vUv;
   void main() {
-    vec3 c = texture2D(map, vUv * tile).rgb;
+    vec2 uv = vUv;
+    if (rot > 0.5 && rot < 1.5) uv = vec2(1.0 - vUv.y, vUv.x);
+    else if (rot > 1.5 && rot < 2.5) uv = vec2(1.0 - vUv.x, 1.0 - vUv.y);
+    else if (rot > 2.5) uv = vec2(vUv.y, 1.0 - vUv.x);
+    vec3 c = texture2D(map, uv * tile).rgb;
     vec2 d = (vUv - vec2(0.5, 0.62)) * vec2(aspect, 1.0);
     float spot = 1.0 - smoothstep(0.35, 1.25, length(d));
     vec3 light = lightColor * intensity * (0.8 + 0.25 * spot);
@@ -105,6 +110,7 @@ export function photoMaterial(map, { tile = [1, 1], intensity = 1.0, aspect = 1 
       intensity: { value: intensity },
       lightColor: { value: new THREE.Color(0xfff0dc) },
       aspect: { value: aspect },
+      rot: { value: 0 },
     },
     vertexShader: photoVert,
     fragmentShader: photoFrag,

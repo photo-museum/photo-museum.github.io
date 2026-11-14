@@ -387,6 +387,7 @@ export class MuseumScene {
         if (!tex) { if (this.onTextureError) this.onTextureError(p.photo); return; }
         front.uniforms.map.value = tex;
         front.uniforms.tile.value.set(1, 1);
+        front.uniforms.rot.value = ((p.photo.rot || 0) % 4 + 4) % 4;
         front.uniforms.intensity.value = 0.95;
       });
     }
