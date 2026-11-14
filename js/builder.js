@@ -24,16 +24,18 @@ const rgbToHex = ([r, g, b]) => (Math.round(Math.min(1, r) * 255) << 16) | (Math
 const css = h => '#' + h.toString(16).padStart(6, '0');
 // 무늬(밝기 base)에 곱해 원하는 색이 나오도록 색을 나눠 둔다
 const tintFor = (hex, base) => rgbToHex(hexToRgb(hex).map(v => v / base));
+const FLOOR_WHITE = 0xe8e2d8; // 모든 방 바닥: 따뜻한 흰색
 function colorRoom({ label, desc, wall, floor, ceil, dark = false }) {
   const [r, g, b] = hexToRgb(wall);
   const light = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45;
   return {
-    label, desc, light, mapFloor: css(floor), mapWall: css(wall),
+    label, desc, light, mapFloor: css(FLOOR_WHITE), mapWall: css(wall),
     // 벽 색이 그대로 보이도록 주변광은 차분하게, 사진 둘레 빛은 은은하게 (색이 들뜨지 않게)
     wallMap: 'wallWhite', wallTint: tintFor(wall, 0.93), wallAmb: dark ? 0.56 : 0.7, wallLm: dark ? 0.75 : 0.42,
     endAmb: dark ? 0.52 : 0.66, endLm: dark ? 0.6 : 0.35,
-    floorMap: 'floorWhite', floorTint: tintFor(floor, 0.8), floorAmb: dark ? 0.58 : 0.68, floorLm: dark ? 0.5 : 0.3, reflect: 0, floorTile: [3.2, 3.2],
-    ceil: 'ceilingWhite', ceilSpec: { map: 'wallWhite', tile: [3, 3], tint: tintFor(ceil, 0.93), amb: 0.82 },
+    // 바닥은 모든 방이 같은 따뜻한 흰색, 천장은 벽과 같은 색. 입체감은 구석 그림자로만.
+    floorMap: 'floorWhite', floorTint: tintFor(FLOOR_WHITE, 0.8), floorAmb: 0.7, floorLm: dark ? 0.35 : 0.25, reflect: 0, floorTile: [3.2, 3.2],
+    ceil: 'ceilingWhite', ceilSpec: { map: 'wallWhite', tile: [3, 3], tint: tintFor(wall, 0.93), amb: dark ? 0.62 : 0.74 },
     jambTint: tintFor(wall, 0.93), jambAmb: 0.62, edges: light ? 'edgesWhite' : 'edgesDark',
     wash: true, ao: true, introBg: css(rgbToHex(hexToRgb(wall).map(v => v * 0.86))),
   };
@@ -339,28 +341,36 @@ function introCanvas(room, light, FONTS, bg) {
   const ink = light ? 'rgba(36,33,30,0.94)' : 'rgba(236,229,217,0.94)';
   const sub = light ? 'rgba(62,58,52,0.85)' : 'rgba(208,200,187,0.82)';
   const faint = light ? 'rgba(62,58,52,0.42)' : 'rgba(208,200,187,0.4)';
-  const pad = 0.26 * ppm, W = CW - pad * 2;
+  // 글은 가운데로 모아 컴팩트하게 (폭의 60% 안에서 가운데 정렬, 위아래도 가운데)
+  const W = CW * 0.6, cx = CW / 2;
   const no = `ROOM ${String(room.index + 1).padStart(2, '0')}`;
-  const lines = [{ text: no, font: FONTS.mark(36), color: sub, lh: 56, track: 10 }];
-  if (room.name) lines.push({ text: room.name, font: FONTS.title(92), color: ink, lh: 118, gap: 18, max: 2 });
-  let y = drawTextBlock(g, pad, pad + 10, W, lines);
-  if (room.intro) {
+  const blocks = [{ text: no, font: FONTS.mark(34), color: sub, lh: 54, track: 10 }];
+  if (room.name) blocks.push({ text: room.name, font: FONTS.title(96), color: ink, lh: 120, gap: 14, max: 2 });
+  const rule = !!room.intro;
+  const body = room.intro
+    ? [{ text: room.intro, font: FONTS.text(40), color: sub, lh: 66, max: 6 }]
+    : (!room.name ? [{ text: '벽을 눌러 이 방의 이름과 설명을 적어 주세요.', font: FONTS.text(38), color: faint, lh: 62 }] : []);
+  g.textAlign = 'center';
+  // 높이 재기 (투명하게 한 번 그려 본다)
+  const ghost = arr => arr.map(b => ({ ...b, color: 'rgba(0,0,0,0)' }));
+  const h1 = drawTextBlock(g, cx, 0, W, ghost(blocks));
+  const h2 = body.length ? drawTextBlock(g, cx, 0, W, ghost(body)) : 0;
+  const total = h1 + (rule ? 58 : body.length ? 30 : 0) + h2;
+  let y = Math.max(CH * 0.08, (CH - total) / 2 - CH * 0.04);
+  y = drawTextBlock(g, cx, y, W, blocks);
+  if (rule) {
     g.fillStyle = light ? 'rgba(150,110,60,0.55)' : 'rgba(255,217,160,0.6)';
-    g.fillRect(pad, y + 26, 90, 3);
+    g.fillRect(cx - 45, y + 24, 90, 3);
     y += 58;
-    drawTextBlock(g, pad, y, W, [{ text: room.intro, font: FONTS.text(40), color: sub, lh: 68, max: Math.floor((CH - y - pad) / 68) }]);
-  } else if (!room.name) {
-    drawTextBlock(g, pad, y + 26, W, [{ text: '벽을 눌러 이 방의 이름과 설명을 적어 주세요.', font: FONTS.text(38), color: faint, lh: 62 }]);
-  }
-  // 관람 방향: 첫 사진이 걸린 쪽으로 작은 화살표
+  } else if (body.length) y += 30;
+  if (body.length) drawTextBlock(g, cx, y, W, body);
+  // 관람 방향: 첫 사진이 걸린 쪽으로 작은 화살표 (아래 가운데)
   const first = room.panels.find(p => p.index === 0);
   const left = !first || first.wall === 'L';
-  g.font = FONTS.text(34);
+  g.font = FONTS.text(32);
   g.fillStyle = sub;
   g.textBaseline = 'alphabetic';
-  const lbl = left ? '←  관람 방향' : '관람 방향  →';
-  g.textAlign = left ? 'left' : 'right';
-  g.fillText(lbl, left ? pad : CW - pad, CH - pad * 0.7);
+  g.fillText(left ? '←  관람 방향' : '관람 방향  →', cx, CH - CH * 0.07);
   g.textAlign = 'left';
   return c;
 }

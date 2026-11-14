@@ -98,6 +98,7 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 250));
 // ---------- 조이스틱 (휴대폰) ----------
 // 조이스틱은 돌린 화면 밖(실제 화면 좌표)에 둔다. 돌린 화면에서는 내용의 왼쪽 아래 = 실제 화면 왼쪽 위.
 let joystick = null;
+const joyZone = document.querySelector('#joy');
 function makeJoystick() {
   if (!isTouch || !window.nipplejs) return;
   if (joystick) { joystick.destroy(); joystick = null; }
@@ -1346,6 +1347,7 @@ function loop(t) {
   lastT = t;
   if (homeOpen || !museum) { requestAnimationFrame(loop); return; } // 홈에서는 그리지 않는다
   controls.update(dt);
+  if (joyZone && joyZone.classList.contains('blocked') !== controls.joyBlocked) joyZone.classList.toggle('blocked', controls.joyBlocked);
   guide.tick();
   const tip = (guide.active && editor.classList.contains('open') && guide.step.editorTip) || '';
   if (tip !== (loop.tip || '')) { loop.tip = tip; setEditorTip(tip); }
