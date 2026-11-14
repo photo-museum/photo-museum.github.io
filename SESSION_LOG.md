@@ -23,6 +23,28 @@
   실패하면 화면에 이유를 띄움. 사진 고르는 동안 WebGL 을 잃으면 돌아와서 다시 짓기. toBlob 실패 대비.
 - 확인: Chromium(iPhone 13 크기)으로 넣기→새로고침 OK. 실제 아이폰 확인은 사용자 몫.
 
+## 2026-11-14 · 글씨체 3차 시안
+
+### 한 일
+- 사용자가 G(디필레이아)가 좋다며 비슷하게 개성 있는 글씨를 더 원함.
+- 무료 한글 글씨체 모음 눈누(noonnu.cc)의 '독특한/감성적인/명조/고전체/장식체/우아한/레트로' 분류에서 247개를 모아 직접 그려 보고 10개를 고름.
+- 시안 페이지(같은 링크)를 3차로 바꿈: https://claude.ai/artifact/864x1HnkNw2Xu8Gkcj4oJw
+  눈누 글씨는 아티팩트에서 바로 못 불러와서, 실제 글씨를 그림으로 그려 넣음. G 는 비교용.
+- 고르면 앱에 넣을 글씨 파일 주소 (jsDelivr):
+  - M OG 르네상스 비밀: https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2312-1@1.1/OG_Renaissance_Secret-Rg.woff2
+  - N 덕온공주체: https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2205@1.0/DeogonPrincess.woff2
+  - O 산하엽: https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_JAMO@1.0/Diphylleia-Regular.woff2
+  - P 마포꽃섬: https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/MapoFlowerIslandA.woff
+  - Q 송암 이형식체: https://cdn.jsdelivr.net/gh/projectnoonnu/2604-1@1.0/SongamIhyeongsik-Regular.woff2
+  - R 그리운X국한박 송글손글 감성 흘림체: https://cdn.jsdelivr.net/gh/Project-Noonnu/2607161334@x-3/x/GriunXHangeul_SongleSongeulHeullim-Rg.woff2
+  - S 을유1945: https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2102-01@1.0/Eulyoo1945-Regular.woff
+  - T 스텔라체: https://cdn.jsdelivr.net/gh/Project-Noonnu/2608201622@stellar-serif/stellar-serif/Stellar_Serif_Bold_Condensed.woff2
+  - U 연천 허목체: https://cdn.jsdelivr.net/gh/Project-Noonnu/2608201852@cts5114-font02/cts5114-font02/cts5114_font02.woff2
+  - V 균명조: https://cdn.jsdelivr.net/gh/Project-Noonnu/2611080026@gyunmyeongjo-regular/gyunmyeongjo-regular/GyunMyeongjo-Regular.woff2
+
+### 다음 할 일
+- 사용자가 고르면 `js/fonts.js`, index.html(@font-face), CSS 변수 바꾸기.
+
 ## 2026-11-14 · 글씨체 C(함렛) 적용
 
 ### 한 일
