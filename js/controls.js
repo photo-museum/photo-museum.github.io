@@ -45,11 +45,15 @@ export class WalkControls {
     this.vel.x = this.vel.z = 0;
   }
 
-  walkTo(x, z, yaw) {
-    // yaw 를 가까운 방향으로
-    let d = yaw - this.yawT;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    this.auto = { x, z, yaw: this.yawT + d };
+  walkTo(x, z, yaw) { this.walkPath([{ x, z }], yaw); }
+
+  // 여러 점을 차례로 지나 마지막 점에서 yaw 를 바라본다 (벽을 돌아가거나 문을 지날 때).
+  // 길이 길면 조금 빨리 걷는다.
+  walkPath(points, yaw) {
+    let len = 0, px = this.pos.x, pz = this.pos.z;
+    for (const p of points) { len += Math.hypot(p.x - px, p.z - pz); px = p.x; pz = p.z; }
+    const last = points[points.length - 1];
+    this.auto = { path: points.slice(), x: last.x, z: last.z, yawEnd: yaw, speed: Math.min(5, Math.max(WALK, len / 3.2)) };
   }
 
   _bind() {
@@ -241,14 +245,21 @@ export class WalkControls {
 
     if (this.auto) {
       const a = this.auto;
-      const dx = a.x - this.pos.x, dz = a.z - this.pos.z;
+      const goal = a.path[0];
+      const dx = goal.x - this.pos.x, dz = goal.z - this.pos.z;
       const d = Math.hypot(dx, dz);
-      const v = Math.min(WALK, d * 1.6);
+      const lastLeg = a.path.length === 1;
+      if (!lastLeg && d < 0.35) a.path.shift(); // 중간 점은 지나가듯
+      const v = lastLeg ? Math.min(a.speed, d * 1.6) : a.speed;
       if (d > 0.02) { tx = dx / d * v; tz = dz / d * v; }
-      let dy = a.yaw - this.yawT;
-      this.yawT += dy * Math.min(1, dt * 3);
+      // 가는 동안은 가는 쪽을, 마지막 구간에서는 바라볼 쪽을 본다
+      let want = a.yawEnd;
+      const remain = lastLeg ? d : 99;
+      if (remain > 1.2 && d > 0.3) want = Math.atan2(-dx, -dz);
+      let dy = want - this.yawT; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      this.yawT += dy * Math.min(1, dt * 3.2);
       this.pitchT += (-0.02 - this.pitchT) * Math.min(1, dt * 3);
-      if (d < 0.03 && Math.abs(dy) < 0.01) this.auto = null;
+      if (lastLeg && d < 0.03 && Math.abs(dy) < 0.01) this.auto = null;
     }
 
     const a = 1 - Math.exp(-ACCEL * dt);

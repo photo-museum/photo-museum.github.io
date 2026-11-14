@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { MuseumScene, THEMES, THEME_ORDER, themeOf } from './builder.js';
+import { MuseumScene, THEMES, THEME_ORDER, themeOf, themeId } from './builder.js';
 import { WalkControls } from './controls.js';
-import { viewingSpot, INTRO_S, LOBBY_L } from './layout.js';
+import { viewingSpot, INTRO_S, INTRO_W, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
 import { MuseumMap, thumbURL } from './map.js';
 import { Guide } from './guide.js';
 import { EXAMPLE } from './example.js';
@@ -145,7 +145,7 @@ function rebuild(fallbackRi = 0, fresh = false) {
     if (ni >= 0) {
       const r = hereId === 'exit' ? layout.exit : layout[ni];
       const z = r.zStart + Math.max(-(r.length - 0.5), Math.min(-0.4, local));
-      if (controls.auto) controls.auto.z += z - controls.pos.z;
+      controls.auto = null;
       controls.pos.z = z;
     } else {
       const r = layout[Math.min(fallbackRi, layout.length - 1)];
@@ -448,7 +448,7 @@ function bestSpot() {
     if (Math.abs(r.index - ri) > 1) continue;
     for (const p of r.panels) cands.push({ kind: p.photo.imageId ? '사진' : '빈 판', photoId: p.photo.id, cx: p.x, cz: p.z, spot: viewingSpot(p) });
     const iz = r.zStart - INTRO_S;
-    cands.push({ kind: '안내벽', cx: r.introX, cz: iz, spot: { x: r.introX, z: iz + 2.3, yaw: 0 } });
+    cands.push({ kind: '안내벽', cx: r.introX, cz: iz, spot: { x: r.introX, z: iz + 3.4, yaw: 0 } });
   }
   if (ri < 0) cands.push({ kind: '전시 소개', cx: -1.25, cz: -LOBBY_L, spot: { x: -1.25, z: -LOBBY_L + 3.0, yaw: 0 } });
   if (L.exit && ri >= L.length) cands.push(...exitSpots(L.exit));
@@ -527,6 +527,79 @@ $('#gb-save').addEventListener('click', () => {
 });
 gb.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') closeGuestbook(); });
 
+// ---------- 이전 / 다음 사진 (터치 한 번으로) ----------
+// 관람 순서: 전시 소개 → (방마다) 안내벽 → 걷는 순서대로 사진 → … → 방명록
+function museumStops() {
+  const L = museumScene.layout;
+  if (!L) return [];
+  const out = [{ kind: '전시 소개', spot: { x: -1.25, z: -LOBBY_L + 3.0, yaw: 0 } }];
+  for (const r of L) {
+    const iz = r.zStart - INTRO_S;
+    out.push({ kind: '안내벽', spot: { x: r.introX, z: iz + 3.4, yaw: 0 } });
+    for (const p of [...r.panels].sort((a, b) => a.sAlong - b.sAlong)) {
+      if (p.photo.imageId) out.push({ kind: '사진', photoId: p.photo.id, spot: viewingSpot(p) });
+    }
+  }
+  if (L.exit) out.push({ kind: '방명록', spot: { x: 0, z: L.exit.zStart - 3.4 + 1.5, yaw: 0 } });
+  return out;
+}
+// 지금 자리에서 목표까지: 안내벽은 옆으로 돌아가고, 방 사이는 문을 지나간다
+function route(x0, z0, x1, z1) {
+  const L = museumScene.layout;
+  const fwd = z1 < z0;
+  const ev = [];
+  const cross = zc => (z0 - zc) * (z1 - zc) < 0;
+  const doors = [{ zA: L.lobby.zEnd, x: L.lobby.doorOutX || 0 }, ...L.map(r => ({ zA: r.zEnd, x: r.doorOutX || 0 }))];
+  for (const d of doors) {
+    const zB = d.zA - WALL_T;
+    if (!cross((d.zA + zB) / 2)) continue;
+    const a = { x: d.x, z: d.zA + 0.5 }, b = { x: d.x, z: zB - 0.5 };
+    ev.push({ z: (d.zA + zB) / 2, pts: fwd ? [a, b] : [b, a] });
+  }
+  const gx = INTRO_W / 2 + (ROOM_W / 2 - INTRO_W / 2) / 2; // 안내벽 옆 통로 가운데
+  for (const r of L) {
+    const iz = r.zStart - INTRO_S;
+    if (!cross(iz)) continue;
+    const side = Math.sign(x1) || Math.sign(x0) || -1;
+    const a = { x: side * gx, z: iz + 0.7 }, b = { x: side * gx, z: iz - 0.7 };
+    ev.push({ z: iz, pts: fwd ? [a, b] : [b, a] });
+  }
+  ev.sort((a, b) => (fwd ? b.z - a.z : a.z - b.z));
+  return [...ev.flatMap(e => e.pts), { x: x1, z: z1 }];
+}
+const navPrev = $('#nav-prev'), navNext = $('#nav-next');
+let navTargets = { prev: null, next: null };
+function updateNav() {
+  const show = museum && !homeOpen && controls.enabled && !map.isOpen && !sheetOpen() && !controls.auto
+    && Math.hypot(controls.vel.x, controls.vel.z) < 0.15;
+  let prev = null, next = null;
+  if (show) {
+    const st = museumStops();
+    const px = controls.pos.x, pz = controls.pos.z;
+    let at = -1, best = 0.6;
+    st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz); if (d < best) { best = d; at = i; } });
+    if (at >= 0) { prev = st[at - 1] || null; next = st[at + 1] || null; }
+    else {
+      next = st.find(s => s.spot.z < pz - 0.2) || null;
+      prev = [...st].reverse().find(s => s.spot.z > pz + 0.2) || null;
+    }
+  }
+  navTargets = { prev, next };
+  navPrev.classList.toggle('show', !!prev);
+  navNext.classList.toggle('show', !!next);
+  if (prev) navPrev.setAttribute('aria-label', `이전 ${prev.kind}으로`);
+  if (next) navNext.setAttribute('aria-label', `다음 ${next.kind}으로`);
+}
+function goStop(s) {
+  if (!s) return;
+  controls.walkPath(route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z), s.spot.yaw);
+  controls.pitchT = -0.02;
+  navPrev.classList.remove('show'); navNext.classList.remove('show');
+  hideHint();
+}
+navPrev.addEventListener('click', () => goStop(navTargets.prev));
+navNext.addEventListener('click', () => goStop(navTargets.next));
+
 const gotoBtn = $('#goto');
 let gotoTarget = null;
 function updateGoto() {
@@ -547,7 +620,7 @@ function updateGoto() {
 gotoBtn.addEventListener('click', () => {
   const t = gotoTarget;
   if (!t) return;
-  controls.walkTo(t.spot.x, t.spot.z, t.spot.yaw);
+  controls.walkPath(route(controls.pos.x, controls.pos.z, t.spot.x, t.spot.z), t.spot.yaw);
   controls.pitchT = -0.02;
   gotoBtn.classList.remove('show');
 });
@@ -830,7 +903,7 @@ $('#tools').addEventListener('click', e => {
     ], 'grid');
   }
   if (act === 'theme') {
-    const cur = museum.rooms[ri].theme || 'dark';
+    const cur = themeId(museum.rooms[ri]);
     openSheet([
       { title: true, label: `ROOM ${String(ri + 1).padStart(2, '0')} 방 스타일` },
       ...themeItems(cur, id => setRoomTheme(ri, id)),
@@ -1114,14 +1187,19 @@ async function startShowcase() {
     persist();
     toast('준비됐어요', 1200);
   }
-  // 새 방 스타일이 생겼으면 이어 붙인다
-  const have = new Set(ex.rooms.map(r => r.theme));
-  const src = ex.rooms[0]?.photos || [];
-  for (const id of THEME_ORDER) if (!have.has(id) && src.length) {
-    const room = newRoom(0, id);
-    room.name = THEMES[id].label; room.intro = THEMES[id].desc + '.';
-    room.photos = src.map(p => ({ ...newPhoto(p.imageId, p.aspect), caption: p.caption }));
-    ex.rooms.push(room);
+  // 방 스타일 목록이 바뀌었으면 (예: 색깔 방으로 정리) 같은 사진으로 다시 짠다
+  if (ex.rooms.map(r => r.theme).join() !== THEME_ORDER.join()) {
+    const seen = new Set(), pics = [];
+    for (const r of ex.rooms) for (const p of r.photos) if (p.imageId && !seen.has(p.imageId)) { seen.add(p.imageId); pics.push(p); }
+    if (pics.length) {
+      ex.rooms = THEME_ORDER.map((id, k) => {
+        const room = newRoom(0, id);
+        room.name = THEMES[id].label; room.intro = THEMES[id].desc + '.';
+        for (let n = 0; n < 4; n++) { const P = pics[(k * 2 + n) % pics.length]; room.photos.push({ ...newPhoto(P.imageId, P.aspect), caption: P.caption }); }
+        return room;
+      });
+      ex.intro = `방 스타일 ${THEME_ORDER.length}가지를 차례로 이어 붙인 전시실이에요.\n걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 색에서 바꿀 수 있어요.`;
+    }
   }
   persist();
   enterExhibition(ex);
@@ -1212,7 +1290,7 @@ function loop(t) {
     document.body.classList.toggle('light-room', !!(museum.rooms[ri] && themeOf(museum.rooms[ri]).light));
   }
   applyZoom();
-  if ((loop.n = (loop.n || 0) + 1) % 8 === 0) updateGoto();
+  if ((loop.n = (loop.n || 0) + 1) % 8 === 0) { updateGoto(); updateNav(); }
   if (loop.n % 20 === 0) updateHD();
   map.update();
   renderer.render(scene, camera);
@@ -1226,4 +1304,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, guide, startTutorial, startShowcase, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
