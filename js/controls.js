@@ -12,6 +12,8 @@ const STEP_LEN = 0.72;  // 한 걸음 (m)
 const BOB_Y = 0.014;    // 위아래 흔들림 (m)
 const BOB_X = 0.008;    // 좌우 흔들림
 const ZOOM_MAX = 5;     // 최대 확대
+const LOOK_TOUCH = 0.0078; // 손가락으로 끌 때 돌아가는 정도 (조금만 끌어도 많이 돌게)
+const LOOK_MOUSE = 0.0040; // 마우스로 끌 때
 const ZOOM_BACK = 12;   // 손을 떼면 원래대로 돌아오는 빠르기
 
 export class WalkControls {
@@ -117,7 +119,7 @@ export class WalkControls {
       if (p.pinched) return; // 확대하던 손가락 하나가 남아 있으면 둘러보기 안 함
       if (p.right) { const [nx, ny] = this.toNorm(rawX, rawY); this.zoomAt = { x: nx, y: ny }; return; }
       const touch = e.pointerType === 'touch';
-      const k = (touch ? 0.0042 : 0.0032) / this.zoom; // 확대 중엔 천천히 둘러보기
+      const k = (touch ? LOOK_TOUCH : LOOK_MOUSE) / this.zoom; // 확대 중엔 천천히 둘러보기
       this.yawT += dx * k;
       this.pitchT = Math.max(-1.1, Math.min(1.1, this.pitchT + dy * k));
       if (p.moved > 6) this.auto = null;
