@@ -86,7 +86,7 @@ export class WalkControls {
 
   update(dt) {
     dt = Math.min(dt, 0.1);
-    const k = this.keys;
+    const k = this.enabled ? this.keys : new Set();
     let f = 0, s = 0, turn = 0;
     if (k.has('KeyW') || k.has('ArrowUp')) f += 1;
     if (k.has('KeyS') || k.has('ArrowDown')) f -= 1;

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MuseumScene, THEMES } from './builder.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot } from './layout.js';
+import { MuseumMap } from './map.js';
 import {
   loadMuseum, saveMuseum, putImage, deleteImage, prepareImage, requestPersistence, uid,
   newPhoto, newRoom, EMPTY_ASPECT,
@@ -97,6 +98,7 @@ function rebuild() {
   const layout = museumScene.build(museum);
   controls.colliders = museumScene.colliders;
   currentRoom = -1;
+  map.invalidate();
   return layout;
 }
 
@@ -249,6 +251,49 @@ function setRoomTheme(ri, theme) {
 }
 
 function currentRoomIndex() { return Math.max(0, museumScene.roomIndexAt(controls.pos.z)); }
+
+// ---------- 지도 ----------
+const map = new MuseumMap({
+  controls,
+  getLayout: () => museumScene.layout,
+  getMuseum: () => museum,
+  mapDelta: (dx, dy) => controls.mapDelta(dx, dy),
+  onOpen: open => {
+    controls.enabled = !open;
+    controls.joy.x = controls.joy.y = 0;
+    controls.keys.clear();
+    document.body.classList.toggle('map-open', open);
+    if (open) { closeSheet(); hideHint(); }
+  },
+  onGo: ri => goToRoom(ri),
+  onReorder: ids => reorderRooms(ids),
+});
+
+// 방 입구에 서서 방 안쪽을 바라본다
+function goToRoom(ri) {
+  const r = museumScene.layout[ri];
+  if (!r) return;
+  controls.auto = null;
+  controls.setPose(0, r.zStart - 1.4, 0);
+  toast(`ROOM ${String(ri + 1).padStart(2, '0')}`);
+}
+
+// 방 순서 바꾸기. 지금 있던 방 안에서의 위치는 그대로 따라간다.
+function reorderRooms(ids) {
+  const before = museumScene.layout;
+  const ri = currentRoomIndex();
+  const hereId = museum.rooms[ri]?.id;
+  const local = controls.pos.z - (before[ri]?.zStart || 0);
+  const byId = new Map(museum.rooms.map(r => [r.id, r]));
+  const next = ids.map(id => byId.get(id)).filter(Boolean);
+  if (next.length !== museum.rooms.length) return;
+  museum.rooms = next;
+  persist();
+  const layout = rebuild();
+  const ni = next.findIndex(r => r.id === hereId);
+  if (ni >= 0) controls.setPose(controls.pos.x, layout[ni].zStart + local, controls.yawT);
+  toast('방 순서를 바꿨어요');
+}
 
 // ---------- 탭 → 판 고르기 ----------
 const raycaster = new THREE.Raycaster();
@@ -412,6 +457,7 @@ function loop(t) {
     $('#room').textContent = `ROOM ${String(ri + 1).padStart(2, '0')}`;
     document.body.classList.toggle('light-room', (museum.rooms[ri]?.theme) === 'white');
   }
+  map.update();
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
@@ -423,4 +469,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme };
+window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, goToRoom, reorderRooms };

@@ -116,3 +116,59 @@ body.light-room .vignette { opacity: 0.3; }
   background: var(--ink); color: #111;
 }
 #editor button.quiet { background: transparent; color: var(--dim); }
+
+/* 작은 지도 (오른쪽 위) */
+#minimap {
+  position: absolute; top: max(36px, calc(env(safe-area-inset-top) + 22px)); right: max(14px, env(safe-area-inset-right));
+  padding: 0; border: 1px solid rgba(233,227,216,0.16); border-radius: 10px; overflow: hidden;
+  background: rgba(10,9,8,0.55); cursor: pointer; z-index: 2;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+#minimap canvas { display: block; }
+#minimap:active { transform: scale(0.97); }
+body.rotated #minimap { top: 36px; right: 14px; }
+@media (pointer: coarse) { #hint { width: min(520px, calc(100% - 360px)); } }
+
+/* 큰 지도 (팝업) */
+#map {
+  position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column;
+  padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(6,6,5,0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  opacity: 0; transform: scale(0.94); transform-origin: calc(100% - 80px) 80px; pointer-events: none;
+  transition: opacity .25s ease, transform .3s cubic-bezier(.2,.8,.2,1);
+}
+body.rotated #map { padding: 14px 16px; }
+#map.open { opacity: 1; transform: none; pointer-events: auto; }
+#map .bar { display: flex; align-items: center; gap: 10px; padding: 2px 2px 10px; }
+#map .bar b { font-weight: 500; font-size: 14px; letter-spacing: 0.06em; }
+#map .tip { flex: 1; font-size: 12px; color: var(--dim); }
+#map .bar button {
+  appearance: none; border: 1px solid rgba(233,227,216,0.2); background: rgba(255,255,255,0.04); color: var(--ink);
+  font: inherit; font-size: 13px; padding: 7px 14px; border-radius: 999px; cursor: pointer;
+}
+#map .bar button.quiet { border-color: transparent; color: var(--dim); font-size: 16px; padding: 5px 10px; }
+#map.editing .bar button[data-act="edit"] { background: var(--ink); color: #111; }
+#map .rooms {
+  flex: 1; min-height: 0; display: flex; align-items: center; gap: 14px; padding: 0 16px;
+  overflow-x: auto; overflow-y: hidden; touch-action: none; scrollbar-width: thin;
+}
+#map .mroom {
+  flex: none; display: flex; flex-direction: column; gap: 8px; padding: 0; cursor: pointer;
+  border-radius: 8px; transition: transform .22s ease; position: relative;
+}
+#map .mroom canvas { display: block; border-radius: 4px; }
+#map .mroom.here canvas { box-shadow: 0 0 0 1.5px rgba(255,217,160,0.7); }
+#map .mroom .cap { display: flex; flex-direction: column; gap: 2px; padding-left: 4px; }
+#map .mroom .cap b { font-weight: 500; font-size: 12px; letter-spacing: 0.18em; }
+#map .mroom .cap span { font-size: 11px; color: var(--dim); }
+#map .mroom:not(:last-child)::after {
+  /* 방 사이 문 */
+  content: ''; position: absolute; right: -14px; width: 14px; height: 2px; top: calc((100% - 38px) / 2);
+  background: rgba(233,227,216,0.25);
+}
+#map.editing .mroom { cursor: grab; animation: wiggle .32s ease-in-out infinite alternate; }
+#map.editing .mroom:nth-child(2n) { animation-delay: -.16s; }
+#map.editing .mroom::after { display: none; }
+#map .mroom.drag { animation: none !important; transition: none; z-index: 2; cursor: grabbing; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.6)); }
+@keyframes wiggle { from { transform: rotate(-0.6deg); } to { transform: rotate(0.6deg); } }
+body.map-open #joy { visibility: hidden; }

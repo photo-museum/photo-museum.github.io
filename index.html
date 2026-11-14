@@ -21,6 +21,8 @@
     <span id="room">ROOM 01</span>
   </header>
 
+  <button id="minimap" aria-label="전시장 지도 열기"><canvas></canvas></button>
+
   <p id="hint"></p>
   <div id="toast"></div>
 
@@ -29,6 +31,16 @@
     <button data-act="room">+ 방</button>
     <button data-act="theme" aria-label="이 방 색 바꾸기">◐ 방 색</button>
   </nav>
+
+  <div id="map" role="dialog" aria-label="전시장 지도">
+    <div class="bar">
+      <b>전시장 지도</b>
+      <span class="tip">방을 누르면 그 방으로 가요</span>
+      <button data-act="edit">편집</button>
+      <button data-act="close" class="quiet" aria-label="닫기">✕</button>
+    </div>
+    <div class="rooms"></div>
+  </div>
 
   <div id="sheet" role="dialog" aria-label="메뉴"></div>
   <div id="loading">전시장을 준비하고 있어요</div>

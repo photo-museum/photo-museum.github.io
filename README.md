@@ -15,6 +15,7 @@
 | `js/materials.js` | 빛 무늬를 곱하는 가벼운 셰이더 |
 | `js/textures.js` | 콘크리트·나무 살·석고 무늬 (캔버스로 생성) |
 | `js/controls.js` | 걷기, 시선, 충돌 |
+| `js/map.js` | 작은 지도, 큰 평면도, 방 이동과 순서 바꾸기 |
 | `js/main.js` | 시작, 화면 조작, 사진 넣기 |
 | `vendor/` | three.js 0.170.0, nipplejs 0.10.2 |
 
