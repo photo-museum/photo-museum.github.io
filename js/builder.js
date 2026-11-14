@@ -4,7 +4,7 @@ import {
   ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, PANEL_GAP, layoutMuseum,
   INTRO_S, INTRO_W, INTRO_H, INTRO_D,
 } from './layout.js';
-import { FONTS } from './fonts.js';
+import { fontsFor } from './fonts.js';
 import { concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture } from './textures.js';
 import { surfaceMaterial, photoMaterial } from './materials.js';
 import { getImage } from './store.js';
@@ -186,7 +186,7 @@ function wrapLines(g, text, maxW) {
   }
   return out;
 }
-function makeLabel(text, light) {
+function makeLabel(text, light, FONTS) {
   const W = Math.round(LABEL_W * LABEL_PX);
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
@@ -237,7 +237,7 @@ function drawTextBlock(g, x, y, maxW, lines) {
 
 // 로비 정면 벽의 전시 소개 (투명 바탕, 벽 위에 붙임)
 const LOBBY_TEXT = { w: 3.9, h: 2.9, x: -1.25, y: 1.75 };
-function makeLobbyText(museum) {
+function makeLobbyText(museum, FONTS) {
   const ppm = 300;
   const c = document.createElement('canvas');
   c.width = Math.round(LOBBY_TEXT.w * ppm); c.height = Math.round(LOBBY_TEXT.h * ppm);
@@ -269,7 +269,7 @@ function makeLobbyText(museum) {
 }
 
 // 방 안내벽 앞면: 벽 색 바탕 + 위에서 비추는 빛 + 글
-function introCanvas(room, light) {
+function introCanvas(room, light, FONTS) {
   const ppm = 400;
   const c = document.createElement('canvas');
   c.width = Math.round(INTRO_W * ppm); c.height = Math.round(INTRO_H * ppm);
@@ -512,7 +512,7 @@ export class MuseumScene {
     endWall.position.set(-ROOM_W / 2, 0, zEnd);
     both(endWall);
     if (room.lobby) {
-      const t = makeLobbyText(this.museum);
+      const t = makeLobbyText(this.museum, fontsFor(room.font));
       keep(t.geometry, t.material, t.material.map);
       t.position.set(LOBBY_TEXT.x, LOBBY_TEXT.y, zEnd + 0.004);
       t.userData = { wallText: 'exhibition' };
@@ -561,7 +561,7 @@ export class MuseumScene {
     // ----- 방 안내벽 (문 들어서 정면, 홀로 선 벽) -----
     if (!room.lobby) {
       const light = room.theme === 'white';
-      const tex = keep(new THREE.CanvasTexture(introCanvas(room, light)));
+      const tex = keep(new THREE.CanvasTexture(introCanvas(room, light, fontsFor(room.font))));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 8;
       const front = keep(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
@@ -618,7 +618,7 @@ export class MuseumScene {
     mesh.userData = { roomIndex: room.index, photoIndex: p.index, photoId: p.photo.id, panel: p, empty };
     group.add(mesh);
     if (p.photo.caption && p.photo.caption.trim()) {
-      const label = makeLabel(p.photo.caption, room.theme === 'white');
+      const label = makeLabel(p.photo.caption, room.theme === 'white', fontsFor(room.font));
       keep(label.geometry, label.material, label.material.map);
       // 판 기준 오른쪽(보는 사람 오른쪽) 벽 위, 아래 끝을 사진 아래 끝에 맞춤
       label.position.set(p.w / 2 + 0.22 + LABEL_W / 2, -p.h / 2 + label.userData.h / 2, -(PANEL_D / 2 + PANEL_GAP) + 0.003);

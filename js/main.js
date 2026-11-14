@@ -3,7 +3,7 @@ import { MuseumScene, THEMES } from './builder.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot } from './layout.js';
 import { MuseumMap, thumbURL } from './map.js';
-import { loadFonts } from './fonts.js';
+import { loadFonts, ensureFont, isFontReady, fontFamily, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
 import {
   loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid,
   newPhoto, newRoom, newExhibition, EMPTY_ASPECT,
@@ -124,6 +124,7 @@ function rebuild(fallbackRi = 0, fresh = false) {
   }
   map.invalidate();
   if (map.isOpen) map.render(true);
+  ensureMuseumFonts();
   return layout;
 }
 
@@ -228,10 +229,14 @@ const editor = $('#editor');
 const editorText = $('#caption');
 const editorTitle = $('#ed-title');
 let editJob = null;
-// job: { head, title?: { label, value, placeholder }, body: { label, value, placeholder }, onSave(title, body) }
+let editFont = null;
+// job: { head, title?: { label, value, placeholder }, body: { label, value, placeholder },
+//        font?: { value, inherit?: 글씨 id (null 을 고르면 따라갈 글씨) }, onSave(title, body, font) }
 function openText(job) {
   editJob = job;
   $('#ed-head').textContent = job.head;
+  editor.classList.toggle('with-font', !!job.font);
+  if (job.font) renderFontPicker(job.font);
   const hasTitle = !!job.title;
   editor.classList.toggle('with-title', hasTitle);
   if (hasTitle) {
@@ -252,7 +257,50 @@ function closeEditor(save) {
   editor.classList.remove('open');
   editorText.blur(); editorTitle.blur();
   controls.enabled = !map.isOpen && !homeOpen;
-  if (save && job) job.onSave(editorTitle.value.trim(), editorText.value.replace(/\s+$/, ''));
+  if (save && job) job.onSave(editorTitle.value.trim(), editorText.value.replace(/\s+$/, ''), editFont);
+}
+
+// 글씨체 고르기: 미리보기 그림이라 글씨 파일을 내려받지 않아도 보인다
+function renderFontPicker(opt) {
+  const box = $('#ed-fonts');
+  box.innerHTML = '';
+  editFont = opt.value || null;
+  const items = [];
+  if (opt.inherit !== undefined) items.push({ id: null, img: opt.inherit, name: '전시실 글씨 따르기', inherit: true });
+  for (const f of FONT_LIST) items.push({ id: f.id, img: f.id, name: f.name + (f.id === DEFAULT_FONT ? ' (기본)' : '') });
+  if (opt.inherit === undefined && !editFont) editFont = DEFAULT_FONT;
+  for (const it of items) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.className = (it.inherit ? 'inherit' : '') + (it.id === editFont ? ' on' : '');
+    b.setAttribute('aria-checked', it.id === editFont);
+    b.innerHTML = `<img src="assets/fonts/${fontInfo(it.img).id}.png" alt=""><span></span>`;
+    b.querySelector('span').textContent = it.name;
+    b.addEventListener('click', () => {
+      editFont = it.id;
+      for (const x of box.children) { x.classList.remove('on'); x.setAttribute('aria-checked', 'false'); }
+      b.classList.add('on'); b.setAttribute('aria-checked', 'true');
+      if (it.id) ensureFont(it.id); // 미리 받아 두기
+    });
+    box.appendChild(b);
+  }
+  const on = box.querySelector('.on');
+  if (on) setTimeout(() => on.scrollIntoView({ inline: 'center', block: 'nearest' }), 30);
+}
+
+// 지금 전시실에서 쓰는 글씨들을 내려받고, 다 받으면 벽 글씨를 다시 그린다
+const failedFonts = new Set();
+function ensureMuseumFonts() {
+  if (!museum) return;
+  const ids = new Set([museum.font || DEFAULT_FONT, ...museum.rooms.map(r => r.font || museum.font || DEFAULT_FONT)]);
+  const missing = [...ids].filter(id => !isFontReady(id) && !failedFonts.has(id));
+  if (!missing.length) return;
+  const m = museum;
+  Promise.all(missing.map(id => ensureFont(id).then(ok => { if (!ok) failedFonts.add(id); return ok; }))).then(r => {
+    if (museum === m && !homeOpen) rebuild();
+    if (r.some(x => !x)) toast('글씨체를 불러오지 못해 기본 글씨로 보여요. 인터넷 연결을 확인해 주세요', 3500);
+  });
 }
 function openEditor(t) {
   const photo = findPhoto(t.photoId)?.room.photos.find(p => p.id === t.photoId);
@@ -275,9 +323,11 @@ function editRoomText(ri) {
     head: `ROOM ${String(ri + 1).padStart(2, '0')} 안내벽`,
     title: { label: '방 이름', value: room.name, placeholder: '예) 바다, 아침 7시' },
     body: { label: '방 설명 (문 들어서 정면 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
-    onSave: (name, intro) => {
+    font: { value: room.font, inherit: museum.font || DEFAULT_FONT },
+    onSave: (name, intro, font) => {
       if (name) room.name = name; else delete room.name;
       if (intro) room.intro = intro; else delete room.intro;
+      if (font) room.font = font; else delete room.font;
       persist();
       rebuild();
       toast('안내벽을 고쳤어요');
@@ -289,9 +339,11 @@ function editExhibitionText(ex, after) {
     head: '전시실',
     title: { label: '전시 이름', value: ex.title, placeholder: '예) 제주, 겨울의 빛' },
     body: { label: '전시 설명 (입구 정면 벽에 적혀요)', value: ex.intro, placeholder: '이 전시가 무엇을 담고 있는지 적어 주세요' },
-    onSave: (title, intro) => {
+    font: { value: ex.font || DEFAULT_FONT },
+    onSave: (title, intro, font) => {
       ex.title = title || '이름 없는 전시';
       ex.intro = intro;
+      if (font && font !== DEFAULT_FONT) ex.font = font; else delete ex.font;
       persist();
       if (ex === museum && !homeOpen) { rebuild(); $('#ex-title').textContent = ex.title; }
       if (homeOpen) renderHome();
@@ -636,7 +688,10 @@ function renderHome() {
     const card = document.createElement('div');
     card.className = 'excard';
     card.innerHTML = `<div class="cover"></div><div class="info"><b></b><p></p><span>방 ${st.rooms} · 사진 ${st.photos}</span></div><button class="more" aria-label="전시실 메뉴">⋯</button>`;
-    card.querySelector('b').textContent = ex.title || '이름 없는 전시';
+    const tb = card.querySelector('b');
+    tb.textContent = ex.title || '이름 없는 전시';
+    tb.style.fontFamily = fontFamily(ex.font);
+    if (ex.font) ensureFont(ex.font);
     card.querySelector('p').textContent = (ex.intro || '').split('\n')[0] || '설명이 아직 없어요';
     const cover = card.querySelector('.cover');
     if (st.cover) thumbURL(st.cover).then(u => { if (u) cover.style.backgroundImage = `url("${u}")`; });

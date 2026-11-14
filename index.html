@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- 글씨체: js/fonts.js 와 같이 바꾼다 -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Diphylleia&family=Hahmlet:wght@300;400;500&display=swap">
   <link rel="stylesheet" href="css/style.css">
   <script type="importmap">
     { "imports": { "three": "./vendor/three.module.min.js" } }
@@ -71,6 +71,8 @@
       <input id="ed-title" class="t" maxlength="60" autocomplete="off">
       <label for="caption" id="ed-body-label">사진 설명</label>
       <textarea id="caption" maxlength="600" rows="5"></textarea>
+      <p class="fl f" id="ed-font-label">글씨체</p>
+      <div id="ed-fonts" class="f" role="radiogroup" aria-labelledby="ed-font-label"></div>
       <div class="row">
         <button id="editor-cancel" class="quiet">취소</button>
         <button id="editor-save">저장</button>

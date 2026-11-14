@@ -40,7 +40,7 @@ export function displayAspect(photo) {
 export function layoutMuseum(museum) {
   const rooms = [];
   const lobby = {
-    index: -1, id: 'lobby', lobby: true, theme: 'dark', zStart: 0, zEnd: -LOBBY_L, length: LOBBY_L, panels: [],
+    index: -1, id: 'lobby', lobby: true, theme: 'dark', font: museum.font || null, zStart: 0, zEnd: -LOBBY_L, length: LOBBY_L, panels: [],
     doorIn: false, doorOut: museum.rooms.length > 0, doorInX: 0, doorOutX: LOBBY_DOOR_X,
   };
   let z = -LOBBY_L - WALL_T;
@@ -81,6 +81,7 @@ export function layoutMuseum(museum) {
     rooms.push({
       index: ri, id: room.id, theme: room.theme || 'dark', zStart, zEnd, length, panels,
       name: room.name || '', intro: room.intro || '',
+      font: room.font || museum.font || null, // 방 글씨 > 전시실 글씨 > 기본
       doorIn: true,
       doorOut: ri < museum.rooms.length - 1,
       doorInX: ri === 0 ? LOBBY_DOOR_X : 0, doorOutX: 0,

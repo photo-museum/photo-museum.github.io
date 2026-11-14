@@ -16,7 +16,8 @@
 | `js/textures.js` | 콘크리트·나무 살·석고 무늬 (캔버스로 생성) |
 | `js/controls.js` | 걷기, 시선, 충돌 |
 | `js/map.js` | 작은 지도, 큰 평면도, 방 이동·순서, 사진 자리 바꾸기 |
-| `js/fonts.js` | 벽 글씨·제목 글씨체 (바꿀 때 index.html 링크와 함께) |
+| `js/fonts.js` | 고를 수 있는 글씨체 목록, 필요할 때 내려받기 |
+| `assets/fonts/` | 글씨 고르는 칸의 미리보기 그림 |
 | `js/main.js` | 시작, 화면 조작, 사진 넣기 |
 | `vendor/` | three.js 0.170.0, nipplejs 0.10.2 |
 
