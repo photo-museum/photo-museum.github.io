@@ -46,6 +46,28 @@ function toContent(sx, sy) {
   return rotated ? [sy, window.innerWidth - sx] : [sx, sy];
 }
 controls.mapDelta = (dx, dy) => (rotated ? [dy, -dx] : [dx, dy]);
+controls.toNorm = (sx, sy) => { const [cx, cy] = toContent(sx, sy); return [cx / viewW, cy / viewH]; };
+
+// 잠깐 확대: 카메라가 보는 화면의 일부만 크게 그린다 (시선은 그대로)
+let lastZoomKey = '';
+function applyZoom() {
+  const z = controls.zoom;
+  if (z <= 1.001) {
+    if (lastZoomKey) { camera.clearViewOffset(); lastZoomKey = ''; }
+    return;
+  }
+  const w = viewW / z, h = viewH / z;
+  let x = controls.zoomFocus.x * viewW - controls.zoomAt.x * w;
+  let y = controls.zoomFocus.y * viewH - controls.zoomAt.y * h;
+  x = Math.max(0, Math.min(viewW - w, x));
+  y = Math.max(0, Math.min(viewH - h, y));
+  // 화면 끝에 막혀 밀린 만큼 확대 점을 맞춰 둔다 (다시 확대할 때 튀지 않게)
+  controls.zoomFocus = { x: (x + controls.zoomAt.x * w) / viewW, y: (y + controls.zoomAt.y * h) / viewH };
+  const key = `${z.toFixed(4)},${x.toFixed(1)},${y.toFixed(1)},${viewW},${viewH}`;
+  if (key === lastZoomKey) return;
+  lastZoomKey = key;
+  camera.setViewOffset(viewW, viewH, x, y, w, h);
+}
 
 function resize() {
   const sw = window.innerWidth, sh = window.innerHeight;
@@ -63,6 +85,7 @@ function resize() {
   const vfov = 2 * Math.atan(Math.tan(hfov / 2) / aspect) * 180 / Math.PI;
   camera.fov = Math.max(48, Math.min(75, vfov));
   camera.aspect = aspect;
+  lastZoomKey = '';
   camera.updateProjectionMatrix();
   if (wasRotated !== rotated || !joystick) makeJoystick();
 }
@@ -623,8 +646,8 @@ function toast(msg, ms = 1800) {
 }
 
 $('#hint').innerHTML = isTouch
-  ? '왼쪽 아래 조이스틱으로 걷고, 화면을 끌어 둘러보세요.<br>판을 누르면 사진을 걸 수 있어요.'
-  : '<b>W A S D</b> 또는 방향키로 걷고, 마우스를 끌어 둘러보세요. <b>Shift</b> 빠르게.<br>판을 누르면 사진을 걸 수 있어요.';
+  ? '왼쪽 아래 조이스틱으로 걷고, 화면을 끌어 둘러보세요.<br>두 손가락을 벌리면 잠깐 확대돼요. 판을 누르면 사진을 걸 수 있어요.'
+  : '<b>W A S D</b> 또는 방향키로 걷고, 마우스를 끌어 둘러보세요. <b>Shift</b> 빠르게.<br><b>휠</b>이나 <b>오른쪽 버튼</b>으로 잠깐 확대. 판을 누르면 사진을 걸 수 있어요.';
 let hintHidden = false;
 function hideHint() {
   if (hintHidden) return;
@@ -759,6 +782,7 @@ function loop(t) {
     $('#room').textContent = ri < 0 ? '입구' : `ROOM ${String(ri + 1).padStart(2, '0')}${nm ? ' · ' + nm : ''}`;
     document.body.classList.toggle('light-room', (museum.rooms[ri]?.theme) === 'white');
   }
+  applyZoom();
   map.update();
   renderer.render(scene, camera);
   requestAnimationFrame(loop);

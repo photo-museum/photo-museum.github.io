@@ -11,6 +11,8 @@ const RADIUS = 0.35;    // 몸 반지름 (벽과 거리)
 const STEP_LEN = 0.72;  // 한 걸음 (m)
 const BOB_Y = 0.014;    // 위아래 흔들림 (m)
 const BOB_X = 0.008;    // 좌우 흔들림
+const ZOOM_MAX = 5;     // 최대 확대
+const ZOOM_BACK = 12;   // 손을 떼면 원래대로 돌아오는 빠르기
 
 export class WalkControls {
   constructor(camera, dom) {
@@ -27,6 +29,11 @@ export class WalkControls {
     this.auto = null;            // 사진 앞으로 걸어가기
     this.onTap = null;           // (clientX, clientY) => void
     this.enabled = true;
+    // 잠깐 확대해서 보기: 화면의 한 부분만 크게 (시선 방향은 그대로)
+    // focus = 확대할 점 (전체 화면 기준 0~1), at = 그 점이 보일 화면 위치 (0~1)
+    this.zoom = 1; this.zoomGoal = 1; this.zoomHold = false;
+    this.zoomFocus = { x: 0.5, y: 0.5 }; this.zoomAt = { x: 0.5, y: 0.5 };
+    this.toNorm = (sx, sy) => [sx / innerWidth, sy / innerHeight]; // main 이 돌린 화면에 맞춰 바꾼다
     this._bind();
   }
 
@@ -54,22 +61,63 @@ export class WalkControls {
     window.addEventListener('keyup', e => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
 
-    // 드래그로 둘러보기, 짧게 누르면 탭
+    // 드래그로 둘러보기, 짧게 누르면 탭, 두 손가락 벌리면 확대
     const ptrs = new Map();
+    let pinch = null;
+    const two = () => { const [a, b] = [...ptrs.values()]; return { a, b }; };
+    const startPinch = () => {
+      const { a, b } = two();
+      const d0 = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      const [mx, my] = this.toNorm((a.x + b.x) / 2, (a.y + b.y) / 2);
+      a.pinched = b.pinched = true;
+      pinch = { d0, z0: this.zoom, P: this._pointAt(mx, my) };
+      this.zoomHold = true;
+    };
     el.addEventListener('pointerdown', e => {
       if (!this.enabled) return;
       el.setPointerCapture(e.pointerId);
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), moved: 0 });
+      if (e.pointerType === 'touch' && ptrs.size === 2) startPinch();
+      if (e.button === 2) { // 오른쪽 버튼을 누르고 있는 동안 확대
+        const [nx, ny] = this.toNorm(e.clientX, e.clientY);
+        this._zoomAround(nx, ny, Math.max(this.zoom, 2.5));
+        this.zoomHold = true;
+        ptrs.get(e.pointerId).right = true;
+      }
     });
+    el.addEventListener('contextmenu', e => e.preventDefault());
+    el.addEventListener('wheel', e => {
+      if (!this.enabled) return;
+      e.preventDefault();
+      // 트랙패드 핀치(ctrlKey)나 마우스 휠: 그쪽으로 확대, 멈추면 잠시 뒤 돌아온다
+      const k = e.ctrlKey ? 0.012 : 0.0018;
+      const [nx, ny] = this.toNorm(e.clientX, e.clientY);
+      this._zoomAround(nx, ny, this.zoom * Math.exp(-e.deltaY * k));
+      clearTimeout(this._wheelT);
+      this.zoomHold = true;
+      this._wheelT = setTimeout(() => { if (![...ptrs.values()].some(p => p.right)) this.zoomHold = false; }, 900);
+    }, { passive: false });
     el.addEventListener('pointermove', e => {
       const p = ptrs.get(e.pointerId);
       if (!p) return;
+      const rawX = e.clientX, rawY = e.clientY;
       let dx = e.clientX - p.x, dy = e.clientY - p.y;
       if (this.mapDelta) [dx, dy] = this.mapDelta(dx, dy);
-      p.x = e.clientX; p.y = e.clientY;
+      p.x = rawX; p.y = rawY;
       p.moved += Math.abs(dx) + Math.abs(dy);
+      if (pinch && ptrs.size >= 2) {
+        const { a, b } = two();
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        const [mx, my] = this.toNorm((a.x + b.x) / 2, (a.y + b.y) / 2);
+        this.zoom = this.zoomGoal = Math.max(1, Math.min(ZOOM_MAX, pinch.z0 * d / pinch.d0));
+        this.zoomFocus = { x: pinch.P.x, y: pinch.P.y };
+        this.zoomAt = { x: mx, y: my };
+        return;
+      }
+      if (p.pinched) return; // 확대하던 손가락 하나가 남아 있으면 둘러보기 안 함
+      if (p.right) { const [nx, ny] = this.toNorm(rawX, rawY); this.zoomAt = { x: nx, y: ny }; return; }
       const touch = e.pointerType === 'touch';
-      const k = (touch ? 0.0042 : 0.0032);
+      const k = (touch ? 0.0042 : 0.0032) / this.zoom; // 확대 중엔 천천히 둘러보기
       this.yawT += dx * k;
       this.pitchT = Math.max(-1.1, Math.min(1.1, this.pitchT + dy * k));
       if (p.moved > 6) this.auto = null;
@@ -78,14 +126,33 @@ export class WalkControls {
       const p = ptrs.get(e.pointerId);
       if (!p) return;
       ptrs.delete(e.pointerId);
-      if (p.moved < 8 && performance.now() - p.t0 < 450 && this.onTap) this.onTap(e.clientX, e.clientY);
+      if (pinch && ptrs.size < 2) { pinch = null; this.zoomHold = false; } // 손을 떼면 원래대로
+      if (p.right) { this.zoomHold = false; return; }
+      if (p.pinched) return;
+      if (e.type === 'pointerup' && p.moved < 8 && performance.now() - p.t0 < 450 && this.onTap) this.onTap(e.clientX, e.clientY);
     };
     el.addEventListener('pointerup', end);
-    el.addEventListener('pointercancel', e => ptrs.delete(e.pointerId));
+    el.addEventListener('pointercancel', end);
+  }
+
+  // 지금 화면의 (nx, ny) 에 보이는 점 (전체 화면 기준 0~1)
+  _pointAt(nx, ny) {
+    const z = this.zoom;
+    return { x: this.zoomFocus.x - this.zoomAt.x / z + nx / z, y: this.zoomFocus.y - this.zoomAt.y / z + ny / z };
+  }
+  _zoomAround(nx, ny, z) {
+    const P = this._pointAt(nx, ny);
+    this.zoom = this.zoomGoal = Math.max(1, Math.min(ZOOM_MAX, z));
+    this.zoomFocus = P;
+    this.zoomAt = { x: nx, y: ny };
   }
 
   update(dt) {
     dt = Math.min(dt, 0.1);
+    if (!this.zoomHold && this.zoom !== 1) {
+      this.zoom += (1 - this.zoom) * (1 - Math.exp(-ZOOM_BACK * dt));
+      if (this.zoom < 1.002) this.zoom = 1;
+    }
     const k = this.enabled ? this.keys : new Set();
     let f = 0, s = 0, turn = 0;
     if (k.has('KeyW') || k.has('ArrowUp')) f += 1;
