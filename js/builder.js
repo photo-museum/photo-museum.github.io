@@ -5,7 +5,10 @@ import {
   INTRO_S, INTRO_W, INTRO_H, INTRO_D,
 } from './layout.js';
 import { fontsFor } from './fonts.js';
-import { concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture } from './textures.js';
+import {
+  concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture,
+  herringboneTexture, parquetTexture, marbleTexture, terracottaTexture, louverTexture,
+} from './textures.js';
 import { surfaceMaterial, photoMaterial } from './materials.js';
 import { getImage, getImageHD } from './store.js';
 
@@ -13,25 +16,98 @@ const SPOT_COLOR = 0xffe9cf;   // 따뜻한 할로겐 빛
 const TRACK_INSET = 1.5;       // 조명 레일: 벽에서 안쪽으로
 
 // 방 테마. 방마다 room.theme 으로 고른다.
+// light: 밝은 방(글씨·화면 요소를 어둡게). mapFloor/mapWall: 지도 색. desc: 고르는 창 설명.
+// ceilSpec: 구석 그림자(ao)를 그리는 방의 천장 { map, tile, tint, amb }
+const CEIL_GRID = { map: 'grid', tile: [1.2, 1.2], tint: 0xffffff, amb: 0.94 };
+const CEIL_PLASTER = { map: 'wallWhite', tile: [3, 3], tint: 0xf6f3ee, amb: 0.82 };
+const CEIL_LOUVER = { map: 'louver', tile: [0.6, 0.6], tint: 0xffffff, amb: 1.0 };
 export const THEMES = {
   dark: {
-    label: '어두운 방',
+    label: '어두운 방', desc: '콘크리트 벽, 사진마다 스포트라이트', light: false, mapFloor: '#2b2927', mapWall: '#8d8780',
     wallMap: 'wall', wallTint: 0x707274, wallAmb: 0.27, wallLm: 3.0, endAmb: 0.19, endLm: 2.2,
     floorMap: 'floor', floorTint: 0x6a6866, floorAmb: 0.2, floorLm: 2.4, reflect: 0.26,
     ceil: 'ceilingDark', jambTint: 0x6a6662, jambAmb: 0.2, edges: 'edgesDark',
-    spots: true, benches: false,
+    spots: true,
   },
   white: {
-    label: '하얀 방',
-    // 레퍼런스: 흰 벽 + 원목 마루 + 빛나는 격자 유리 천장 + 나무 벤치.
-    // 너무 하얘서 평평해 보이지 않게: 주변광을 낮추고, 천장 빛이 벽·구석으로 갈수록 약해지고,
-    // 사진마다 은은한 조명(wash)을 받는다.
+    label: '하얀 방', desc: '흰 벽, 원목 마루, 빛나는 격자 천장', light: true, mapFloor: '#d8cfc1', mapWall: '#f4efe6',
     wallMap: 'wallWhite', wallTint: 0xe9e3d9, wallAmb: 0.5, wallLm: 0.95, endAmb: 0.48, endLm: 0.8,
     floorMap: 'oak', floorTint: 0xf2e6d6, floorAmb: 0.5, floorLm: 0.9, reflect: 0.13, floorTile: [2.0, 4.0],
-    ceil: 'ceilingGrid', jambTint: 0xd8d2c8, jambAmb: 0.42, edges: 'edgesWhite',
-    spots: false, wash: true, ao: true, benches: false, skyGlow: true, // 의자는 걸려서 뺌
+    ceil: 'ceilingGrid', ceilSpec: CEIL_GRID, jambTint: 0xd8d2c8, jambAmb: 0.42, edges: 'edgesWhite',
+    wash: true, ao: true, skyGlow: true,
+  },
+  cove: {
+    label: '빛줄기 방', desc: '천장 가장자리로 빛 한 줄이 흐르는 고요한 방', light: false, mapFloor: '#232224', mapWall: '#777679',
+    wallMap: 'wall', wallTint: 0x606164, wallAmb: 0.2, wallLm: 2.7, endAmb: 0.16, endLm: 1.9,
+    floorMap: 'floor', floorTint: 0x504d4b, floorAmb: 0.16, floorLm: 2.2, reflect: 0.32,
+    ceil: 'ceilingCove', jambTint: 0x5a5856, jambAmb: 0.18, edges: 'edgesDark',
+    spots: true, rails: false, cove: true,
+  },
+  water: {
+    label: '물 위의 유리관', desc: '밤, 아래에서 비추는 따뜻한 빛, 물처럼 비치는 바닥', light: false, mapFloor: '#141821', mapWall: '#a08f7a',
+    wallMap: 'wall', wallTint: 0x8c8172, wallAmb: 0.15, wallLm: 2.5, endAmb: 0.13, endLm: 1.8,
+    floorMap: 'floor', floorTint: 0x22232a, floorAmb: 0.1, floorLm: 1.0, reflect: 0.62,
+    ceil: 'ceilingNight', jambTint: 0x6a6158, jambAmb: 0.16, edges: 'edgesDark',
+    spots: true, rails: false, uplight: true,
+  },
+  salon: {
+    label: '버건디 살롱', desc: '짙은 와인색 벽, 밝은 원목 바닥, 금빛 테두리', light: false, mapFloor: '#b89a74', mapWall: '#7a2e30',
+    wallMap: 'wallWhite', wallTint: 0x7c2c30, wallAmb: 0.55, wallLm: 1.4, endAmb: 0.5, endLm: 1.1,
+    floorMap: 'oak', floorTint: 0xe9d3b5, floorAmb: 0.42, floorLm: 0.9, reflect: 0.14, floorTile: [2.0, 4.0],
+    ceil: 'ceilingWhite', ceilSpec: CEIL_PLASTER, jambTint: 0x5c2224, jambAmb: 0.5, edges: 'edgesGold',
+    wash: true, ao: true, introBg: '#5a2024',
+  },
+  conservatory: {
+    label: '유리 온실', desc: '유리 천장 아래 햇빛, 테라코타 타일', light: true, mapFloor: '#c07a58', mapWall: '#f3efe6',
+    wallMap: 'wallWhite', wallTint: 0xf2eee5, wallAmb: 0.62, wallLm: 0.8, endAmb: 0.58, endLm: 0.7,
+    floorMap: 'terracotta', floorTint: 0xffffff, floorAmb: 0.56, floorLm: 0.7, reflect: 0.1, floorTile: [1.6, 1.6],
+    ceil: 'ceilingGrid', ceilSpec: { ...CEIL_GRID, amb: 1.0 }, jambTint: 0xe0dad0, jambAmb: 0.5, edges: 'edgesWhite',
+    wash: true, ao: true, skyGlow: true,
+  },
+  oakgallery: {
+    label: '원목 갤러리', desc: '따뜻한 흰 벽, 지그재그 원목 마루', light: true, mapFloor: '#b9875a', mapWall: '#f1ebe1',
+    wallMap: 'wallWhite', wallTint: 0xf0e9de, wallAmb: 0.52, wallLm: 1.1, endAmb: 0.5, endLm: 0.9,
+    floorMap: 'herringbone', floorTint: 0xffffff, floorAmb: 0.5, floorLm: 1.0, reflect: 0.12, floorTile: [1.6, 1.6],
+    ceil: 'ceilingWhite', ceilSpec: CEIL_PLASTER, jambTint: 0xdcd4c8, jambAmb: 0.45, edges: 'edgesWhite',
+    wash: true, ao: true,
+  },
+  blue: {
+    label: '푸른 응접실', desc: '깊은 파란 벽, 체크 쪽마루, 금빛 테두리', light: false, mapFloor: '#9a6a44', mapWall: '#34557f',
+    wallMap: 'wallWhite', wallTint: 0x35567f, wallAmb: 0.58, wallLm: 1.3, endAmb: 0.54, endLm: 1.0,
+    floorMap: 'parquet', floorTint: 0xffffff, floorAmb: 0.45, floorLm: 0.9, reflect: 0.12, floorTile: [1.4, 1.4],
+    ceil: 'ceilingWhite', ceilSpec: CEIL_PLASTER, jambTint: 0x2a4566, jambAmb: 0.5, edges: 'edgesGold',
+    wash: true, ao: true, introBg: '#26405f',
+  },
+  hall: {
+    label: '천창 회랑', desc: '아이보리 벽, 대리석 바닥, 유리 천장', light: true, mapFloor: '#ece7de', mapWall: '#eee4d2',
+    wallMap: 'wallWhite', wallTint: 0xeee3d0, wallAmb: 0.6, wallLm: 0.8, endAmb: 0.56, endLm: 0.7,
+    floorMap: 'marble', floorTint: 0xffffff, floorAmb: 0.6, floorLm: 0.7, reflect: 0.22, floorTile: [2.4, 2.4],
+    ceil: 'ceilingGrid', ceilSpec: CEIL_GRID, jambTint: 0xdcd2c0, jambAmb: 0.5, edges: 'edgesWhite',
+    wash: true, ao: true, skyGlow: true,
+  },
+  cube: {
+    label: '화이트 큐브', desc: '하얀 루버 천장 사이로 고른 빛, 연회색 바닥', light: true, mapFloor: '#d9d8d4', mapWall: '#f6f6f4',
+    wallMap: 'wallWhite', wallTint: 0xf4f4f2, wallAmb: 0.62, wallLm: 0.7, endAmb: 0.58, endLm: 0.6,
+    floorMap: 'floorWhite', floorTint: 0xdad9d5, floorAmb: 0.55, floorLm: 0.6, reflect: 0.1, floorTile: [3.2, 3.2],
+    ceil: 'ceilingLouver', ceilSpec: CEIL_LOUVER, jambTint: 0xe6e6e3, jambAmb: 0.5, edges: 'edgesWhite',
+    wash: true, ao: true, skyGlow: true,
+  },
+  fold: {
+    label: '사진 갤러리', desc: '하얗고 밝은 방, 검은 얇은 테두리 (흑백 사진에 잘 어울림)', light: true, mapFloor: '#efeeeb', mapWall: '#fbfbfa',
+    wallMap: 'wallWhite', wallTint: 0xf8f8f7, wallAmb: 0.6, wallLm: 0.7, endAmb: 0.56, endLm: 0.6,
+    floorMap: 'floorWhite', floorTint: 0xf0efec, floorAmb: 0.58, floorLm: 0.6, reflect: 0.08, floorTile: [3.2, 3.2],
+    ceil: 'ceilingLouver', ceilSpec: { ...CEIL_LOUVER, tile: [1.4, 1.4] }, jambTint: 0xebebea, jambAmb: 0.5, edges: 'edgesBlack',
+    wash: true, ao: true, skyGlow: true,
+  },
+  lounge: {
+    label: '사진 라운지', desc: '흰 벽, 짙은 원목 마루, 검은 테두리, 따뜻한 빛', light: true, mapFloor: '#8a6444', mapWall: '#f2efea',
+    wallMap: 'wallWhite', wallTint: 0xf1ede6, wallAmb: 0.48, wallLm: 1.2, endAmb: 0.46, endLm: 1.0,
+    floorMap: 'oak', floorTint: 0xb98d63, floorAmb: 0.42, floorLm: 1.0, reflect: 0.14, floorTile: [2.0, 4.0],
+    ceil: 'ceilingWhite', ceilSpec: CEIL_PLASTER, jambTint: 0xd8d2c8, jambAmb: 0.42, edges: 'edgesBlack',
+    wash: true, ao: true,
   },
 };
+export const THEME_ORDER = ['dark', 'white', 'cove', 'water', 'salon', 'conservatory', 'oakgallery', 'blue', 'hall', 'cube', 'fold', 'lounge'];
 export function themeOf(room) { return THEMES[room && room.theme] || THEMES.dark; }
 
 // ---------- 공용 자원 (한 번만 만든다) ----------
@@ -46,11 +122,26 @@ function getShared(maxAniso) {
   const floorWhite = concreteTexture(512, 41, false, 0.8, 0.55);
   const oak = oakFloorTexture();
   const grid = lightGridTexture();
-  for (const t of [wall, floor, wood, plaster, wallWhite, floorWhite, oak, grid]) t.anisotropy = Math.min(8, maxAniso);
+  const herringbone = herringboneTexture(), parquet = parquetTexture(), marble = marbleTexture();
+  const terracotta = terracottaTexture(), louver = louverTexture();
+  for (const t of [wall, floor, wood, plaster, wallWhite, floorWhite, oak, grid, herringbone, parquet, marble, terracotta, louver]) t.anisotropy = Math.min(8, maxAniso);
   const black = new THREE.DataTexture(new Uint8Array([0, 255, 0, 255]), 1, 1);
   black.needsUpdate = true;
   shared = {
-    wall, floor, wood, plaster, black, wallWhite, floorWhite, oak, grid,
+    wall, floor, wood, plaster, black, wallWhite, floorWhite, oak, grid, herringbone, parquet, marble, terracotta, louver,
+    edgesGold: {
+      top: new THREE.MeshBasicMaterial({ color: 0xe0bd72 }),
+      side: new THREE.MeshBasicMaterial({ color: 0xa8833e }),
+      bottom: new THREE.MeshBasicMaterial({ color: 0x3a2c18 }),
+    },
+    edgesBlack: {
+      top: new THREE.MeshBasicMaterial({ color: 0x2c2c2c }),
+      side: new THREE.MeshBasicMaterial({ color: 0x161616 }),
+      bottom: new THREE.MeshBasicMaterial({ color: 0x080808 }),
+    },
+    ceilingCove: surfaceMaterial({ map: plaster, tile: [3, 3], tint: 0x3c3c3f, lightMap: black, ambient: 0.4, lmIntensity: 0 }),
+    ceilingNight: surfaceMaterial({ map: plaster, tile: [3, 3], tint: 0x1e2436, lightMap: black, ambient: 0.4, lmIntensity: 0 }),
+    ceilingLouver: surfaceMaterial({ map: louver, tile: [0.6, 0.6], tint: 0xffffff, lightMap: black, ambient: 1.0, lmIntensity: 0 }),
     edgesDark: {
       top: new THREE.MeshBasicMaterial({ color: 0x8c8274 }),
       side: new THREE.MeshBasicMaterial({ color: 0x3e3933 }),
@@ -276,7 +367,7 @@ function makeLobbyText(museum, FONTS) {
 }
 
 // 방 안내벽 앞면: 벽 색 바탕 + 위에서 비추는 빛 + 글
-function introCanvas(room, light, FONTS) {
+function introCanvas(room, light, FONTS, bg) {
   const ppm = 400;
   const c = document.createElement('canvas');
   const S = 1.6; // 글씨를 더 촘촘하게 그려 선명하게
@@ -284,7 +375,7 @@ function introCanvas(room, light, FONTS) {
   c.width = Math.round(CW * S); c.height = Math.round(CH * S);
   const g = c.getContext('2d');
   g.scale(S, S);
-  g.fillStyle = light ? '#d6cfc3' : '#232220';
+  g.fillStyle = bg || (light ? '#d6cfc3' : '#232220');
   g.fillRect(0, 0, CW, CH);
   const grd = g.createRadialGradient(CW / 2, -CH * 0.15, 0, CW / 2, -CH * 0.15, CH * 1.25);
   grd.addColorStop(0, light ? 'rgba(255,246,230,0.5)' : 'rgba(255,226,180,0.22)');
@@ -311,6 +402,27 @@ function introCanvas(room, light, FONTS) {
     drawTextBlock(g, pad, y + 26, W, [{ text: '벽을 눌러 이 방의 이름과 설명을 적어 주세요.', font: FONTS.text(38), color: faint, lh: 62 }]);
   }
   return c;
+}
+
+// 빛줄기 방: 천장 가장자리 빛이 벽 위쪽을 따라 번진다
+function paintCove(L) {
+  const { g, c, ppm } = L;
+  const y0 = 0.32 * ppm;
+  const grd = g.createLinearGradient(0, y0 - 0.15 * ppm, 0, y0 + 1.4 * ppm);
+  grd.addColorStop(0, 'rgba(255,0,0,0.25)');
+  grd.addColorStop(0.12, 'rgba(255,0,0,0.85)');
+  grd.addColorStop(0.45, 'rgba(255,0,0,0.3)');
+  grd.addColorStop(1, 'rgba(255,0,0,0)');
+  g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = grd;
+  g.fillRect(0, 0, c.width, y0 + 1.4 * ppm);
+  g.restore();
+}
+// 물 위의 유리관: 벽 아래에서 위로 쏘는 따뜻한 빛 (1.6m 마다)
+function paintUplights(L, Lr) {
+  const { g, c, ppm } = L;
+  for (let u = 0.8; u < Lr; u += 1.6) {
+    glow(g, u * ppm, c.height, 0.42 * ppm, 2.6 * ppm, [[0, 0.75], [0.4, 0.35], [1, 0]]);
+  }
 }
 
 // 위 천장에서 내려오는 빛: 벽 위쪽이 조금 더 밝다
@@ -583,6 +695,8 @@ export class MuseumScene {
     const lmR = lightCanvas(Lr, ROOM_H);
     const lmF = lightCanvas(ROOM_W, Lr, 24);
     if (T.skyGlow) { paintSkyGlow(lmL); paintSkyGlow(lmR); }
+    if (T.cove) { paintCove(lmL); paintCove(lmR); }
+    if (T.uplight) { paintUplights(lmL, Lr); paintUplights(lmR, Lr); }
     const benches = T.benches ? benchSpots(Lr) : [];
     for (const b of benches) paintFloorShadow(lmF, b);
     for (const p of room.panels) {
@@ -628,7 +742,8 @@ export class MuseumScene {
       // 빛나는 천장도 벽 쪽으로 갈수록 조금 어둡게
       const lmC = lightCanvas(ROOM_W, Lr, 16);
       paintEdgeAO(lmC, { l: [1.8, 0.55], r: [1.8, 0.55], t: [1.4, 0.4], b: [1.4, 0.4] });
-      ceilMat = keep(surfaceMaterial({ map: R.grid, tile: [1.2, 1.2], tint: 0xffffff, lightMap: keep(lightTex(lmC.c)), lmSize: [ROOM_W, Lr], ambient: 0.94, lmIntensity: 0 }));
+      const C = T.ceilSpec || CEIL_GRID;
+      ceilMat = keep(surfaceMaterial({ map: R[C.map], tile: C.tile, tint: C.tint, lightMap: keep(lightTex(lmC.c)), lmSize: [ROOM_W, Lr], ambient: C.amb, lmIntensity: 0 }));
     }
     const ceil = new THREE.Mesh(ceilGeo, ceilMat);
     ceil.rotation.x = Math.PI / 2;
@@ -710,7 +825,7 @@ export class MuseumScene {
     }
 
     // ----- 조명 레일 (스포트라이트 방만) -----
-    if (T.spots && !room.lobby && !room.exit) {
+    if (T.spots && T.rails !== false && !room.lobby && !room.exit) {
       const railGeo = keep(new THREE.BoxGeometry(0.035, 0.035, Lr - 0.6));
       for (const sx of [-1, 1]) {
         const rail = new THREE.Mesh(railGeo, R.fixtureMat);
@@ -732,10 +847,21 @@ export class MuseumScene {
       this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
     }
 
+    // ----- 빛줄기: 천장 가장자리를 따라 빛나는 띠 -----
+    if (T.cove) {
+      const stripGeo = keep(new THREE.BoxGeometry(0.05, 0.03, Lr - 0.3));
+      const stripMat = keep(new THREE.MeshBasicMaterial({ color: 0xfff1da, toneMapped: false }));
+      for (const sx of [-1, 1]) {
+        const st = new THREE.Mesh(stripGeo, stripMat);
+        st.position.set(sx * (ROOM_W / 2 - 0.03), ROOM_H - 0.32, zMid);
+        both(st);
+      }
+    }
+
     // ----- 방 안내벽 (문 들어서 정면, 홀로 선 벽) -----
     if (!room.lobby && !room.exit) {
-      const light = room.theme === 'white';
-      const tex = keep(new THREE.CanvasTexture(introCanvas(room, light, fontsFor(room.font))));
+      const light = !!T.light;
+      const tex = keep(new THREE.CanvasTexture(introCanvas(room, light, fontsFor(room.font), T.introBg)));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = MAX_ANISO;
       const front = keep(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
@@ -792,7 +918,7 @@ export class MuseumScene {
     mesh.userData = { roomIndex: room.index, photoIndex: p.index, photoId: p.photo.id, panel: p, empty };
     group.add(mesh);
     if (p.photo.caption && p.photo.caption.trim()) {
-      const label = makeLabel(p.photo.caption, room.theme === 'white', fontsFor(room.font));
+      const label = makeLabel(p.photo.caption, !!themeOf(room).light, fontsFor(room.font));
       keep(label.geometry, label.material, label.material.map);
       // 판 기준 오른쪽(보는 사람 오른쪽) 벽 위, 아래 끝을 사진 아래 끝에 맞춤
       label.position.set(p.w / 2 + 0.22 + LABEL_W / 2, -p.h / 2 + label.userData.h / 2, -(PANEL_D / 2 + PANEL_GAP) + 0.003);

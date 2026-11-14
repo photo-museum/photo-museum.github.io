@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MuseumScene, THEMES } from './builder.js';
+import { MuseumScene, THEMES, THEME_ORDER, themeOf } from './builder.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, INTRO_S, LOBBY_L } from './layout.js';
 import { MuseumMap, thumbURL } from './map.js';
@@ -219,7 +219,7 @@ async function hangPhotos(job, files) {
       photo.aspect = aspect;
       delete photo.rot;
       await persist();
-      if (old) { deleteImage(old); museumScene.forgetTexture(old); }
+      if (old) releaseImage(old);
       rebuild();
       ok++;
     } catch (e) {
@@ -240,7 +240,7 @@ function removePhoto(t) {
   photo.aspect = EMPTY_ASPECT;
   delete photo.rot;
   persist();
-  deleteImage(old); museumScene.forgetTexture(old);
+  releaseImage(old);
   rebuild();
 }
 
@@ -249,7 +249,7 @@ function removePanel(t) {
   const i = room.photos.findIndex(p => p.id === t.photoId);
   if (i < 0) return;
   const [photo] = room.photos.splice(i, 1);
-  if (photo.imageId) { deleteImage(photo.imageId); museumScene.forgetTexture(photo.imageId); }
+  if (photo.imageId) releaseImage(photo.imageId);
   persist();
   rebuild();
   toast('판을 뗐어요');
@@ -633,7 +633,17 @@ function roomAction(act, ri) {
   }
 }
 function forgetPhotos(photos) {
-  for (const p of photos) if (p.imageId) { deleteImage(p.imageId); museumScene.forgetTexture(p.imageId); }
+  for (const p of photos) if (p.imageId) releaseImage(p.imageId);
+}
+// 사진 원본 지우기. 같은 사진을 다른 판(다른 전시실 포함)이 아직 쓰고 있으면 남겨 둔다.
+// 데이터를 바꾼 직후에 부르므로 한 박자 뒤에 확인한다.
+function releaseImage(id) {
+  setTimeout(() => {
+    const used = library.exhibitions.some(ex => ex.rooms.some(r => r.photos.some(p => p.imageId === id)));
+    if (used) return;
+    deleteImage(id);
+    museumScene.forgetTexture(id);
+  }, 0);
 }
 function clearRoom(ri) {
   const room = museum.rooms[ri];
@@ -737,9 +747,17 @@ function rotatePhoto(t) {
 const sheet = $('#sheet');
 let sheetItems = [];
 function sheetOpen() { return sheet.classList.contains('open'); }
-function openSheet(items) {
+// 방 스타일 고르기 항목 (벽·바닥 색 견본 + 이름 + 설명)
+function themeItems(cur, fn) {
+  return THEME_ORDER.map(id => {
+    const T = THEMES[id];
+    return { label: T.label, sub: T.desc, swatch: [T.mapWall, T.mapFloor], on: id === cur, fn: () => fn(id) };
+  });
+}
+function openSheet(items, kind = '') {
   sheetItems = items;
   sheet.innerHTML = '';
+  sheet.className = kind;
   items.forEach((it, i) => {
     if (it.title) {
       const h = document.createElement('p');
@@ -751,6 +769,14 @@ function openSheet(items) {
     const b = document.createElement('button');
     b.textContent = it.label;
     b.dataset.i = i;
+    if (it.swatch) {
+      b.textContent = '';
+      b.innerHTML = `<i class="sw" style="background:linear-gradient(180deg, ${it.swatch[0]} 0 58%, ${it.swatch[1]} 58%)"></i><span class="tx"><b></b><small></small></span>`;
+      b.querySelector('b').textContent = (it.on ? '✓ ' : '') + it.label;
+      b.querySelector('small').textContent = it.sub;
+      b.classList.add('theme');
+      if (it.on) b.classList.add('on');
+    }
     if (it.quiet) b.className = 'quiet';
     if (it.danger) b.className = 'danger';
     sheet.appendChild(b);
@@ -776,18 +802,18 @@ $('#tools').addEventListener('click', e => {
   if (act === 'photos') pickPhotos({ roomIndex: ri });
   if (act === 'room') {
     openSheet([
-      { label: '+ 어두운 방 만들기', fn: () => addRoom('dark') },
-      { label: '+ 하얀 방 만들기', fn: () => addRoom('white') },
+      { title: true, label: '어떤 방을 만들까요?' },
+      ...themeItems(null, id => addRoom(id)),
       { label: '닫기', quiet: true },
-    ]);
+    ], 'grid');
   }
   if (act === 'theme') {
     const cur = museum.rooms[ri].theme || 'dark';
     openSheet([
-      { label: `${cur === 'dark' ? '✓ ' : ''}어두운 방`, fn: () => setRoomTheme(ri, 'dark') },
-      { label: `${cur === 'white' ? '✓ ' : ''}하얀 방`, fn: () => setRoomTheme(ri, 'white') },
+      { title: true, label: `ROOM ${String(ri + 1).padStart(2, '0')} 방 스타일` },
+      ...themeItems(cur, id => setRoomTheme(ri, id)),
       { label: '닫기', quiet: true },
-    ]);
+    ], 'grid');
   }
 });
 
@@ -868,7 +894,13 @@ function renderHome() {
   tour.innerHTML = '<span class="eyebrow">처음이라면</span><b>사용법 둘러보기</b><span>제주 여행 예시 전시실을 걸으며<br>하나씩 따라 해 봐요</span><span class="go">시작하기 →</span>';
   tour.addEventListener('click', () => startTutorial());
   list.appendChild(tour);
+  const styles = document.createElement('button');
+  styles.className = 'excard tour styles';
+  styles.innerHTML = `<span class="eyebrow">방 고르기</span><b>방 스타일 둘러보기</b><span>${THEME_ORDER.length}가지 방을 이어 붙인 전시실을<br>걸으며 비교해 봐요</span><span class="go">들어가기 →</span>`;
+  styles.addEventListener('click', () => startShowcase());
+  list.appendChild(styles);
   for (const ex of library.exhibitions) {
+    if (ex.showcase) continue; // 방 스타일 둘러보기는 위 카드로
     const st = exhibitionStats(ex);
     const card = document.createElement('div');
     card.className = 'excard';
@@ -971,6 +1003,64 @@ async function buildExample() {
   return ex;
 }
 
+// 방 스타일 둘러보기: 모든 방 스타일을 한 전시실에 이어 붙여, 걸어 다니며 비교한다.
+// 예시 사진 8장을 한 번만 저장하고 여러 방에서 같이 쓴다.
+async function buildShowcase() {
+  const pics = [];
+  for (const R of EXAMPLE.rooms) for (const P of R.photos) {
+    const blob = await (await fetch(P.file)).blob();
+    const { blob: small, hd, aspect } = await prepareImage(blob);
+    const imageId = uid('img_');
+    await putImage(imageId, small);
+    if (hd) await putImage(imageId + HD, hd);
+    pics.push({ imageId, aspect, caption: P.caption });
+  }
+  const ex = newExhibition('방 스타일 둘러보기');
+  ex.intro = `방 스타일 ${THEME_ORDER.length}가지를 차례로 이어 붙인 전시실이에요.\n`
+    + '걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 색에서 바꿀 수 있어요.';
+  ex.showcase = true;
+  ex.rooms = THEME_ORDER.map((id, k) => {
+    const T = THEMES[id];
+    const room = newRoom(0, id);
+    room.name = T.label;
+    room.intro = T.desc + '.';
+    for (let n = 0; n < 4; n++) {
+      const P = pics[(k * 2 + n) % pics.length];
+      const photo = newPhoto(P.imageId, P.aspect);
+      photo.caption = P.caption;
+      room.photos.push(photo);
+    }
+    return room;
+  });
+  return ex;
+}
+
+async function startShowcase() {
+  if (buildingExample) return;
+  let ex = library.exhibitions.find(e => e.showcase);
+  if (!ex) {
+    buildingExample = true;
+    toast('방 스타일 전시실을 준비하고 있어요…', 8000);
+    try { ex = await buildShowcase(); }
+    catch (e) { console.error(e); toast('예시 사진을 불러오지 못했어요. 인터넷 연결을 확인해 주세요', 4000); return; }
+    finally { buildingExample = false; }
+    library.exhibitions.unshift(ex);
+    persist();
+    toast('준비됐어요', 1200);
+  }
+  // 새 방 스타일이 생겼으면 이어 붙인다
+  const have = new Set(ex.rooms.map(r => r.theme));
+  const src = ex.rooms[0]?.photos || [];
+  for (const id of THEME_ORDER) if (!have.has(id) && src.length) {
+    const room = newRoom(0, id);
+    room.name = THEMES[id].label; room.intro = THEMES[id].desc + '.';
+    room.photos = src.map(p => ({ ...newPhoto(p.imageId, p.aspect), caption: p.caption }));
+    ex.rooms.push(room);
+  }
+  persist();
+  enterExhibition(ex);
+}
+
 async function startTutorial() {
   if (buildingExample) return;
   let ex = library.exhibitions.find(e => e.tutorial);
@@ -1053,7 +1143,7 @@ function loop(t) {
     const nm = museum.rooms[ri]?.name;
     $('#room').textContent = ri < 0 ? '입구' : ri >= museum.rooms.length ? '출구'
       : `ROOM ${String(ri + 1).padStart(2, '0')}${nm ? ' · ' + nm : ''}`;
-    document.body.classList.toggle('light-room', (museum.rooms[ri]?.theme) === 'white');
+    document.body.classList.toggle('light-room', !!(museum.rooms[ri] && themeOf(museum.rooms[ri]).light));
   }
   applyZoom();
   if ((loop.n = (loop.n || 0) + 1) % 8 === 0) updateGoto();
@@ -1070,4 +1160,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, guide, startTutorial, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, guide, startTutorial, startShowcase, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };

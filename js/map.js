@@ -3,15 +3,13 @@
 // 큰 지도에서 방을 누르면 그 방으로 이동, '편집'을 누르면 방을 끌어서 순서를 바꾼다.
 import { ROOM_W, DOOR_W, INTRO_S, INTRO_W } from './layout.js';
 import { getImage } from './store.js';
+import { themeOf } from './builder.js';
 
-const COLORS = {
-  dark: { floor: '#2b2927', wall: '#8d8780' },
-  white: { floor: '#d8cfc1', wall: '#f4efe6' },
-};
+const colorsOf = r => { const T = themeOf(r); return { floor: T.mapFloor, wall: T.mapWall, light: T.light }; };
 
 // 방 하나를 그린다. px(z) = ox - z*s, py(x) = oy + x*s
 function drawRoom(g, r, s, ox, oy, { current = false } = {}) {
-  const C = COLORS[r.theme] || COLORS.dark;
+  const C = colorsOf(r);
   const x0 = ox - r.zStart * s, x1 = ox - r.zEnd * s;
   const y0 = oy - ROOM_W / 2 * s, y1 = oy + ROOM_W / 2 * s;
   g.fillStyle = C.floor;
@@ -35,7 +33,7 @@ function drawRoom(g, r, s, ox, oy, { current = false } = {}) {
   g.stroke();
   // 안내벽 / 로비 소개 글
   g.lineWidth = Math.max(1.5, s * 0.16);
-  g.strokeStyle = r.theme === 'white' ? 'rgba(90,80,68,0.7)' : 'rgba(255,217,160,0.55)';
+  g.strokeStyle = C.light ? 'rgba(90,80,68,0.7)' : 'rgba(255,217,160,0.55)';
   g.beginPath();
   if (r.lobby) {
     const xe = x1 - g.lineWidth;
@@ -51,7 +49,7 @@ function drawRoom(g, r, s, ox, oy, { current = false } = {}) {
   g.lineWidth = Math.max(2, s * 0.22);
   for (const p of r.panels) {
     const y = oy + p.x * s + (p.wall === 'L' ? 1 : -1) * g.lineWidth * 0.6;
-    g.strokeStyle = p.photo.imageId ? '#ffd9a0' : (r.theme === 'white' ? 'rgba(90,85,78,0.45)' : 'rgba(220,215,205,0.35)');
+    g.strokeStyle = p.photo.imageId ? '#ffd9a0' : (C.light ? 'rgba(90,85,78,0.45)' : 'rgba(220,215,205,0.35)');
     g.beginPath();
     g.moveTo(ox - (p.z + p.w / 2) * s, y);
     g.lineTo(ox - (p.z - p.w / 2) * s, y);
@@ -259,7 +257,7 @@ export class MuseumMap {
       if (!room.name) nm.className = 'none';
       cap.innerHTML = `<b>${label(i)}</b>`;
       cap.firstChild.after(nm);
-      cap.insertAdjacentHTML('beforeend', `<span>${r.theme === 'white' ? '하얀 방' : '어두운 방'} · 사진 ${hung}${i === here ? ' · 지금 여기' : ''}</span>`);
+      cap.insertAdjacentHTML('beforeend', `<span>${themeOf(r).label} · 사진 ${hung}${i === here ? ' · 지금 여기' : ''}</span>`);
       const acts = document.createElement('div');
       acts.className = 'acts';
       acts.innerHTML = `<button data-act="rename">이름·설명</button><button data-act="fill">+ 사진 넣기</button>`

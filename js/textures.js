@@ -193,3 +193,99 @@ export function lightGridTexture(size = 256) {
   g.fillRect(t, 0, 2, size); g.fillRect(size - t - 2, 0, 2, size);
   return canvasTex(c);
 }
+
+// ---------- 방 스타일용 무늬 ----------
+
+// 쉐브론(지그재그) 원목 마루. 세로 띠마다 판이 반대로 기울어 V 모양을 이룬다.
+// 한 장 = 띠 4개 (가로로 이어짐), 세로로도 이어짐
+export function herringboneTexture(size = 1024, seed = 61) {
+  const c = makeCanvas(size, size);
+  const g = c.getContext('2d');
+  const img = g.createImageData(size, size);
+  const cols = 4, cw = size / cols;      // 띠 폭
+  const pw = size / 12;                   // 판 폭 (기울어진 방향으로)
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const col = Math.floor(x / cw);
+    const lx = x - col * cw;
+    const dir = col % 2 ? 1 : -1;
+    const t = ((y + dir * (col % 2 ? lx : cw - lx)) % size + size) % size; // 띠 경계에서 V 로 만난다
+    const k = Math.floor(t / pw);
+    const inT = t - k * pw;
+    const tone = hash(col * 97 + k, 7, seed);
+    const grain = fbm(lx / cw * 2 + col * 5.1, t / pw * 0.35 + k * 1.7, 8, 64, seed + col, 3);
+    let l = (0.86 + tone * 0.16) * (0.9 + grain * 0.14);
+    if (inT < 1.6 || lx < 1.2) l *= 0.78; // 판 사이 이음새
+    const i4 = (y * size + x) * 4;
+    img.data[i4] = Math.min(255, 206 * l);
+    img.data[i4 + 1] = Math.min(255, 158 * l);
+    img.data[i4 + 2] = Math.min(255, 108 * l);
+    img.data[i4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return canvasTex(c);
+}
+
+// 체크무늬 쪽마루 (작은 판 네 개씩 방향을 바꿔 깐 바구니 무늬)
+export function parquetTexture(size = 512, seed = 71) {
+  const c = makeCanvas(size, size);
+  const g = c.getContext('2d');
+  const n = 4, cell = size / n, strips = 4, sw = cell / strips;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const horiz = (i + j) % 2 === 0;
+    for (let s = 0; s < strips; s++) {
+      const tone = hash(i * 31 + j * 7 + s, 3, seed);
+      g.fillStyle = `rgb(${150 + tone * 40 | 0},${98 + tone * 30 | 0},${58 + tone * 20 | 0})`;
+      if (horiz) g.fillRect(i * cell, j * cell + s * sw, cell, sw - 1.5);
+      else g.fillRect(i * cell + s * sw, j * cell, sw - 1.5, cell);
+    }
+  }
+  return canvasTex(c);
+}
+
+// 하얀 대리석 (부드러운 회색 결)
+export function marbleTexture(size = 512, seed = 81) {
+  const c = makeCanvas(size, size);
+  const g = c.getContext('2d');
+  const img = g.createImageData(size, size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const u = x / size, v = y / size;
+    const n = fbm(u * 4, v * 4, 4, 4, seed, 5);
+    const vein = Math.abs(Math.sin((u * 3 + v * 2 + n * 2.6) * Math.PI));
+    const l = 0.93 - Math.pow(1 - vein, 14) * 0.28 - n * 0.05;
+    const i = (y * size + x) * 4;
+    img.data[i] = 245 * l; img.data[i + 1] = 241 * l; img.data[i + 2] = 234 * l; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  // 큰 판 이음새
+  g.fillStyle = 'rgba(150,140,128,0.35)';
+  g.fillRect(0, 0, size, 1.5); g.fillRect(0, 0, 1.5, size);
+  return canvasTex(c);
+}
+
+// 테라코타 타일 (온실 바닥)
+export function terracottaTexture(size = 512, seed = 91) {
+  const c = makeCanvas(size, size);
+  const g = c.getContext('2d');
+  g.fillStyle = '#e7dccb'; g.fillRect(0, 0, size, size);
+  const n = 4, t = size / n;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const tone = hash(i, j, seed);
+    g.fillStyle = `rgb(${184 + tone * 26 | 0},${104 + tone * 20 | 0},${70 + tone * 14 | 0})`;
+    g.fillRect(i * t + 2, j * t + 2, t - 4, t - 4);
+  }
+  return canvasTex(c);
+}
+
+// 하얀 루버 천장: 가는 하얀 살 사이로 빛
+export function louverTexture(size = 256) {
+  const c = makeCanvas(size, size);
+  const g = c.getContext('2d');
+  g.fillStyle = '#fdfdfb'; g.fillRect(0, 0, size, size);
+  for (let i = 0; i < 4; i++) {
+    const x = i * size / 4;
+    const grd = g.createLinearGradient(x, 0, x + size / 4, 0);
+    grd.addColorStop(0, '#d9d8d2'); grd.addColorStop(0.18, '#f4f3ef'); grd.addColorStop(1, '#fdfdfb');
+    g.fillStyle = grd; g.fillRect(x, 0, size / 4, size);
+  }
+  return canvasTex(c);
+}
