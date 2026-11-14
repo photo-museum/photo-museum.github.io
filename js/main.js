@@ -94,11 +94,34 @@ function makeJoystick() {
 let museum = null;
 let currentRoom = -1;
 
-function rebuild() {
+// 다시 짓기. 앞쪽 방 길이가 바뀌거나 방 순서가 바뀌어도, 서 있던 방의 같은 자리에 그대로 있게 한다.
+// 서 있던 방이 사라졌으면 fallbackRi 방 입구로.
+function rebuild(fallbackRi = 0) {
+  const old = museumScene.layout;
+  let hereId = null, local = 0;
+  if (old && old.length) {
+    const ri = Math.max(0, museumScene.roomIndexAt(controls.pos.z));
+    hereId = old[ri]?.id;
+    local = controls.pos.z - old[ri].zStart;
+  }
   const layout = museumScene.build(museum);
   controls.colliders = museumScene.colliders;
   currentRoom = -1;
+  if (hereId) {
+    const ni = layout.findIndex(r => r.id === hereId);
+    if (ni >= 0) {
+      const r = layout[ni];
+      const z = r.zStart + Math.max(-(r.length - 0.5), Math.min(-0.4, local));
+      if (controls.auto) controls.auto.z += z - controls.pos.z;
+      controls.pos.z = z;
+    } else {
+      const r = layout[Math.min(fallbackRi, layout.length - 1)];
+      controls.auto = null;
+      controls.setPose(0, r.zStart - 1.4, 0);
+    }
+  }
   map.invalidate();
+  if (map.isOpen) map.render(true);
   return layout;
 }
 
@@ -258,6 +281,11 @@ const map = new MuseumMap({
   getLayout: () => museumScene.layout,
   getMuseum: () => museum,
   mapDelta: (dx, dy) => controls.mapDelta(dx, dy),
+  toContent: (sx, sy) => toContent(sx, sy),
+  isBlocked: () => { if (sheetOpen()) { closeSheet(); return true; } return editor.classList.contains('open'); },
+  onSwap: (a, b) => swapPhotos(a, b),
+  onPhotoTap: (ri, pid) => openPanelSheet({ roomIndex: ri, photoId: pid, panel: panelFor(pid) }),
+  onRoomAction: (act, ri) => roomAction(act, ri),
   onOpen: open => {
     controls.enabled = !open;
     controls.joy.x = controls.joy.y = 0;
@@ -278,21 +306,77 @@ function goToRoom(ri) {
   toast(`ROOM ${String(ri + 1).padStart(2, '0')}`);
 }
 
-// 방 순서 바꾸기. 지금 있던 방 안에서의 위치는 그대로 따라간다.
+// 방 순서 바꾸기. 지금 있던 방 안에서의 위치는 그대로 따라간다 (rebuild 가 맞춰 줌).
 function reorderRooms(ids) {
-  const before = museumScene.layout;
-  const ri = currentRoomIndex();
-  const hereId = museum.rooms[ri]?.id;
-  const local = controls.pos.z - (before[ri]?.zStart || 0);
   const byId = new Map(museum.rooms.map(r => [r.id, r]));
   const next = ids.map(id => byId.get(id)).filter(Boolean);
   if (next.length !== museum.rooms.length) return;
   museum.rooms = next;
   persist();
-  const layout = rebuild();
-  const ni = next.findIndex(r => r.id === hereId);
-  if (ni >= 0) controls.setPose(controls.pos.x, layout[ni].zStart + local, controls.yawT);
+  rebuild();
   toast('방 순서를 바꿨어요');
+}
+
+// 두 판의 사진 자리 바꾸기 (다른 방끼리도, 빈 판이면 옮기기)
+function findPhoto(pid) {
+  for (const room of museum.rooms) {
+    const i = room.photos.findIndex(p => p.id === pid);
+    if (i >= 0) return { room, i };
+  }
+  return null;
+}
+function swapPhotos(a, b) {
+  const A = findPhoto(a), B = findPhoto(b);
+  if (!A || !B) return;
+  const pa = A.room.photos[A.i], pb = B.room.photos[B.i];
+  A.room.photos[A.i] = pb;
+  B.room.photos[B.i] = pa;
+  persist();
+  rebuild();
+  toast(pa.imageId && pb.imageId ? '두 사진 자리를 바꿨어요' : '사진을 옮겼어요');
+}
+
+// 지도의 방 아래 버튼들
+function roomAction(act, ri) {
+  const room = museum.rooms[ri];
+  if (!room) return;
+  const name = `ROOM ${String(ri + 1).padStart(2, '0')}`;
+  const hung = room.photos.filter(p => p.imageId).length;
+  if (act === 'fill') pickPhotos({ roomIndex: ri });
+  if (act === 'clear') {
+    openSheet([
+      { title: true, label: `${name}의 사진 ${hung}장을 모두 내릴까요? 빈 판 4개만 남아요` },
+      { label: '모두 내리기', danger: true, fn: () => clearRoom(ri) },
+      { label: '취소', quiet: true },
+    ]);
+  }
+  if (act === 'delete') {
+    if (museum.rooms.length <= 1) { toast('방이 하나뿐이라 지울 수 없어요'); return; }
+    openSheet([
+      { title: true, label: hung ? `${name}을 지울까요? 걸린 사진 ${hung}장도 함께 지워져요` : `${name}을 지울까요?` },
+      { label: '방 지우기', danger: true, fn: () => deleteRoom(ri) },
+      { label: '취소', quiet: true },
+    ]);
+  }
+}
+function forgetPhotos(photos) {
+  for (const p of photos) if (p.imageId) { deleteImage(p.imageId); museumScene.forgetTexture(p.imageId); }
+}
+function clearRoom(ri) {
+  const room = museum.rooms[ri];
+  forgetPhotos(room.photos);
+  room.photos = newRoom(4).photos;
+  persist();
+  rebuild();
+  toast('사진을 모두 내렸어요');
+}
+function deleteRoom(ri) {
+  if (museum.rooms.length <= 1) return;
+  const [room] = museum.rooms.splice(ri, 1);
+  forgetPhotos(room.photos);
+  persist();
+  rebuild(Math.min(ri, museum.rooms.length - 1));
+  toast('방을 지웠어요');
 }
 
 // ---------- 탭 → 판 고르기 ----------
@@ -315,19 +399,22 @@ controls.onTap = (sx, sy) => {
   if (!hit || !hit.object.userData.photoId) return;
   const ud = hit.object.userData;
   const t = { roomIndex: ud.roomIndex, photoId: ud.photoId, panel: ud.panel };
-  const capLabel = ud.panel.photo.caption ? '설명 고치기' : '설명 쓰기';
   if (ud.label) { openEditor(t); return; }
-  if (ud.empty) {
-    openSheet([
-      { label: '사진 걸기 (여러 장 가능)', fn: () => pickPhotos({ roomIndex: t.roomIndex, startPhotoId: t.photoId }) },
-      { label: capLabel, fn: () => openEditor(t) },
-      { label: '판 떼기', quiet: true, fn: () => removePanel(t) },
-      { label: '닫기', quiet: true },
-    ]);
-  } else {
-    openPhotoSheet(t);
-  }
+  openPanelSheet(t);
 };
+
+function openPanelSheet(t) {
+  const panel = panelFor(t.photoId) || t.panel;
+  if (!panel) return;
+  if (panel.photo.imageId) { openPhotoSheet(t); return; }
+  const capLabel = panel.photo.caption ? '설명 고치기' : '설명 쓰기';
+  openSheet([
+    { label: '사진 걸기 (여러 장 가능)', fn: () => pickPhotos({ roomIndex: t.roomIndex, startPhotoId: t.photoId }) },
+    { label: capLabel, fn: () => openEditor(t) },
+    { label: '판 떼기', quiet: true, fn: () => removePanel(t) },
+    { label: '닫기', quiet: true },
+  ]);
+}
 
 // 사진이 걸린 판 메뉴. 돌리기 뒤에는 다시 열어서 계속 돌릴 수 있게.
 function panelFor(photoId) {
@@ -338,7 +425,11 @@ function openPhotoSheet(t) {
   const panel = panelFor(t.photoId) || t.panel;
   const capLabel = panel.photo.caption ? '설명 고치기' : '설명 쓰기';
   openSheet([
-    { label: '앞에 가서 보기', fn: () => { const v = viewingSpot(panelFor(t.photoId) || panel); controls.walkTo(v.x, v.z, v.yaw); } },
+    { label: '앞에 가서 보기', fn: () => {
+      const v = viewingSpot(panelFor(t.photoId) || panel);
+      if (map.isOpen) { map.close(); controls.auto = null; controls.setPose(v.x, v.z, v.yaw); }
+      else controls.walkTo(v.x, v.z, v.yaw);
+    } },
     { label: '↻ 90° 돌리기', fn: () => { rotatePhoto(t); openPhotoSheet(t); } },
     { label: capLabel, fn: () => openEditor(t) },
     { label: '사진 바꾸기', fn: () => pickPhotos({ roomIndex: t.roomIndex, startPhotoId: t.photoId, replace: true }) },
@@ -349,7 +440,7 @@ function openPhotoSheet(t) {
 }
 
 function rotatePhoto(t) {
-  const photo = museum.rooms[t.roomIndex]?.photos.find(p => p.id === t.photoId);
+  const photo = findPhoto(t.photoId)?.room.photos.find(p => p.id === t.photoId);
   if (!photo) return;
   photo.rot = ((photo.rot || 0) + 1) % 4;
   if (!photo.rot) delete photo.rot;
@@ -365,10 +456,18 @@ function openSheet(items) {
   sheetItems = items;
   sheet.innerHTML = '';
   items.forEach((it, i) => {
+    if (it.title) {
+      const h = document.createElement('p');
+      h.className = 'title';
+      h.textContent = it.label;
+      sheet.appendChild(h);
+      return;
+    }
     const b = document.createElement('button');
     b.textContent = it.label;
     b.dataset.i = i;
     if (it.quiet) b.className = 'quiet';
+    if (it.danger) b.className = 'danger';
     sheet.appendChild(b);
   });
   sheet.classList.add('open');
@@ -469,4 +568,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, goToRoom, reorderRooms };
+window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom };
