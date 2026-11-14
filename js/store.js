@@ -23,12 +23,12 @@ export function newPhoto(imageId = null, aspect = EMPTY_ASPECT) {
   return { id: uid('p_'), imageId, aspect };
 }
 
-export function newRoom(photoCount = 3, theme = 'dark') {
+export function newRoom(photoCount = 4, theme = 'dark') {
   return { id: uid('r_'), theme, photos: Array.from({ length: photoCount }, () => newPhoto()) };
 }
 
 export function defaultMuseum() {
-  return { version: 1, rooms: [newRoom(3)] };
+  return { version: 1, rooms: [newRoom(4)] };
 }
 
 let dbPromise = null;

@@ -234,7 +234,7 @@ editor.addEventListener('keydown', e => {
 
 // ---------- 방 ----------
 function addRoom(theme) {
-  museum.rooms.push(newRoom(3, theme));
+  museum.rooms.push(newRoom(4, theme));
   persist();
   rebuild();
   const n = museum.rooms.length;
