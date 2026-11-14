@@ -30,6 +30,7 @@ $('#app').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 120);
 const museumScene = new MuseumScene(renderer, scene);
+museumScene.camera = camera; // 미리 셰이더 만들기(warmUp)에 쓴다
 museumScene.onTextureError = () => toast('사진 하나를 불러오지 못했어요. 판을 눌러 다시 넣어 주세요', 4000);
 
 // 아이폰은 사진 고르는 동안 WebGL 을 잃어버릴 수 있다 → 돌아오면 다시 짓는다

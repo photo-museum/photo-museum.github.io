@@ -556,7 +556,28 @@ export class MuseumScene {
     this.buildRoom(layout.lobby);
     for (const room of layout) this.buildRoom(room);
     this.buildRoom(layout.exit);
+    // 빛 무늬·글씨 무늬를 지금 미리 그래픽 메모리에 올려 둔다 (방이 보이는 순간 올리느라 멈칫하는 것 막기)
+    this.warmUp();
     return layout;
+  }
+
+  // 모든 방의 재질에 붙은 그림을 미리 그래픽 메모리에 올리고 셰이더도 미리 만든다
+  warmUp() {
+    const seen = new Set();
+    const up = t => { if (t && t.isTexture && !seen.has(t)) { seen.add(t); try { this.renderer.initTexture(t); } catch (e) {} } };
+    this.root.traverse(o => {
+      const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      for (const m of ms) {
+        up(m.map);
+        if (m.uniforms) for (const k in m.uniforms) up(m.uniforms[k].value);
+      }
+    });
+    if (this.camera) {
+      const vis = this.rooms.map(r => r.group.visible);
+      for (const r of this.rooms) r.group.visible = true;
+      try { this.renderer.compile(this.scene, this.camera); } catch (e) {}
+      this.rooms.forEach((r, i) => { r.group.visible = vis[i]; });
+    }
   }
 
   clear() {
@@ -1014,6 +1035,7 @@ export class MuseumScene {
       t.anisotropy = MAX_ANISO;
       t.minFilter = THREE.LinearMipmapLinearFilter;
       t.needsUpdate = true;
+      try { this.renderer.initTexture(t); } catch (e) {} // 불러오자마자 올려 둔다 (보이는 순간 멈칫 방지)
       return t;
     } finally {
       // 이미지가 GPU 로 올라간 뒤에 풀어야 아이폰에서 안전하다
@@ -1035,8 +1057,8 @@ export class MuseumScene {
   // i = -1 은 로비
   setActiveRoom(i) {
     for (const r of this.rooms) {
-      // 문 너머 두 칸 앞까지 미리 그려 둔다 (방을 옮길 때 검게 비어 보이던 깜빡임 없애기)
-      const v = Math.abs(r.layout.index - i) <= 2;
+      // 문이 일직선이라 여러 칸 너머까지 보인다 → 네 칸까지 그려 둔다 (먼 문 너머가 검게 비었다 나타나는 깜빡임 없애기)
+      const v = Math.abs(r.layout.index - i) <= 4;
       r.group.visible = v;
       r.mirror.visible = false; // 바닥 반사는 쓰지 않는다
     }

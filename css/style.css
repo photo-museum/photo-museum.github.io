@@ -106,8 +106,9 @@ body.light-room #hint b { color: #222; }
 #loading.done { opacity: 0; pointer-events: none; }
 
 body.sheet-open #joy { visibility: hidden; }
-body.light-room .vignette { opacity: 0.3; }
-.vignette { transition: opacity .6s; }
+/* 방마다 가장자리 그림자를 바꾸지 않는다 (방을 옮길 때 화면이 번쩍이지 않게) */
+body.light-room .vignette { opacity: 0.55; }
+.vignette { transition: opacity 1.2s; opacity: 0.55; }
 
 /* 설명 쓰기 창 (돌린 화면 밖, 항상 똑바로) */
 #editor {
@@ -734,3 +735,6 @@ body:has(#loading:not(.done)) #hud, body:has(#loading:not(.done)) #hint { visibi
 #home .fcap .acts { display: flex; gap: 8px; margin-top: 6px; }
 #home .fcap button { appearance: none; border: 0; border-radius: 999px; padding: 8px 18px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; background: #17191c; color: #fff; }
 #home .fcap button.more { background: rgba(255,255,255,.6); color: #17191c; border: 1px solid rgba(255,255,255,.85); padding: 8px 13px; }
+
+/* 밝은 방 ↔ 어두운 방을 지날 때 화면 버튼·글씨 색이 부드럽게 바뀌게 */
+#home-btn, #tools button, #goto, .nav, #hud, #hint, #minimap { transition: background-color .8s ease, color .8s ease, border-color .8s ease, opacity .4s ease; }
