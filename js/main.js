@@ -1435,6 +1435,18 @@ fcap.querySelector('.more').addEventListener('click', flowMenu);
     if (e.key === 'Enter') flowOpen();
   });
   window.addEventListener('resize', () => { if (homeOpen) requestAnimationFrame(() => layoutFlow(false)); });
+  // 글씨체가 늦게 들어오거나 화면 크기가 자리 잡으면서 칸 크기가 바뀌어도 바로 다시 맞춘다
+  // (전에는 처음에 크게 나왔다가 한 번 만져야 작아졌다)
+  let lastFlowSize = '';
+  const refit = () => {
+    const k = flow.clientWidth + 'x' + flow.clientHeight;
+    if (k === lastFlowSize) return;
+    lastFlowSize = k;
+    if (homeOpen) layoutFlow(false);
+  };
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(refit)).observe(flow);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => requestAnimationFrame(refit));
+  for (const ms of [300, 1000, 2500]) setTimeout(() => requestAnimationFrame(refit), ms);
 })();
 // 대표 사진 고르기: 그 전시실에 걸린 사진들 중에서
 function openCoverPicker(ex) {
