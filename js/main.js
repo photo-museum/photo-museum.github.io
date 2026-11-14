@@ -8,7 +8,7 @@ import { EXAMPLE } from './example.js';
 import { loadFonts, ensureFont, isFontReady, fontFamily, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
 import {
   loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid,
-  newPhoto, newRoom, newExhibition, EMPTY_ASPECT,
+  newPhoto, newRoom, newExhibition, EMPTY_ASPECT, HD,
 } from './store.js';
 
 const $ = s => document.querySelector(s);
@@ -17,7 +17,8 @@ const stage = $('#stage');
 
 // ---------- 렌더러 ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isTouch ? 1.75 : 2));
+// 사진과 글씨가 선명하도록 휴대폰도 2배까지 (3배 화면은 2배로 충분히 선명하고 훨씬 가볍다)
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
@@ -132,15 +133,16 @@ function rebuild(fallbackRi = 0, fresh = false) {
   let hereId = null, local = 0;
   if (old && old.length) {
     const ri = museumScene.roomIndexAt(controls.pos.z);
-    if (ri >= 0) { hereId = old[ri]?.id; local = controls.pos.z - old[ri].zStart; }
+    if (ri >= old.length) { hereId = 'exit'; local = controls.pos.z - old.exit.zStart; }
+    else if (ri >= 0) { hereId = old[ri]?.id; local = controls.pos.z - old[ri].zStart; }
   }
   const layout = museumScene.build(museum);
   controls.colliders = museumScene.colliders;
   currentRoom = -2;
   if (hereId) {
-    const ni = layout.findIndex(r => r.id === hereId);
+    const ni = hereId === 'exit' ? layout.length : layout.findIndex(r => r.id === hereId);
     if (ni >= 0) {
-      const r = layout[ni];
+      const r = hereId === 'exit' ? layout.exit : layout[ni];
       const z = r.zStart + Math.max(-(r.length - 0.5), Math.min(-0.4, local));
       if (controls.auto) controls.auto.z += z - controls.pos.z;
       controls.pos.z = z;
@@ -203,11 +205,12 @@ async function hangPhotos(job, files) {
   for (let i = 0; i < files.length; i++) {
     toast(files.length > 1 ? `사진을 거는 중… ${i + 1} / ${files.length}` : '사진을 거는 중…', 8000);
     try {
-      const { blob, aspect } = await prepareImage(files[i]);
+      const { blob, hd, aspect } = await prepareImage(files[i]);
       const imageId = uid('img_');
       const tex = await museumScene.primeTexture(imageId, blob);
       if (!tex) throw new Error('사진을 화면에 올리지 못했어요');
       await putImage(imageId, blob);
+      if (hd) await putImage(imageId + HD, hd);
       let photo = targets.shift();
       if (!photo) { photo = newPhoto(); room.photos.push(photo); }
       const old = photo.imageId;
@@ -403,40 +406,143 @@ function setRoomTheme(ri, theme) {
   toast(`${THEMES[theme].label}으로 바꿨어요`);
 }
 
-function currentRoomIndex() { return Math.max(0, museumScene.roomIndexAt(controls.pos.z)); }
+// 사진·방 버튼이 쓸 방 (로비면 첫 방, 출구면 마지막 방)
+function currentRoomIndex() { return Math.max(0, Math.min(museum.rooms.length - 1, museumScene.roomIndexAt(controls.pos.z))); }
 
 // ---------- 사진 앞에 서기 도우미 ----------
-// 걷다가 멈췄을 때, 바라보는 쪽 가까이에 사진(또는 안내벽)이 있으면 그 정면으로 스르륵 간다.
+// 걷다가 멈췄을 때 바라보는 쪽 가까이에 사진(또는 안내벽)이 있으면, 오른쪽에 '사진 앞으로' 버튼이 희미하게 뜬다.
+// 누르면 그 정면으로 스르륵 가서 바라본다. 저절로 움직이지는 않는다 (실수로 움직였을 때 끌려가지 않게).
 const SNAP_ANGLE = 70 * Math.PI / 180; // 이 각도 안에 있어야 (보고 있는 것)
-const SNAP_DIST = 2.3;                 // 감상 자리까지 이 거리 안이면
-controls.onStop = () => {
+const SNAP_DIST = 2.6;                 // 감상 자리까지 이 거리 안이면
+function bestSpot() {
   const L = museumScene.layout;
-  if (!L || map.isOpen || homeOpen) return;
+  if (!L) return null;
   const ri = museumScene.roomIndexAt(controls.pos.z);
   const px = controls.pos.x, pz = controls.pos.z;
   const fx = -Math.sin(controls.yaw), fz = -Math.cos(controls.yaw);
   const cands = [];
   for (const r of L) {
     if (Math.abs(r.index - ri) > 1) continue;
-    for (const p of r.panels) cands.push({ cx: p.x, cz: p.z, spot: viewingSpot(p) });
-    // 안내벽: 정면 2.3m 앞
+    for (const p of r.panels) cands.push({ kind: p.photo.imageId ? '사진' : '빈 판', photoId: p.photo.id, cx: p.x, cz: p.z, spot: viewingSpot(p) });
     const iz = r.zStart - INTRO_S;
-    cands.push({ cx: r.introX, cz: iz, spot: { x: r.introX, z: iz + 2.3, yaw: 0 } });
+    cands.push({ kind: '안내벽', cx: r.introX, cz: iz, spot: { x: r.introX, z: iz + 2.3, yaw: 0 } });
   }
-  // 로비 소개 벽
-  if (ri < 0) cands.push({ cx: -1.25, cz: -LOBBY_L, spot: { x: -1.25, z: -LOBBY_L + 3.0, yaw: 0 } });
+  if (ri < 0) cands.push({ kind: '전시 소개', cx: -1.25, cz: -LOBBY_L, spot: { x: -1.25, z: -LOBBY_L + 3.0, yaw: 0 } });
+  if (L.exit && ri >= L.length) cands.push(...exitSpots(L.exit));
   let best = null, bestScore = Infinity;
   for (const c of cands) {
     const d = Math.hypot(c.spot.x - px, c.spot.z - pz);
-    if (d > SNAP_DIST || d < 0.05) continue;
+    if (d > SNAP_DIST) continue;
     const vx = c.cx - px, vz = c.cz - pz, vl = Math.hypot(vx, vz) || 1;
     const ang = Math.acos(Math.max(-1, Math.min(1, (vx * fx + vz * fz) / vl)));
     if (ang > SNAP_ANGLE) continue;
     const score = ang + d * 0.35;
-    if (score < bestScore) { bestScore = score; best = c; }
+    if (score < bestScore) { bestScore = score; best = c; best.d = d; best.ang = ang; }
   }
-  if (best) controls.walkTo(best.spot.x, best.spot.z, best.spot.yaw);
-};
+  return best;
+}
+
+// 출구 방: 방명록 책상 앞, 인사 글 앞
+function exitSpots(ex) {
+  const dz = ex.zStart - 3.4;
+  return [
+    { kind: '방명록', cx: 0, cz: dz, spot: { x: 0, z: dz + 1.5, yaw: 0 } },
+  ];
+}
+
+// ---------- 방명록 ----------
+const gb = $('#guestbook');
+let gbColor = 0;
+function openGuestbook() {
+  renderGuestbook();
+  gb.classList.add('open');
+  controls.enabled = false;
+}
+function closeGuestbook() {
+  gb.classList.remove('open');
+  $('#gb-text').blur(); $('#gb-name').blur();
+  controls.enabled = !map.isOpen && !homeOpen;
+}
+function renderGuestbook() {
+  const list = $('#gb-list');
+  list.innerHTML = '';
+  const entries = (museum.guestbook || []).slice().reverse();
+  if (!entries.length) list.innerHTML = '<p class="empty">아직 남긴 글이 없어요. 첫 글을 남겨 주세요.</p>';
+  for (const e of entries) {
+    const d = document.createElement('div');
+    d.className = 'note c' + (e.color || 0);
+    const t = document.createElement('p'); t.textContent = e.text;
+    const m = document.createElement('span');
+    m.textContent = (e.name ? e.name + ' · ' : '') + new Date(e.at).toLocaleDateString('ko-KR');
+    const x = document.createElement('button'); x.className = 'del'; x.textContent = '지우기'; x.setAttribute('aria-label', '이 글 지우기');
+    x.addEventListener('click', () => {
+      museum.guestbook = museum.guestbook.filter(g => g.id !== e.id);
+      persist(); rebuild(); renderGuestbook();
+    });
+    d.append(t, m, x);
+    list.appendChild(d);
+  }
+  const dots = $('#gb-colors');
+  dots.innerHTML = '';
+  ['#f6e7c8', '#f3d3d0', '#d6e6d2', '#d5e1ef', '#efe2f2', '#fff1a8'].forEach((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.style.background = c; b.className = i === gbColor ? 'on' : '';
+    b.setAttribute('aria-label', `쪽지 색 ${i + 1}`);
+    b.addEventListener('click', () => { gbColor = i; renderGuestbook(); });
+    dots.appendChild(b);
+  });
+}
+$('#gb-close').addEventListener('click', closeGuestbook);
+$('#gb-save').addEventListener('click', () => {
+  const text = $('#gb-text').value.trim();
+  if (!text) { $('#gb-text').focus(); return; }
+  museum.guestbook = museum.guestbook || [];
+  museum.guestbook.push({ id: uid('g_'), name: $('#gb-name').value.trim(), text, at: Date.now(), color: gbColor });
+  $('#gb-text').value = '';
+  persist(); rebuild(); renderGuestbook();
+  toast('방명록에 남겼어요 ✦');
+});
+gb.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') closeGuestbook(); });
+
+const gotoBtn = $('#goto');
+let gotoTarget = null;
+function updateGoto() {
+  const moving = Math.hypot(controls.vel.x, controls.vel.z) > 0.15 || controls.auto;
+  let t = null;
+  if (!moving && controls.enabled && !map.isOpen && !sheetOpen()) {
+    t = bestSpot();
+    // 이미 그 자리에서 그쪽을 보고 있으면 띄우지 않는다
+    if (t) {
+      let dy = t.spot.yaw - controls.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      if (t.d < 0.3 && Math.abs(dy) < 0.15) t = null;
+    }
+  }
+  gotoTarget = t;
+  gotoBtn.classList.toggle('show', !!t);
+  if (t) gotoBtn.querySelector('span').textContent = `${t.kind} 앞으로`;
+}
+gotoBtn.addEventListener('click', () => {
+  const t = gotoTarget;
+  if (!t) return;
+  controls.walkTo(t.spot.x, t.spot.z, t.spot.yaw);
+  controls.pitchT = -0.02;
+  gotoBtn.classList.remove('show');
+});
+
+// 사진 앞에 섰거나 확대해서 보고 있으면 그 사진 하나만 선명한 원본으로
+function updateHD() {
+  let id = null;
+  const t = bestSpot();
+  if (t && t.photoId && t.kind === '사진' && t.d < 1.2 && t.ang < 0.6) id = t.photoId;
+  if (controls.zoom > 1.25) {
+    ndc.set(controls.zoomAt.x * 2 - 1, -(controls.zoomAt.y * 2 - 1));
+    raycaster.setFromCamera(ndc, camera);
+    raycaster.far = 40;
+    const hit = raycaster.intersectObjects(museumScene.pickables, false).find(h => visibleChain(h.object));
+    if (hit && hit.object.userData.photoId && !hit.object.userData.empty && !hit.object.userData.label) id = hit.object.userData.photoId;
+  }
+  museumScene.setHD(id);
+}
 
 // ---------- 지도 ----------
 const map = new MuseumMap({
@@ -445,7 +551,7 @@ const map = new MuseumMap({
   getMuseum: () => museum,
   mapDelta: (dx, dy) => controls.mapDelta(dx, dy),
   toContent: (sx, sy) => toContent(sx, sy),
-  isBlocked: () => { if (sheetOpen()) { closeSheet(); return true; } return editor.classList.contains('open'); },
+  isBlocked: () => { if (sheetOpen()) { closeSheet(); return true; } return editor.classList.contains('open') || gb.classList.contains('open'); },
   onSwap: (a, b) => swapPhotos(a, b),
   onPhotoTap: (ri, pid) => openPanelSheet({ roomIndex: ri, photoId: pid, panel: panelFor(pid) }),
   onRoomAction: (act, ri) => roomAction(act, ri),
@@ -566,6 +672,15 @@ controls.onTap = (sx, sy) => {
   const ud = hit.object.userData;
   if (ud.wallText === 'room') { editRoomText(ud.roomIndex); return; }
   if (ud.wallText === 'exhibition') { editExhibitionText(museum); return; }
+  if (ud.guestbook) { openGuestbook(); return; }
+  if (ud.exitDoor) {
+    openSheet([
+      { title: true, label: '전시실을 나가 홈으로 갈까요?' },
+      { label: '홈으로 나가기', fn: () => openHome() },
+      { label: '더 둘러보기', quiet: true },
+    ]);
+    return;
+  }
   if (!ud.photoId) return;
   const t = { roomIndex: ud.roomIndex, photoId: ud.photoId, panel: ud.panel };
   if (ud.label) { openEditor(t); return; }
@@ -814,7 +929,16 @@ function confirmDeleteExhibition(ex) {
 $('#home-btn').addEventListener('click', () => openHome());
 
 // ---------- 튜토리얼: 제주 여행 예시 전시실 + 따라 하기 안내 ----------
-const guide = new Guide($('#guide'), { onEnd: () => setEditorTip('') });
+const guide = new Guide({
+  modal: $('#guide-modal'), pill: $('#guide'),
+  onEnd: () => { setEditorTip(''); controls.enabled = !map.isOpen && !homeOpen; },
+  // 안내 글이 떠 있는 동안은 걷지 않는다
+  onModal: on => {
+    if (on) { controls.joy.x = controls.joy.y = 0; controls.keys.clear(); }
+    controls.enabled = !on && !map.isOpen && !homeOpen && !editor.classList.contains('open');
+    document.body.classList.toggle('guide-modal', on);
+  },
+});
 function setEditorTip(html) {
   const t = $('#ed-tip');
   t.innerHTML = html || '';
@@ -833,9 +957,10 @@ async function buildExample() {
     room.intro = R.intro;
     for (const P of R.photos) {
       const blob = await (await fetch(P.file)).blob();
-      const { blob: small, aspect } = await prepareImage(blob);
+      const { blob: small, hd, aspect } = await prepareImage(blob);
       const imageId = uid('img_');
       await putImage(imageId, small);
+      if (hd) await putImage(imageId + HD, hd);
       const photo = newPhoto(imageId, aspect);
       photo.caption = P.caption;
       room.photos.push(photo);
@@ -879,30 +1004,34 @@ function atViewingSpot() {
 function tutorialSteps() {
   const seen = {};
   const editorOpen = () => editor.classList.contains('open');
+  const walk = isTouch ? '왼쪽 아래 <b>조이스틱</b>' : '<b>W A S D</b>(또는 방향키)';
+  const look = isTouch ? '화면을 손가락으로 끌면' : '마우스로 끌면';
   return [
-    { text: '<b>제주 여행 예시 전시</b>예요. 입구 정면 벽에 전시 이름과 설명이 적혀 있어요. 미술관처럼 먼저 읽고 들어가요.', manual: true },
-    { text: isTouch
-        ? '왼쪽 아래 <b>조이스틱</b>으로 걸어서 오른쪽 문을 지나 ROOM 01로 들어가 보세요. 화면을 끌면 둘러볼 수 있어요.'
-        : '<b>W A S D</b>로 걸어서 오른쪽 문을 지나 ROOM 01로 들어가 보세요. 마우스를 끌면 둘러볼 수 있어요.',
-      done: () => museumScene.roomIndexAt(controls.pos.z) >= 0 },
-    { text: '방마다 문 앞에 <b>안내벽</b>이 있어요. 벽을 돌아 사진 쪽을 보며 걷다가 <b>멈춰</b> 보세요. 사진 정면으로 데려다줘요.',
-      done: atViewingSpot, manual: true },
-    { text: isTouch
-        ? '두 손가락을 <b>벌려</b> 사진 옆 설명을 확대해 보세요. 손을 떼면 돌아와요.'
-        : '<b>휠</b>을 굴리거나 <b>오른쪽 버튼</b>을 누른 채로 사진 옆 설명을 확대해 보세요. 놓으면 돌아와요.',
-      done: () => { if (controls.zoom > 1.6) seen.zoom = true; return seen.zoom && controls.zoom < 1.05; }, manual: true },
-    { text: '<b>사진을 눌러</b> 보세요. 90° 돌리기, 설명 쓰기, 사진 바꾸기 메뉴가 나와요.', done: () => sheetOpen(), manual: true },
-    { text: '메뉴를 닫고, 오른쪽 위 <b>작은 지도</b>를 눌러 보세요.', done: () => map.isOpen && !sheetOpen() },
-    { text: '방을 누르면 그 방으로 바로 가요. 사진을 <b>꾹 눌러</b> 다른 사진 위에 놓으면 둘의 자리가 바뀌어요. 해 보세요.',
-      done: () => stats.swaps > seen.swaps0, onEnter: () => { seen.swaps0 = stats.swaps; }, manual: true },
-    { text: '오른쪽 위 <b>편집</b>을 누르면 방을 끌어서 순서를 바꿀 수 있어요.', done: () => map.editing, manual: true },
-    { text: '방을 끌어 자리를 바꿔 보고, 다 됐으면 <b>완료</b>를 눌러요.', done: () => !map.editing },
-    { text: '방 아래 <b>이름·설명</b>을 눌러 보세요. 안내벽에 적힐 글과 글씨체를 바꿀 수 있어요.', done: editorOpen, manual: true },
-    { text: '창 맨 아래 <b>글씨체</b>를 골라 저장해 보세요.',
-      editorTip: '맨 아래 <b>글씨체</b>에서 마음에 드는 글씨를 고르고 <b>저장</b>해 보세요. 그 방 안내벽과 사진 설명 글씨가 바뀌어요.',
-      done: () => !editorOpen() },
-    { text: '지도를 닫고(✕) 오른쪽 아래 버튼도 살펴보세요. <b>+ 사진</b> 여러 장 걸기, <b>+ 방</b> 새 방, <b>◐ 방 색</b> 어두운 방·하얀 방.', manual: true },
-    { text: '다 됐어요! 왼쪽 위 <b>‹ 홈</b>에서 나만의 전시실을 만들어 보세요. 이 예시 전시실은 홈에서 지울 수 있고, 언제든 다시 둘러볼 수 있어요.', manual: true },
+    { title: '어서 오세요', text: '사용법을 함께 둘러봐요. 이곳은 <b>제주 여행 예시 전시실</b>이에요.<br>입구 정면 벽에 전시 이름과 설명이 적혀 있어요. 미술관처럼 먼저 읽고 들어가요.' },
+    { title: '걸어서 들어가기', text: `${walk}로 걸을 수 있어요. ${look} 둘러볼 수 있고요.<br>오른쪽 문을 지나 <b>ROOM 01</b>로 들어가 보세요.`,
+      task: '오른쪽 문을 지나 <b>ROOM 01</b>로 들어가 보세요', done: () => museumScene.roomIndexAt(controls.pos.z) >= 0 },
+    { title: '방 안내벽', text: '방마다 문 앞에 <b>안내벽</b>이 있어요. 이 방이 어떤 방인지 적혀 있어요.<br>벽을 돌아 사진 쪽을 보고 멈추면 오른쪽에 <b>사진 앞으로</b> 버튼이 희미하게 떠요. 눌러 보세요.',
+      task: '사진 쪽을 보고 멈춘 뒤, 오른쪽 <b>사진 앞으로</b>를 눌러 보세요', done: atViewingSpot },
+    { title: '잠깐 확대해서 보기', text: isTouch
+        ? '두 손가락을 <b>벌리면</b> 그 자리가 확대돼요. 사진 옆 설명 글씨도 또렷하게 볼 수 있어요. 손을 떼면 원래대로 돌아와요.'
+        : '<b>휠</b>을 굴리거나 <b>오른쪽 버튼</b>을 누르고 있으면 그 자리가 확대돼요. 사진 옆 설명 글씨도 또렷하게 볼 수 있어요.',
+      task: isTouch ? '두 손가락을 벌려 확대했다가 놓아 보세요' : '휠이나 오른쪽 버튼으로 확대했다가 놓아 보세요',
+      done: () => { if (controls.zoom > 1.6) seen.zoom = true; return seen.zoom && controls.zoom < 1.05; } },
+    { title: '사진 메뉴', text: '사진을 <b>누르면</b> 메뉴가 나와요. 90° 돌리기, 설명 쓰기, 사진 바꾸기, 내리기를 할 수 있어요.',
+      task: '사진을 눌러 보세요', done: () => sheetOpen() },
+    { title: '전시장 지도', text: '메뉴는 바깥을 누르면 닫혀요.<br>오른쪽 위의 <b>작은 지도</b>를 누르면 전시장 전체가 한눈에 보여요.',
+      task: '오른쪽 위 <b>작은 지도</b>를 눌러 보세요', done: () => map.isOpen && !sheetOpen() },
+    { title: '사진 자리 바꾸기', text: '지도에서 방을 누르면 그 방으로 바로 가요.<br>사진을 <b>꾹 눌러</b> 다른 사진 위에 놓으면 두 사진의 자리가 바뀌어요. 다른 방 사진과도 돼요.',
+      task: '사진을 꾹 눌러 다른 사진 위에 놓아 보세요', done: () => stats.swaps > seen.swaps0, onEnter: () => { seen.swaps0 = stats.swaps; } },
+    { title: '방 순서 바꾸기', text: '지도 오른쪽 위 <b>편집</b>을 누르면 방이 살짝 흔들려요. 그때 방을 끌어서 순서를 바꿀 수 있어요. 다 됐으면 <b>완료</b>.',
+      task: '<b>편집</b>을 눌러 방을 끌어 보고 <b>완료</b>를 눌러요', done: () => { if (map.editing) seen.edit = true; return seen.edit && !map.editing; } },
+    { title: '방 이름과 글씨체', text: '방 아래 <b>이름·설명</b>을 누르면 안내벽에 적힐 글을 고칠 수 있어요.<br>창 맨 아래에서 <b>글씨체</b>도 골라 보세요. 저장하면 그 방 글씨가 바뀌어요.',
+      task: '방 아래 <b>이름·설명</b> → 글씨체 고르고 <b>저장</b>',
+      editorTip: '맨 아래 <b>글씨체</b>에서 마음에 드는 글씨를 고르고 <b>저장</b>해 보세요.',
+      done: () => { if (editorOpen()) seen.ed = true; return seen.ed && !editorOpen(); } },
+    { title: '나만의 전시 꾸미기', text: '지도를 닫으면(✕) 오른쪽 아래에 버튼이 있어요.<br><b>+ 사진</b> 여러 장 한 번에 걸기 · <b>+ 방</b> 새 방 만들기 · <b>◐ 방 색</b> 어두운 방과 하얀 방.' },
+    { title: '출구와 방명록', text: '마지막 방 끝에는 <b>출구</b>가 있어요. 방명록 책상을 누르면 한마디를 남길 수 있고, 남긴 글은 벽에 쪽지로 붙어요. 초록 <b>출구</b> 문을 누르면 홈으로 나가요.' },
+    { title: '다 됐어요 ✦', text: '이제 왼쪽 위 <b>‹ 홈</b>에서 나만의 전시실을 만들어 보세요.<br>이 예시 전시실은 홈에서 지울 수 있고, <b>사용법 둘러보기</b>로 언제든 다시 볼 수 있어요.' },
   ];
 }
 
@@ -921,10 +1050,13 @@ function loop(t) {
     currentRoom = ri;
     museumScene.setActiveRoom(ri);
     const nm = museum.rooms[ri]?.name;
-    $('#room').textContent = ri < 0 ? '입구' : `ROOM ${String(ri + 1).padStart(2, '0')}${nm ? ' · ' + nm : ''}`;
+    $('#room').textContent = ri < 0 ? '입구' : ri >= museum.rooms.length ? '출구'
+      : `ROOM ${String(ri + 1).padStart(2, '0')}${nm ? ' · ' + nm : ''}`;
     document.body.classList.toggle('light-room', (museum.rooms[ri]?.theme) === 'white');
   }
   applyZoom();
+  if ((loop.n = (loop.n || 0) + 1) % 8 === 0) updateGoto();
+  if (loop.n % 20 === 0) updateHD();
   map.update();
   renderer.render(scene, camera);
   requestAnimationFrame(loop);

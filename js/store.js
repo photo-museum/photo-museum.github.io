@@ -107,8 +107,13 @@ export async function getImage(id) {
 }
 
 export function deleteImage(id) {
+  tx('images', 'readwrite', s => s.delete(id + HD)).catch(() => {});
   return tx('images', 'readwrite', s => s.delete(id)).catch(() => {});
 }
+
+// 선명한 원본 (사진 앞에 섰을 때만 쓴다). 없으면 null.
+export const HD = '@hd';
+export function getImageHD(id) { return getImage(id + HD).catch(() => null); }
 
 // 브라우저가 저장소를 임의로 지우지 않도록 요청 (지원하는 곳에서만)
 export function requestPersistence() {
@@ -118,8 +123,8 @@ export function requestPersistence() {
 }
 
 // 사진 파일 → 적당한 크기로 줄인 JPEG Blob + 비율
-// 휴대폰 GPU 메모리를 생각해 긴 변 2048px 로 제한.
-export async function prepareImage(file, maxSide = 2048) {
+// 평소에는 긴 변 2048px (휴대폰 GPU 메모리), 사진 앞에 섰을 때 쓸 선명한 판은 긴 변 3072px 까지 따로.
+export async function prepareImage(file, maxSide = 2048, hdSide = 3072) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
@@ -129,22 +134,27 @@ export async function prepareImage(file, maxSide = 2048) {
       im.src = url;
     });
     const w0 = img.naturalWidth, h0 = img.naturalHeight;
-    const scale = Math.min(1, maxSide / Math.max(w0, h0));
-    const w = Math.max(1, Math.round(w0 * scale));
-    const h = Math.max(1, Math.round(h0 * scale));
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    const g = c.getContext('2d');
-    g.imageSmoothingQuality = 'high';
-    g.drawImage(img, 0, 0, w, h);
-    let blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.9));
-    if (!blob) {
-      // toBlob 이 실패하는 기기 대비
-      const data = c.toDataURL('image/jpeg', 0.9);
-      blob = await (await fetch(data)).blob();
-    }
-    c.width = c.height = 1; // 아이폰 캔버스 메모리 바로 반납
-    return { blob, aspect: w / h };
+    const encode = async (side, q) => {
+      const scale = Math.min(1, side / Math.max(w0, h0));
+      const w = Math.max(1, Math.round(w0 * scale));
+      const h = Math.max(1, Math.round(h0 * scale));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, 0, 0, w, h);
+      let blob = await new Promise(res => c.toBlob(res, 'image/jpeg', q));
+      if (!blob) {
+        // toBlob 이 실패하는 기기 대비
+        const data = c.toDataURL('image/jpeg', q);
+        blob = await (await fetch(data)).blob();
+      }
+      c.width = c.height = 1; // 아이폰 캔버스 메모리 바로 반납
+      return blob;
+    };
+    const blob = await encode(maxSide, 0.92);
+    const hd = Math.max(w0, h0) > maxSide * 1.15 ? await encode(hdSide, 0.92) : null;
+    return { blob, hd, aspect: w0 / h0 };
   } finally {
     URL.revokeObjectURL(url);
   }

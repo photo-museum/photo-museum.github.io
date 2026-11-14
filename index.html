@@ -26,16 +26,26 @@
     <span id="room">입구</span>
   </header>
 
+  <button id="goto" aria-label="가까운 사진 앞으로 가기"><i>◎</i><span>사진 앞으로</span></button>
   <button id="minimap" aria-label="전시장 지도 열기"><canvas></canvas></button>
 
   <p id="hint"></p>
 
   <div id="guide" role="status" aria-live="polite">
-    <span class="count"></span>
-    <p class="text"></p>
-    <div class="row">
-      <button data-g="skip" class="quiet">그만 보기</button>
-      <button data-g="next">다음</button>
+    <span class="lbl">지금 할 일</span>
+    <p class="task"></p>
+    <button data-g="pass" class="quiet">건너뛰기</button>
+  </div>
+  <div id="guide-modal" role="dialog" aria-modal="true" aria-label="사용법 안내">
+    <div class="card">
+      <div class="dots"></div>
+      <span class="count"></span>
+      <h2 class="title"></h2>
+      <p class="text"></p>
+      <div class="row">
+        <button data-g="skip" class="quiet">그만 보기</button>
+        <button data-g="go">다음</button>
+      </div>
     </div>
   </div>
   <div id="toast"></div>
@@ -86,6 +96,23 @@
       <div class="row">
         <button id="editor-cancel" class="quiet">취소</button>
         <button id="editor-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="guestbook" role="dialog" aria-label="방명록">
+    <div class="box">
+      <p class="head">방명록</p>
+      <div id="gb-list"></div>
+      <label for="gb-text">한마디</label>
+      <textarea id="gb-text" maxlength="200" rows="3" placeholder="전시를 보고 든 생각, 그날의 기억, 무엇이든요"></textarea>
+      <div class="row2">
+        <input id="gb-name" maxlength="20" placeholder="이름 (안 써도 돼요)" autocomplete="off" aria-label="이름">
+        <div id="gb-colors" aria-label="쪽지 색"></div>
+      </div>
+      <div class="row">
+        <button id="gb-close" class="quiet">닫기</button>
+        <button id="gb-save">남기기</button>
       </div>
     </div>
   </div>

@@ -17,6 +17,7 @@ export const STAGGER = 2.1;     // 오른쪽 벽은 이만큼 늦게 시작 (서
 export const MIN_LEN = 14;      // 최소 방 길이
 export const LOBBY_L = 6.5;     // 입구 로비 길이
 export const LOBBY_DOOR_X = 1.9; // 로비 정면 벽의 문 위치 (오른쪽). 왼쪽엔 전시 설명.
+export const EXIT_L = 7.0;      // 출구 방 길이
 export const INTRO_S = 2.3;     // 방 시작에서 안내벽까지
 export const INTRO_W = 2.8, INTRO_H = 2.5, INTRO_D = 0.18; // 방 안내벽 크기
 const START_MARGIN = 4.6;       // 방 시작에서 첫 사진까지 (안내벽 뒤)
@@ -83,13 +84,18 @@ export function layoutMuseum(museum) {
       name: room.name || '', intro: room.intro || '',
       font: room.font || museum.font || null, // 방 글씨 > 전시실 글씨 > 기본
       doorIn: true,
-      doorOut: ri < museum.rooms.length - 1,
+      doorOut: true, // 마지막 방 뒤에는 출구 방
       doorInX: ri === 0 ? LOBBY_DOOR_X : 0, doorOutX: 0,
       introX: Math.max(-1.3, Math.min(1.3, ri === 0 ? LOBBY_DOOR_X : 0)),
     });
     z = zEnd - WALL_T;
   });
   rooms.lobby = lobby;
+  rooms.exit = {
+    index: rooms.length, id: 'exit', exit: true, theme: 'dark', font: museum.font || null,
+    zStart: z, zEnd: z - EXIT_L, length: EXIT_L, panels: [],
+    doorIn: true, doorOut: false, doorInX: 0, doorOutX: 0,
+  };
   return rooms;
 }
 

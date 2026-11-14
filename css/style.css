@@ -300,26 +300,52 @@ b, strong, h1, h2, h3 { font-weight: 500; }
 #joy { opacity: 0.55; transition: opacity .25s; }
 #joy.active { opacity: 1; }
 
-/* 튜토리얼 안내 카드 (위쪽 가운데) */
+/* 튜토리얼: 할 일 띠 (위쪽 가운데) */
 #guide {
-  position: absolute; z-index: 48; left: 50%; top: 46px; transform: translateX(-50%);
-  width: min(440px, calc(100% - 280px)); min-width: 260px; display: none; flex-direction: column; gap: 6px;
-  padding: 12px 14px 10px; border-radius: 14px; background: rgba(22,20,18,0.88); border: 1px solid rgba(255,217,160,0.28);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  position: absolute; z-index: 48; left: 50%; top: 44px; transform: translateX(-50%);
+  max-width: min(520px, calc(100% - 280px)); display: none; align-items: center; gap: 10px;
+  padding: 7px 8px 7px 14px; border-radius: 999px; background: rgba(28,24,20,0.82); border: 1px solid rgba(255,217,160,0.35);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-#guide.on { display: flex; }
-#guide.pop { animation: guidePop .35s ease; }
+#guide.on { display: flex; animation: guidePop .35s ease; }
 @keyframes guidePop { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }
-#guide .count { font-size: 11px; letter-spacing: 0.14em; color: #ffd9a0; }
-#guide .text { margin: 0; font-size: 14px; line-height: 1.6; }
-#guide .text b { color: #ffe3b8; font-weight: 500; }
-#guide .row { display: flex; justify-content: flex-end; gap: 6px; }
-#guide button {
-  appearance: none; border: 0; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer;
-  background: var(--ink); color: #111;
+#guide .lbl { flex: none; font-size: 10.5px; letter-spacing: 0.14em; color: #ffd9a0; }
+#guide .task { margin: 0; font-size: 13px; line-height: 1.4; }
+#guide .task b { color: #ffe3b8; font-weight: 500; }
+#guide button { flex: none; appearance: none; border: 0; background: transparent; color: var(--dim); font: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer; }
+
+/* 튜토리얼: 화면이 어두워지며 뜨는 안내 */
+#guide-modal {
+  position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: radial-gradient(ellipse at 50% 45%, rgba(10,8,6,0.45), rgba(10,8,6,0.72));
+  opacity: 0; pointer-events: none; transition: opacity .35s ease;
 }
-#guide button.quiet { background: transparent; color: var(--dim); }
-body.home-open #guide { display: none; }
+#guide-modal.on { opacity: 1; pointer-events: auto; }
+#guide-modal .card {
+  width: min(440px, 100%); padding: 20px 22px 16px; border-radius: 18px; display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(160deg, rgba(48,42,36,0.96), rgba(30,27,24,0.96));
+  border: 1px solid rgba(255,217,160,0.35); box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 6px rgba(255,217,160,0.05);
+  transform: translateY(8px) scale(0.98); transition: transform .35s ease;
+}
+#guide-modal.on .card { transform: none; }
+#guide-modal .dots { display: flex; gap: 4px; }
+#guide-modal .dots i { width: 14px; height: 3px; border-radius: 2px; background: rgba(233,227,216,0.18); }
+#guide-modal .dots i.past { background: rgba(255,217,160,0.5); }
+#guide-modal .dots i.now { background: #ffd9a0; width: 22px; }
+#guide-modal .count { font-size: 11px; letter-spacing: 0.14em; color: #ffd9a0; }
+#guide-modal .title { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; }
+#guide-modal .text { margin: 0; font-size: 14.5px; line-height: 1.7; color: rgba(240,233,222,0.88); }
+#guide-modal .text b { color: #ffe3b8; font-weight: 500; }
+#guide-modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+#guide-modal button { appearance: none; border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 14px; cursor: pointer; background: #ffe3b8; color: #2a2018; }
+#guide-modal button.quiet { background: transparent; color: var(--dim); }
+body.home-open #guide, body.home-open #guide-modal { display: none; }
+@media (pointer: coarse) {
+  #guide-modal .card { padding: 14px 16px 12px; gap: 6px; }
+  #guide-modal .title { font-size: 18px; }
+  #guide-modal .text { font-size: 13px; line-height: 1.6; }
+  #guide { top: 38px; }
+}
 #ed-tip { margin: 0; padding: 9px 11px; border-radius: 10px; background: rgba(255,217,160,0.1); border: 1px solid rgba(255,217,160,0.3);
   font-size: 13px; line-height: 1.55; }
 #ed-tip b { color: #ffe3b8; font-weight: 500; }
@@ -335,9 +361,57 @@ body.home-open #guide { display: none; }
 #home .excard.tour span { font-size: 12.5px; line-height: 1.6; color: var(--dim); }
 #home .excard.tour .go { margin-top: 6px; color: #ffd9a0; font-size: 13px; }
 #stage:has(#guide.on) #hint { display: none; }
-@media (pointer: coarse) {
-  #guide { top: 40px; padding: 8px 12px 7px; gap: 3px; width: min(400px, calc(100% - 300px)); }
-  #guide .text { font-size: 12.5px; line-height: 1.5; }
-  #guide button { padding: 4px 11px; font-size: 12px; }
-  #guide .count { font-size: 10px; }
+
+/* 사진 앞으로 버튼: 오른쪽 가운데, 오른손 엄지가 닿는 곳. 희미하게 떴다가 사라진다 */
+#goto {
+  position: absolute; right: max(18px, env(safe-area-inset-right)); top: 52%; transform: translate(8px, -50%);
+  display: flex; align-items: center; gap: 7px; z-index: 3;
+  padding: 10px 15px 10px 12px; border-radius: 999px; border: 1px solid rgba(255,236,205,0.35);
+  background: rgba(20,18,16,0.38); color: rgba(255,244,228,0.92); font: inherit; font-size: 13px; cursor: pointer;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none; transition: opacity .35s ease, transform .35s ease;
 }
+#goto i { font-style: normal; color: #ffd9a0; }
+#goto.show { opacity: 0.72; pointer-events: auto; transform: translate(0, -50%); }
+#goto.show:hover, #goto.show:active { opacity: 1; }
+body.light-room #goto { background: rgba(255,255,255,0.45); color: #2a2622; border-color: rgba(40,36,30,0.2); }
+body.light-room #goto i { color: #b0763a; }
+
+/* 방명록 (돌린 화면 밖, 키보드 때문에) */
+#guestbook {
+  position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(0,0,0,0.55);
+}
+#guestbook.open { display: flex; }
+#guestbook .box {
+  width: min(460px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: #1a1816;
+  border: 1px solid rgba(233,227,216,0.14); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+}
+#guestbook .head { margin: 0; font-family: var(--display); font-size: 20px; }
+#gb-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 38vh; overflow: auto; padding: 4px 2px; }
+#gb-list .empty { grid-column: 1 / -1; margin: 6px 0; color: var(--dim); font-size: 13px; }
+#gb-list .note { position: relative; padding: 12px 12px 10px; border-radius: 4px; color: #2a241e; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+#gb-list .note:nth-child(2n) { transform: rotate(0.8deg); } #gb-list .note:nth-child(2n+1) { transform: rotate(-0.6deg); }
+#gb-list .note p { margin: 0 0 6px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+#gb-list .note span { font-size: 11px; color: rgba(42,36,30,0.65); }
+#gb-list .note .del { position: absolute; top: 4px; right: 4px; border: 0; background: transparent; color: rgba(42,36,30,0.45); font-size: 11px; cursor: pointer; }
+#gb-list .c0 { background: #f6e7c8; } #gb-list .c1 { background: #f3d3d0; } #gb-list .c2 { background: #d6e6d2; }
+#gb-list .c3 { background: #d5e1ef; } #gb-list .c4 { background: #efe2f2; } #gb-list .c5 { background: #fff1a8; }
+#guestbook label { font-size: 12px; color: var(--dim); letter-spacing: 0.06em; }
+#guestbook textarea, #guestbook input {
+  width: 100%; background: #0f0e0d; color: var(--ink); border: 1px solid rgba(233,227,216,0.15); border-radius: 10px;
+  padding: 10px 12px; font: inherit; font-size: 16px; -webkit-user-select: text; user-select: text; resize: none;
+}
+#guestbook .row2 { display: flex; gap: 10px; align-items: center; }
+#guestbook .row2 input { flex: 1; min-width: 0; }
+#gb-colors { display: flex; gap: 6px; }
+#gb-colors button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+#gb-colors button.on { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,217,160,0.6); }
+#guestbook .row { display: flex; justify-content: flex-end; gap: 8px; }
+#guestbook .row button { appearance: none; border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 14px; cursor: pointer; background: var(--ink); color: #111; }
+#guestbook .row button.quiet { background: transparent; color: var(--dim); }
+#guide.done { border-color: #9fe0a8; }
+#guide.done .lbl::after { content: ' ✓'; color: #9fe0a8; }
+#stage:has(#guide-modal.on) #hint { display: none; }
+#gb-list .note .del { top: auto; bottom: 6px; }
+#gb-list .note span { display: block; padding-right: 44px; }

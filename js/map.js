@@ -165,7 +165,7 @@ export class MuseumMap {
     const W = 104, H = 56, s = 4.2;
     const g = fitCanvas(this.miniCanvas, W, H);
     const ox = W / 2 + c.pos.z * s, oy = H / 2;
-    for (const r of [layout.lobby, ...layout]) {
+    for (const r of [layout.lobby, ...layout, layout.exit]) {
       if (ox - r.zStart * s > W || ox - r.zEnd * s < 0) continue;
       drawRoom(g, r, s, ox, oy);
     }

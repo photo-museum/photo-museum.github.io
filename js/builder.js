@@ -7,7 +7,7 @@ import {
 import { fontsFor } from './fonts.js';
 import { concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture } from './textures.js';
 import { surfaceMaterial, photoMaterial } from './materials.js';
-import { getImage } from './store.js';
+import { getImage, getImageHD } from './store.js';
 
 const SPOT_COLOR = 0xffe9cf;   // 따뜻한 할로겐 빛
 const TRACK_INSET = 1.5;       // 조명 레일: 벽에서 안쪽으로
@@ -29,7 +29,7 @@ export const THEMES = {
     wallMap: 'wallWhite', wallTint: 0xe9e3d9, wallAmb: 0.5, wallLm: 0.95, endAmb: 0.48, endLm: 0.8,
     floorMap: 'oak', floorTint: 0xf2e6d6, floorAmb: 0.5, floorLm: 0.9, reflect: 0.13, floorTile: [2.0, 4.0],
     ceil: 'ceilingGrid', jambTint: 0xd8d2c8, jambAmb: 0.42, edges: 'edgesWhite',
-    spots: false, wash: true, ao: true, benches: true, skyGlow: true,
+    spots: false, wash: true, ao: true, benches: false, skyGlow: true, // 의자는 걸려서 뺌
   },
 };
 export function themeOf(room) { return THEMES[room && room.theme] || THEMES.dark; }
@@ -170,6 +170,8 @@ function paintWallSpot(L, u, p, spots = true) {
 // ---------- 설명판: 사진 옆 벽에 붙는 작은 글씨 ----------
 const LABEL_W = 0.4;           // m
 const LABEL_PX = 1150;         // 1m 당 픽셀 (작을수록 글씨가 커짐)
+const LABEL_SS = 2.4;          // 실제로는 이만큼 더 촘촘하게 그린다 (선명하게)
+let MAX_ANISO = 8;             // 기기가 허락하는 만큼 (MuseumScene 에서 정함)
 function wrapLines(g, text, maxW) {
   const out = [];
   for (const para of text.split('\n')) {
@@ -197,7 +199,9 @@ function makeLabel(text, light, FONTS) {
   g.font = bodyF;
   const body = lines.length > 1 ? wrapLines(g, lines.slice(1).join('\n'), W).slice(0, 14) : [];
   const H = Math.round(title.length * 40 + (body.length ? 14 + body.length * 34 : 0) + 8);
-  c.width = W; c.height = H;
+  const S = LABEL_SS;               // 글씨를 더 촘촘하게 그려 선명하게
+  c.width = Math.round(W * S); c.height = Math.round(H * S);
+  g.scale(S, S);
   const ink = light ? 'rgba(38,36,33,0.92)' : 'rgba(226,219,206,0.9)';
   const sub = light ? 'rgba(70,67,62,0.85)' : 'rgba(200,193,181,0.78)';
   g.textBaseline = 'top';
@@ -209,7 +213,7 @@ function makeLabel(text, light, FONTS) {
   for (const l of body) { g.fillText(l, 0, y); y += 34; }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = MAX_ANISO;
   const h = H / LABEL_PX;
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(LABEL_W, h),
@@ -240,28 +244,31 @@ const LOBBY_TEXT = { w: 3.9, h: 2.9, x: -1.25, y: 1.75 };
 function makeLobbyText(museum, FONTS) {
   const ppm = 300;
   const c = document.createElement('canvas');
-  c.width = Math.round(LOBBY_TEXT.w * ppm); c.height = Math.round(LOBBY_TEXT.h * ppm);
+  const S = 1.7; // 글씨를 더 촘촘하게 그려 선명하게
+  const CW = Math.round(LOBBY_TEXT.w * ppm), CH = Math.round(LOBBY_TEXT.h * ppm);
+  c.width = Math.round(CW * S); c.height = Math.round(CH * S);
   const g = c.getContext('2d');
+  g.scale(S, S);
   g.textBaseline = 'top';
   const ink = 'rgba(238,231,219,0.95)', sub = 'rgba(214,206,193,0.8)', faint = 'rgba(214,206,193,0.42)';
   const title = (museum.title || '').trim() || '이름 없는 전시';
   const intro = (museum.intro || '').trim();
-  let y = drawTextBlock(g, 0, 40, c.width, [
+  let y = drawTextBlock(g, 0, 40, CW, [
     { text: 'photo-museum', font: FONTS.mark(42), color: sub, lh: 60, track: 3 },
     { text: title, font: FONTS.title(112), color: ink, lh: 140, gap: 26, max: 2 },
   ]);
   g.fillStyle = 'rgba(255,217,160,0.65)';
   g.fillRect(0, y + 30, 120, 3);
   y += 66;
-  drawTextBlock(g, 0, y, c.width * 0.92, intro
-    ? [{ text: intro, font: FONTS.text(40), color: sub, lh: 70, max: Math.floor((c.height - y - 90) / 70) }]
+  drawTextBlock(g, 0, y, CW * 0.92, intro
+    ? [{ text: intro, font: FONTS.text(40), color: sub, lh: 70, max: Math.floor((CH - y - 90) / 70) }]
     : [{ text: '벽을 눌러 이 전시에 대한 설명을 적어 주세요.', font: FONTS.text(38), color: faint, lh: 64 }]);
-  drawTextBlock(g, 0, c.height - 60, c.width, [
+  drawTextBlock(g, 0, CH - 60, CW, [
     { text: 'ROOM 01 →', font: FONTS.mark(34), color: faint, lh: 50, track: 6 },
   ]);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
+  tex.anisotropy = MAX_ANISO;
   return new THREE.Mesh(
     new THREE.PlaneGeometry(LOBBY_TEXT.w, LOBBY_TEXT.h),
     new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }),
@@ -272,22 +279,25 @@ function makeLobbyText(museum, FONTS) {
 function introCanvas(room, light, FONTS) {
   const ppm = 400;
   const c = document.createElement('canvas');
-  c.width = Math.round(INTRO_W * ppm); c.height = Math.round(INTRO_H * ppm);
+  const S = 1.6; // 글씨를 더 촘촘하게 그려 선명하게
+  const CW = Math.round(INTRO_W * ppm), CH = Math.round(INTRO_H * ppm);
+  c.width = Math.round(CW * S); c.height = Math.round(CH * S);
   const g = c.getContext('2d');
+  g.scale(S, S);
   g.fillStyle = light ? '#d6cfc3' : '#232220';
-  g.fillRect(0, 0, c.width, c.height);
-  const grd = g.createRadialGradient(c.width / 2, -c.height * 0.15, 0, c.width / 2, -c.height * 0.15, c.height * 1.25);
+  g.fillRect(0, 0, CW, CH);
+  const grd = g.createRadialGradient(CW / 2, -CH * 0.15, 0, CW / 2, -CH * 0.15, CH * 1.25);
   grd.addColorStop(0, light ? 'rgba(255,246,230,0.5)' : 'rgba(255,226,180,0.22)');
   grd.addColorStop(1, 'rgba(255,226,180,0)');
-  g.fillStyle = grd; g.fillRect(0, 0, c.width, c.height);
-  const sh = g.createLinearGradient(0, c.height * 0.8, 0, c.height);
+  g.fillStyle = grd; g.fillRect(0, 0, CW, CH);
+  const sh = g.createLinearGradient(0, CH * 0.8, 0, CH);
   sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, light ? 'rgba(60,45,30,0.16)' : 'rgba(0,0,0,0.35)');
-  g.fillStyle = sh; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = sh; g.fillRect(0, 0, CW, CH);
   g.textBaseline = 'top';
   const ink = light ? 'rgba(36,33,30,0.94)' : 'rgba(236,229,217,0.94)';
   const sub = light ? 'rgba(62,58,52,0.85)' : 'rgba(208,200,187,0.82)';
   const faint = light ? 'rgba(62,58,52,0.42)' : 'rgba(208,200,187,0.4)';
-  const pad = 0.26 * ppm, W = c.width - pad * 2;
+  const pad = 0.26 * ppm, W = CW - pad * 2;
   const no = `ROOM ${String(room.index + 1).padStart(2, '0')}`;
   const lines = [{ text: no, font: FONTS.mark(36), color: sub, lh: 56, track: 10 }];
   if (room.name) lines.push({ text: room.name, font: FONTS.title(92), color: ink, lh: 118, gap: 18, max: 2 });
@@ -296,7 +306,7 @@ function introCanvas(room, light, FONTS) {
     g.fillStyle = light ? 'rgba(150,110,60,0.55)' : 'rgba(255,217,160,0.6)';
     g.fillRect(pad, y + 26, 90, 3);
     y += 58;
-    drawTextBlock(g, pad, y, W, [{ text: room.intro, font: FONTS.text(40), color: sub, lh: 68, max: Math.floor((c.height - y - pad) / 68) }]);
+    drawTextBlock(g, pad, y, W, [{ text: room.intro, font: FONTS.text(40), color: sub, lh: 68, max: Math.floor((CH - y - pad) / 68) }]);
   } else if (!room.name) {
     drawTextBlock(g, pad, y + 26, W, [{ text: '벽을 눌러 이 방의 이름과 설명을 적어 주세요.', font: FONTS.text(38), color: faint, lh: 62 }]);
   }
@@ -359,6 +369,70 @@ function paintFloorShadow(L, b) {
   g.restore();
 }
 
+// ---------- 출구 방: 인사 글, 출구 문, 방명록 ----------
+const EXIT_DOOR = { x: 2.35, w: 1.1, h: 2.3 };
+const GB_DESK = { w: 1.2, h: 0.95, d: 0.6, s: 3.4 }; // s: 방 시작에서 거리
+
+function makeExitText(museum, FONTS) {
+  const ppm = 300, S = 1.7, CW = Math.round(3.6 * ppm), CH = Math.round(1.5 * ppm);
+  const c = document.createElement('canvas');
+  c.width = Math.round(CW * S); c.height = Math.round(CH * S);
+  const g = c.getContext('2d');
+  g.scale(S, S);
+  g.textBaseline = 'top';
+  g.textAlign = 'center';
+  const ink = 'rgba(238,231,219,0.95)', sub = 'rgba(214,206,193,0.75)';
+  const line = (t, font, color, y) => { g.font = font; g.fillStyle = color; g.fillText(t, CW / 2, y); };
+  line('관람해 주셔서 고맙습니다', FONTS.title(96), ink, 40);
+  line((museum.title || '').trim(), FONTS.text(44), sub, 190);
+  g.fillStyle = 'rgba(255,217,160,0.65)'; g.fillRect(CW / 2 - 50, 270, 100, 3);
+  line('앞의 방명록에 한마디 남겨 주세요', FONTS.text(38), sub, 300);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = MAX_ANISO;
+  return new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.5),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }));
+}
+
+// 방명록에 남긴 글: 왼쪽 벽에 색색의 쪽지로 붙인다 (최근 12장)
+const NOTE_COLORS = ['#f6e7c8', '#f3d3d0', '#d6e6d2', '#d5e1ef', '#efe2f2', '#fff1a8'];
+function makeGuestNotes(entries, FONTS) {
+  const W = 5.2, H = 2.0, ppm = 260, S = 1.5;
+  const CW = Math.round(W * ppm), CH = Math.round(H * ppm);
+  const c = document.createElement('canvas');
+  c.width = Math.round(CW * S); c.height = Math.round(CH * S);
+  const g = c.getContext('2d');
+  g.scale(S, S);
+  const list = entries.slice(-12).reverse();
+  if (!list.length) list.push({ name: '', text: '첫 방명록을 남겨 주세요 ✦', color: 0, placeholder: true });
+  const cols = 6, cw = CW / cols, rh = CH / 2;
+  list.forEach((e, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const x = col * cw + cw / 2, y = row * rh + rh / 2;
+    let seed = 0; for (const ch of (e.id || String(i))) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
+    g.save();
+    g.translate(x, y);
+    g.rotate(((seed % 9) - 4) * 0.012);
+    const w = cw * 0.8, h = rh * 0.8;
+    g.shadowColor = 'rgba(0,0,0,0.45)'; g.shadowBlur = 14; g.shadowOffsetY = 6;
+    g.fillStyle = e.placeholder ? 'rgba(246,231,200,0.5)' : NOTE_COLORS[(e.color || 0) % NOTE_COLORS.length];
+    g.fillRect(-w / 2, -h / 2, w, h);
+    g.shadowColor = 'transparent';
+    g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(-w * 0.18, -h / 2 - 8, w * 0.36, 16); // 마스킹 테이프
+    g.fillStyle = 'rgba(40,34,28,0.9)';
+    g.textBaseline = 'top';
+    g.font = FONTS.text(19);
+    const lines = wrapLines(g, e.text || '', w - 28).slice(0, 6);
+    lines.forEach((l, k) => g.fillText(l, -w / 2 + 14, -h / 2 + 18 + k * 26));
+    if (e.name) { g.font = FONTS.strong(17); g.fillStyle = 'rgba(40,34,28,0.7)'; g.textAlign = 'right'; g.fillText('— ' + e.name, w / 2 - 12, h / 2 - 28); g.textAlign = 'left'; }
+    g.restore();
+  });
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = MAX_ANISO;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(W, H),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }));
+  return m;
+}
+
 export class MuseumScene {
   constructor(renderer, scene) {
     this.renderer = renderer;
@@ -372,6 +446,9 @@ export class MuseumScene {
     this.mirrorRoot.scale.y = -1;   // 바닥 아래로 뒤집힌 세계 = 바닥 반사
     scene.add(this.mirrorRoot, this.root);
     this.res = getShared(renderer.capabilities.getMaxAnisotropy());
+    MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
+    this.fronts = new Map();  // photoId -> { front 재질, photo } (선명한 판 바꿔 끼우기용)
+    this.hd = null;           // { photoId, tex }
   }
 
   build(museum) {
@@ -381,6 +458,7 @@ export class MuseumScene {
     this.museum = museum;
     this.buildRoom(layout.lobby);
     for (const room of layout) this.buildRoom(room);
+    this.buildRoom(layout.exit);
     return layout;
   }
 
@@ -393,6 +471,97 @@ export class MuseumScene {
     this.rooms = [];
     this.colliders = [];
     this.pickables = [];
+    this.fronts = new Map();
+    this.setHD(null);
+  }
+
+  buildExit(room, group, both, keep) {
+    const { zStart, zEnd } = room;
+    const F = fontsFor(room.font);
+    // 인사 글
+    const t = makeExitText(this.museum, F);
+    keep(t.geometry, t.material, t.material.map);
+    t.position.set(-0.6, 2.75, zEnd + 0.004);
+    group.add(t);
+    // 출구 문 (누르면 홈으로)
+    const doorMat = keep(new THREE.MeshBasicMaterial({ color: 0x0b0a09 }));
+    const frameMat = keep(new THREE.MeshBasicMaterial({ color: 0x3a3632 }));
+    const frame = new THREE.Mesh(keep(new THREE.BoxGeometry(EXIT_DOOR.w + 0.12, EXIT_DOOR.h + 0.06, 0.04)), frameMat);
+    frame.position.set(EXIT_DOOR.x, (EXIT_DOOR.h + 0.06) / 2, zEnd + 0.02);
+    const door = new THREE.Mesh(keep(new THREE.PlaneGeometry(EXIT_DOOR.w, EXIT_DOOR.h)), doorMat);
+    door.position.set(EXIT_DOOR.x, EXIT_DOOR.h / 2, zEnd + 0.045);
+    door.userData = { exitDoor: true };
+    both(frame); both(door);
+    this.pickables.push(door);
+    // 초록 출구 표시등
+    const sc = document.createElement('canvas'); sc.width = 512; sc.height = 192;
+    const sg = sc.getContext('2d');
+    sg.fillStyle = '#1f9d55'; sg.fillRect(0, 0, 512, 192);
+    sg.fillStyle = '#eafff1'; sg.font = '700 96px -apple-system, "Apple SD Gothic Neo", sans-serif';
+    sg.textAlign = 'center'; sg.textBaseline = 'middle'; sg.fillText('출구 EXIT', 256, 100);
+    const stex = keep(new THREE.CanvasTexture(sc)); stex.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Mesh(keep(new THREE.PlaneGeometry(0.62, 0.23)), keep(new THREE.MeshBasicMaterial({ map: stex, toneMapped: false })));
+    sign.position.set(EXIT_DOOR.x, EXIT_DOOR.h + 0.32, zEnd + 0.03);
+    sign.userData = { exitDoor: true };
+    both(sign);
+    this.pickables.push(sign);
+    // 방명록 책상과 펼친 책
+    const dz = zStart - GB_DESK.s;
+    const wood = keep(new THREE.MeshBasicMaterial({ color: 0x3b2d23 }));
+    const woodTop = keep(new THREE.MeshBasicMaterial({ color: 0x5a4434 }));
+    const desk = new THREE.Mesh(keep(new THREE.BoxGeometry(GB_DESK.w, GB_DESK.h, GB_DESK.d)), [wood, wood, woodTop, wood, wood, wood]);
+    desk.position.set(0, GB_DESK.h / 2, dz);
+    desk.userData = { guestbook: true };
+    both(desk);
+    this.pickables.push(desk);
+    const bc = document.createElement('canvas'); bc.width = 1024; bc.height = 640;
+    const bg = bc.getContext('2d');
+    bg.fillStyle = '#f4ecdd'; bg.fillRect(0, 0, 1024, 640);
+    bg.fillStyle = 'rgba(0,0,0,0.12)'; bg.fillRect(506, 0, 12, 640);
+    bg.strokeStyle = 'rgba(120,100,80,0.25)'; bg.lineWidth = 3;
+    for (let y = 150; y < 600; y += 56) { bg.beginPath(); bg.moveTo(50, y); bg.lineTo(470, y); bg.moveTo(554, y); bg.lineTo(974, y); bg.stroke(); }
+    bg.fillStyle = 'rgba(60,48,36,0.85)'; bg.font = F.title(64); bg.textAlign = 'center'; bg.fillText('방명록', 260, 100);
+    bg.font = F.text(36); bg.fillText('Guest Book', 764, 100);
+    const btex = keep(new THREE.CanvasTexture(bc)); btex.colorSpace = THREE.SRGBColorSpace; btex.anisotropy = MAX_ANISO;
+    const book = new THREE.Mesh(keep(new THREE.PlaneGeometry(0.62, 0.39)), keep(new THREE.MeshBasicMaterial({ map: btex, toneMapped: false })));
+    book.rotation.x = -Math.PI / 2 + 0.35;
+    book.position.set(0, GB_DESK.h + 0.05, dz + 0.02);
+    book.userData = { guestbook: true };
+    both(book);
+    this.pickables.push(book);
+    const x0 = -GB_DESK.w / 2, x1 = GB_DESK.w / 2, z0 = dz - GB_DESK.d / 2, z1 = dz + GB_DESK.d / 2;
+    this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
+    // 방명록 쪽지 (왼쪽 벽)
+    const notes = makeGuestNotes(this.museum.guestbook || [], F);
+    keep(notes.geometry, notes.material, notes.material.map);
+    notes.rotation.y = Math.PI / 2;
+    notes.position.set(-ROOM_W / 2 + 0.01, 1.75, (zStart + zEnd) / 2);
+    notes.userData = { guestbook: true };
+    group.add(notes);
+    this.pickables.push(notes);
+  }
+
+  // 사진 앞에 섰을 때 그 사진 하나만 선명한 원본(긴 변 3072px)으로 바꿔 끼운다. null 이면 되돌린다.
+  setHD(photoId) {
+    if ((this.hd && this.hd.photoId) === photoId) return;
+    const prev = this.hd;
+    this.hd = null;
+    if (prev) {
+      const f = this.fronts.get(prev.photoId);
+      if (f && prev.base) f.front.uniforms.map.value = prev.base;
+      if (prev.tex) prev.tex.then(t => t && t.dispose());
+    }
+    if (!photoId) return;
+    const f = this.fronts.get(photoId);
+    if (!f || !f.photo.imageId) return;
+    const job = { photoId, base: f.front.uniforms.map.value };
+    job.tex = getImageHD(f.photo.imageId).then(b => (b ? this.textureFromBlob(b) : null)).catch(() => null);
+    job.tex.then(t => {
+      if (!t || this.hd !== job) return;
+      const cur = this.fronts.get(photoId);
+      if (cur && cur.front === f.front) { job.base = f.front.uniforms.map.value; f.front.uniforms.map.value = t; }
+    });
+    this.hd = job;
   }
 
   buildRoom(room) {
@@ -484,7 +653,11 @@ export class MuseumScene {
       const L = lightCanvas(ROOM_W, ROOM_H, 32);
       const { g, ppm, c } = L;
       if (T.skyGlow) paintSkyGlow(L);
-      if (lobbyText) {
+      if (lobbyText === 'exit') {
+        // 인사 글과 방명록 쪽을 비추는 빛
+        glow(g, ROOM_W / 2 * ppm, c.height - 2.9 * ppm, 3.4 * ppm, 2.4 * ppm, [[0, 0.6], [0.55, 0.28], [1, 0]]);
+        glow(g, (ROOM_W / 2 + EXIT_DOOR.x) * ppm, c.height - (EXIT_DOOR.h + 0.25) * ppm, 0.8 * ppm, 0.5 * ppm, [[0, 0.25], [1, 0]]);
+      } else if (lobbyText) {
         // 전시 소개 글을 비추는 넓은 빛 + 문 위 은은한 빛
         const tu = LOBBY_TEXT.x + ROOM_W / 2;
         glow(g, tu * ppm, c.height - (LOBBY_TEXT.y + 0.6) * ppm, 3.0 * ppm, 2.6 * ppm, [[0, 0.62], [0.55, 0.3], [1, 0]]);
@@ -508,9 +681,10 @@ export class MuseumScene {
     both(startWall);
     // 끝 벽 (+z 를 향함)
     const endGeo = keep(endWallGeometry(room.doorOut, outU));
-    const endWall = new THREE.Mesh(endGeo, endMat(room.doorOut, outU, !!room.lobby));
+    const endWall = new THREE.Mesh(endGeo, endMat(room.doorOut, outU, room.exit ? 'exit' : !!room.lobby));
     endWall.position.set(-ROOM_W / 2, 0, zEnd);
     both(endWall);
+    if (room.exit) this.buildExit(room, group, both, keep);
     if (room.lobby) {
       const t = makeLobbyText(this.museum, fontsFor(room.font));
       keep(t.geometry, t.material, t.material.map);
@@ -536,7 +710,7 @@ export class MuseumScene {
     }
 
     // ----- 조명 레일 (스포트라이트 방만) -----
-    if (T.spots && !room.lobby) {
+    if (T.spots && !room.lobby && !room.exit) {
       const railGeo = keep(new THREE.BoxGeometry(0.035, 0.035, Lr - 0.6));
       for (const sx of [-1, 1]) {
         const rail = new THREE.Mesh(railGeo, R.fixtureMat);
@@ -559,11 +733,11 @@ export class MuseumScene {
     }
 
     // ----- 방 안내벽 (문 들어서 정면, 홀로 선 벽) -----
-    if (!room.lobby) {
+    if (!room.lobby && !room.exit) {
       const light = room.theme === 'white';
       const tex = keep(new THREE.CanvasTexture(introCanvas(room, light, fontsFor(room.font))));
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 8;
+      tex.anisotropy = MAX_ANISO;
       const front = keep(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
       const sideC = light ? 0xc9c1b4 : 0x1d1c1b;
       const side = keep(new THREE.MeshBasicMaterial({ color: sideC }));
@@ -608,7 +782,7 @@ export class MuseumScene {
     const R = this.res;
     const geo = keep(new THREE.BoxGeometry(p.w, p.h, PANEL_D));
     const empty = !p.photo.imageId;
-    const front = keep(photoMaterial(R.plaster, { tile: [p.w / 1.3, p.h / 1.3], intensity: 1.0, aspect: p.w / p.h }));
+    const front = keep(photoMaterial(R.plaster, { tile: [p.w / 1.3, p.h / 1.3], intensity: 0.8, aspect: p.w / p.h }));
     // BoxGeometry 면 순서: +x, -x, +y, -y, +z(앞), -z(뒤)
     const E = R[themeOf(room).edges];
     const mats = [E.side, E.side, E.top, E.bottom, front, E.bottom];
@@ -629,6 +803,7 @@ export class MuseumScene {
     mm.position.copy(mesh.position); mm.rotation.copy(mesh.rotation);
     mirror.add(mm);
     this.pickables.push(mesh);
+    this.fronts.set(p.photo.id, { front, photo: p.photo });
 
     if (!empty) {
       this.loadTexture(p.photo.imageId).then(tex => {
@@ -637,7 +812,7 @@ export class MuseumScene {
         front.uniforms.tile.value.set(1, 1);
         front.uniforms.rot.value = ((p.photo.rot || 0) % 4 + 4) % 4;
         if (!T.spots) front.uniforms.spotMix.value = T.wash ? 0.55 : 0; // 은은한 조명: 가운데가 조금 더 밝게
-        front.uniforms.intensity.value = 0.95;
+        front.uniforms.intensity.value = 1.0;
       });
     }
 
@@ -689,7 +864,7 @@ export class MuseumScene {
       });
       const t = new THREE.Texture(img);
       t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      t.anisotropy = MAX_ANISO;
       t.minFilter = THREE.LinearMipmapLinearFilter;
       t.needsUpdate = true;
       return t;
@@ -726,6 +901,6 @@ export class MuseumScene {
     for (let i = 0; i < L.length; i++) {
       if (z <= L[i].zStart + 0.01 && z >= L[i].zEnd - WALL_T / 2) return i;
     }
-    return L.length - 1;
+    return L.length; // 출구 방
   }
 }

@@ -92,9 +92,9 @@ const photoFrag = /* glsl */`
     vec3 c = texture2D(map, uv * tile).rgb;
     vec2 d = (vUv - vec2(0.5, 0.62)) * vec2(aspect, 1.0);
     float spot = 1.0 - smoothstep(0.35, 1.25, length(d));
-    vec3 light = lightColor * intensity * mix(0.95, 0.8 + 0.25 * spot, spotMix);
+    vec3 light = lightColor * intensity * mix(1.0, 0.86 + 0.16 * spot, spotMix);
     gl_FragColor = vec4(c * light, 1.0);
-    #include <tonemapping_fragment>
+    // 사진은 톤 매핑을 거치지 않는다: 찍은 색과 대비 그대로 선명하게
     #include <colorspace_fragment>
   }
 `;
@@ -109,12 +109,13 @@ export function photoMaterial(map, { tile = [1, 1], intensity = 1.0, aspect = 1 
       map: { value: map },
       tile: { value: new THREE.Vector2(...tile) },
       intensity: { value: intensity },
-      lightColor: { value: new THREE.Color(0xfff0dc) },
+      lightColor: { value: new THREE.Color(0xfffaf2) }, // 거의 흰 빛 (아주 살짝 따뜻하게)
       aspect: { value: aspect },
       rot: { value: 0 },
       spotMix: { value: 1 },
     },
     vertexShader: photoVert,
     fragmentShader: photoFrag,
+    toneMapped: false,
   });
 }
