@@ -1,13 +1,15 @@
 // 글씨체. 벽에 적히는 글(전시 소개, 방 안내벽, 사진 설명)과 홈 카드 제목에 쓴다.
 // 전시실마다 고를 수 있고, 방은 따로 고르지 않으면 전시실 글씨를 따른다.
-// 기본 G(디필레이아)와 C(함렛)는 index.html 에서 Google Fonts 로 미리 부르고,
+// 기본 프리텐다드와 G(디필레이아), C(함렛)는 index.html 에서 미리 부르고,
 // 나머지는 고른 것만 그때 내려받는다 (한글 글씨 파일은 1~4MB 라 미리 다 받지 않는다).
 // 고르는 칸의 미리보기는 assets/fonts/<id>.png 그림이라 내려받지 않아도 보인다.
 
-export const DEFAULT_FONT = 'G';
+export const DEFAULT_FONT = 'PR'; // 프리텐다드: 앱 화면과 벽 글씨 기본
 
 const NOONNU = 'https://cdn.jsdelivr.net/gh/';
 export const FONT_LIST = [
+  // 프리텐다드는 index.html 에서 jsDelivr 의 글자 나눔(dynamic subset) CSS 로 부른다 (쓰는 글자만 내려받음)
+  { id: 'PR', name: '프리텐다드', family: 'Pretendard', google: true, title: 600, text: 400, strong: 600 },
   { id: 'G', name: '디필레이아', family: 'Diphylleia', google: true },
   { id: 'C', name: '함렛', family: 'Hahmlet', google: true, title: 300, text: 300, strong: 500 },
   { id: 'M', name: '르네상스 비밀', family: 'pm-M', url: NOONNU + 'projectnoonnu/noonfonts_2312-1@1.1/OG_Renaissance_Secret-Rg.woff2' },
@@ -68,5 +70,16 @@ export function ensureFont(id, timeout = 8000) {
 // 처음 열 때: 기본 글씨만 기다린다
 export function loadFonts(timeout = 2500) {
   if (!document.fonts || !document.fonts.load) return Promise.resolve();
-  return Promise.race([Promise.all([ensureFont(DEFAULT_FONT), ensureFont('C')]), new Promise(r => setTimeout(r, timeout))]);
+  return Promise.race([ensureFont(DEFAULT_FONT), new Promise(r => setTimeout(r, timeout))]);
+}
+
+// 글자 나눔 글씨(프리텐다드 등)는 쓰는 글자 묶음만 내려받는다. 캔버스에 그리기 전에 그 글자들을 미리 받아 둔다.
+// 새로 받은 글자 묶음이 있으면 true.
+export async function ensureGlyphs(id, text) {
+  if (!document.fonts || !document.fonts.load || !text) return false;
+  const chars = [...new Set(text)].join('');
+  const before = [...document.fonts].filter(f => f.status === 'loaded').length;
+  const F = fontsFor(id);
+  try { await Promise.all([F.title(40), F.text(40), F.strong(40)].map(spec => document.fonts.load(spec, chars))); } catch (e) {}
+  return [...document.fonts].filter(f => f.status === 'loaded').length > before;
 }

@@ -5,7 +5,7 @@ import { viewingSpot, INTRO_S, LOBBY_L } from './layout.js';
 import { MuseumMap, thumbURL } from './map.js';
 import { Guide } from './guide.js';
 import { EXAMPLE } from './example.js';
-import { loadFonts, ensureFont, isFontReady, fontFamily, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
+import { loadFonts, ensureFont, ensureGlyphs, isFontReady, fontFamily, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
 import {
   loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid,
   newPhoto, newRoom, newExhibition, EMPTY_ASPECT, HD,
@@ -321,10 +321,32 @@ function renderFontPicker(opt) {
   if (on) setTimeout(() => on.scrollIntoView({ inline: 'center', block: 'nearest' }), 30);
 }
 
+// 벽에 그릴 글자들을 글씨마다 미리 받아 두고, 새로 받은 게 있으면 다시 그린다
+let glyphKey = '';
+function ensureMuseumGlyphs() {
+  const m = museum;
+  const exFont = m.font || DEFAULT_FONT;
+  const byFont = new Map();
+  const add = (id, t) => { if (t) byFont.set(id, (byFont.get(id) || '') + t); };
+  const fixed = '0123456789ROOMphotomuseum→—·관람해주셔서고맙습니다앞의방명록에한마디남겨주세요벽을눌러이전시에대한설명을적어이름과';
+  add(exFont, fixed + (m.title || '') + (m.intro || '') + (m.guestbook || []).map(g => g.text + g.name).join(''));
+  for (const r of m.rooms) {
+    const f = r.font || exFont;
+    add(f, fixed + (r.name || '') + (r.intro || '') + r.photos.map(p => p.caption || '').join(''));
+  }
+  const key = [...byFont].map(([k, v]) => k + ':' + [...new Set(v)].sort().join('')).join('|');
+  if (key === glyphKey) return;
+  glyphKey = key;
+  Promise.all([...byFont].map(([id, t]) => ensureGlyphs(id, t))).then(r => {
+    if (r.some(Boolean) && museum === m && !homeOpen) rebuild();
+  });
+}
+
 // 지금 전시실에서 쓰는 글씨들을 내려받고, 다 받으면 벽 글씨를 다시 그린다
 const failedFonts = new Set();
 function ensureMuseumFonts() {
   if (!museum) return;
+  ensureMuseumGlyphs();
   const ids = new Set([museum.font || DEFAULT_FONT, ...museum.rooms.map(r => r.font || museum.font || DEFAULT_FONT)]);
   const missing = [...ids].filter(id => !isFontReady(id) && !failedFonts.has(id));
   if (!missing.length) return;

@@ -1,6 +1,6 @@
 :root {
-  --display: "Diphylleia", "Apple SD Gothic Neo", serif;
-  --latin: "Diphylleia", "Apple SD Gothic Neo", serif;
+  --display: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --latin: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
   --ink: #e9e3d8;
   --dim: rgba(233, 227, 216, 0.55);
   --bg: #050505;
@@ -252,8 +252,8 @@ body.rotated #home { padding: 24px 24px 18px; }
 body.home-open #home { display: flex; }
 body.home-open #joy, body.home-open #hud, body.home-open #minimap, body.home-open #tools, body.home-open #hint { visibility: hidden; }
 #home header { display: flex; flex-direction: column; gap: 4px; }
-#home .eyebrow { font-family: var(--latin); font-weight: 300; font-size: 14px; letter-spacing: 0.22em; color: var(--dim); }
-#home h1 { margin: 0; font-family: var(--display); font-weight: 300; font-size: clamp(26px, 4.4vw, 40px); letter-spacing: 0.01em; }
+#home .eyebrow { font-family: var(--latin); font-weight: 500; font-size: 12px; letter-spacing: 0.24em; color: var(--dim); }
+#home h1 { margin: 0; font-family: var(--display); font-weight: 700; letter-spacing: -0.02em; font-size: clamp(26px, 4.4vw, 40px); letter-spacing: 0.01em; }
 #home header p { margin: 2px 0 0; font-size: 13px; color: rgba(233,227,216,0.7); }
 #home .list {
   flex: 1; min-height: 0; display: flex; gap: 16px; align-items: stretch; overflow-x: auto; overflow-y: hidden;
@@ -275,7 +275,7 @@ body.home-open #joy, body.home-open #hud, body.home-open #minimap, body.home-ope
   background: radial-gradient(ellipse 55% 75% at 50% 0%, rgba(255,217,160,0.34), rgba(0,0,0,0) 72%), #37332e;
 }
 #home .excard .info { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; }
-#home .excard .info b { font-family: var(--display); font-weight: 400; font-size: 17px; line-height: 1.3;
+#home .excard .info b { font-family: var(--display); font-weight: 600; font-size: 17px; line-height: 1.3;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #home .excard .info p { margin: 0; font-family: var(--display); font-size: 12.5px; color: var(--dim);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -292,9 +292,8 @@ body.home-open #joy, body.home-open #hud, body.home-open #minimap, body.home-ope
 #home .excard.add b { font-family: var(--display); font-size: 17px; }
 #home .excard.add span:last-child { font-size: 12px; color: var(--dim); }
 
-/* 함렛은 300/400/500 만 불러온다: 굵은 글씨는 500 으로 */
-b, strong, h1, h2, h3 { font-weight: 500; }
-#home .excard.add b { font-weight: 400; }
+b, strong { font-weight: 600; }
+#home .excard.add b { font-weight: 600; }
 
 /* 조이스틱: 평소엔 아주 연하게, 만지면 밝게 */
 #joy { opacity: 0.55; transition: opacity .25s; }
@@ -333,7 +332,7 @@ b, strong, h1, h2, h3 { font-weight: 500; }
 #guide-modal .dots i.past { background: rgba(255,217,160,0.5); }
 #guide-modal .dots i.now { background: #ffd9a0; width: 22px; }
 #guide-modal .count { font-size: 11px; letter-spacing: 0.14em; color: #ffd9a0; }
-#guide-modal .title { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; }
+#guide-modal .title { margin: 0; font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: -0.01em; }
 #guide-modal .text { margin: 0; font-size: 14.5px; line-height: 1.7; color: rgba(240,233,222,0.88); }
 #guide-modal .text b { color: #ffe3b8; font-weight: 500; }
 #guide-modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
@@ -357,7 +356,7 @@ body.home-open #guide, body.home-open #guide-modal { display: none; }
   border-color: rgba(255,217,160,0.3);
 }
 #home .excard.tour .eyebrow { font-size: 11px; letter-spacing: 0.2em; color: #ffd9a0; font-style: normal; }
-#home .excard.tour b { font-family: var(--display); font-weight: 400; font-size: 21px; }
+#home .excard.tour b { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
 #home .excard.tour span { font-size: 12.5px; line-height: 1.6; color: var(--dim); }
 #home .excard.tour .go { margin-top: 6px; color: #ffd9a0; font-size: 13px; }
 #stage:has(#guide.on) #hint { display: none; }
