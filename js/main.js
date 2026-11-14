@@ -908,6 +908,50 @@ function exhibitionStats(ex) {
   return { rooms: ex.rooms.length, photos: photos.length, cover: photos[0] };
 }
 
+// 홈 카드 목록 넘기기. 휴대폰을 세로로 들면 화면을 돌려 보여 주기 때문에 기본 스크롤은 방향이 틀어진다.
+// 손가락 움직임을 화면 방향으로 바꿔 직접 넘기고, 놓으면 관성으로 조금 더 미끄러진다.
+(function homeSwipe() {
+  const list = $('#home .list');
+  let d = null, vel = 0, raf = 0, dragged = false;
+  list.addEventListener('pointerdown', e => {
+    cancelAnimationFrame(raf);
+    d = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, t: performance.now() };
+    dragged = false; vel = 0;
+  });
+  list.addEventListener('pointermove', e => {
+    if (!d || e.pointerId !== d.id) return;
+    const [mx, my] = controls.mapDelta(e.clientX - d.x, e.clientY - d.y);
+    d.x = e.clientX; d.y = e.clientY;
+    d.moved += Math.abs(mx) + Math.abs(my);
+    if (d.moved > 6 && !dragged) { dragged = true; try { list.setPointerCapture(e.pointerId); } catch (er) {} }
+    if (!dragged) return;
+    const now = performance.now(), dt = Math.max(1, now - d.t);
+    d.t = now;
+    list.scrollLeft -= mx;
+    vel = vel * 0.6 + (-mx / dt) * 0.4; // px/ms
+  });
+  const end = e => {
+    if (!d || e.pointerId !== d.id) return;
+    d = null;
+    if (!dragged) return;
+    const glide = () => {
+      if (Math.abs(vel) < 0.02) return;
+      list.scrollLeft += vel * 16;
+      vel *= 0.93;
+      raf = requestAnimationFrame(glide);
+    };
+    raf = requestAnimationFrame(glide);
+  };
+  list.addEventListener('pointerup', end);
+  list.addEventListener('pointercancel', end);
+  // 끌어서 넘긴 뒤에는 카드가 눌리지 않게
+  list.addEventListener('click', e => { if (dragged) { e.stopPropagation(); e.preventDefault(); dragged = false; } }, true);
+  // 컴퓨터: 마우스 휠을 위아래로 굴려도 옆으로 넘어가게
+  list.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { list.scrollLeft += e.deltaY; e.preventDefault(); }
+  }, { passive: false });
+})();
+
 function renderHome() {
   const list = $('#home .list');
   list.innerHTML = '';
