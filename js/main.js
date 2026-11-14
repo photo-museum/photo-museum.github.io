@@ -1034,6 +1034,7 @@ let homeSel = null; // 펼쳐 둔 전시실 id
 let hbgFront = 'a';
 const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
 function setHomeBg(css) {
+  return; // 배경은 물 같은 하늘색으로 고정 (표지 사진 흐림 배경은 쓰지 않음)
   const back = hbgFront === 'a' ? 'b' : 'a';
   const el = $(`#home .hbg .${back}`), old = $(`#home .hbg .${hbgFront}`);
   el.style.background = css;
@@ -1080,7 +1081,7 @@ function renderHome() {
       // 사진이 없으면 첫 방 색으로
       // 사진이 없으면 첫 방 색을 입힌 유리 띠
       const T = themeOf(ex.rooms[0]);
-      pn.style.background = `linear-gradient(160deg, ${hexA(T.mapWall, 0.7)}, ${hexA(T.mapFloor, 0.5)})`;
+      pn.style.background = `linear-gradient(160deg, ${hexA(T.mapWall, 0.55)}, rgba(255,255,255,0.12))`;
       pn.classList.add('empty');
     }
     pn.addEventListener('click', e => {

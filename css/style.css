@@ -511,3 +511,17 @@ body.home-open .nav { display: none; }
 #home .pn.add .lb { color: rgba(255,255,255,.92); }
 #home .pn.empty { backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2); }
 #home .hbtns button:not(.main) { background: rgba(20,30,50,.28); border-color: rgba(255,255,255,.5); }
+
+/* 홈 배경: 물 같은 하늘색. 맑은 하늘빛 바탕 위로 물속 빛 무늬가 천천히 일렁인다 */
+#home { background: linear-gradient(170deg, #d9f3fb 0%, #a9def2 38%, #73c3e6 72%, #4da9d8 100%); }
+#home .hbg .water { position: absolute; left: -800px; top: -800px; right: -800px; bottom: -800px; background-repeat: repeat; mix-blend-mode: overlay; pointer-events: none; }
+#home .hbg .w1 { background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='f' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.012 0.018' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  -4.2 0 0 0 1.25'/%3E%3CfeGaussianBlur stdDeviation='1.2'/%3E%3C/filter%3E%3Crect width='600' height='600' filter='url(%23f)'/%3E%3C/svg%3E"); background-size: 600px 600px; opacity: .75; animation: water1 38s linear infinite; }
+#home .hbg .w2 { background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='780' height='780'%3E%3Cfilter id='f' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.009 0.013' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  -4.2 0 0 0 1.25'/%3E%3CfeGaussianBlur stdDeviation='1.2'/%3E%3C/filter%3E%3Crect width='780' height='780' filter='url(%23f)'/%3E%3C/svg%3E"); background-size: 780px 780px; opacity: .5; animation: water2 52s linear infinite; }
+@keyframes water1 { from { transform: translate(0, 0); } to { transform: translate(-600px, -300px); } }
+@keyframes water2 { from { transform: translate(-780px, 0); } to { transform: translate(0, -390px); } }
+#home .hbg .veil { background:
+  radial-gradient(ellipse 60% 50% at 20% 0%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%),
+  linear-gradient(180deg, rgba(10,60,100,0) 60%, rgba(10,60,100,.18)); }
+@media (prefers-reduced-motion: reduce) { #home .hbg .water { animation: none; } }
+#home header h1, #home header .eyebrow { color: #fff; text-shadow: 0 2px 14px rgba(10,60,110,.35); }
+#home .hbtns button:not(.main) { background: rgba(10,70,120,.22); }
