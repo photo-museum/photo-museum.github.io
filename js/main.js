@@ -1100,100 +1100,154 @@ function makeSwipe(list) {
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { list.scrollLeft += e.deltaY; e.preventDefault(); }
   }, { passive: false });
 }
-makeSwipe($('#home .list'));
 makeSwipe($('#style-panel .items'));
 
 // 홈: 아코디언 (시안 F10). 전시실마다 세로 띠, 고른 하나가 넓게 펼쳐진다.
 // 접힌 띠를 누르면 펼쳐지고, 펼쳐진 띠를 누르면 들어간다.
-let homeSel = null; // 펼쳐 둔 전시실 id
-// 배경: 펼친 전시실 표지를 흐리게 깔고 두 겹을 번갈아 바꿔 스르륵 넘어가게
-let hbgFront = 'a';
-const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
-function setHomeBg(css) {
-  return; // 배경은 물 같은 하늘색으로 고정 (표지 사진 흐림 배경은 쓰지 않음)
-  const back = hbgFront === 'a' ? 'b' : 'a';
-  const el = $(`#home .hbg .${back}`), old = $(`#home .hbg .${hbgFront}`);
-  el.style.background = css;
-  el.style.backgroundSize = 'cover'; el.style.backgroundPosition = 'center';
-  el.classList.add('on'); old.classList.remove('on');
-  hbgFront = back;
-}
-function homeBgFor(ex) {
-  const st = exhibitionStats(ex);
-  if (st.cover) thumbURL(st.cover, 1400).then(u => { if (u && homeSel === ex.id) setHomeBg(`url("${u}")`); });
-  else {
-    // 사진이 없으면 밝은 파스텔에 첫 방 색을 살짝
-    const T = themeOf(ex.rooms[0]);
-    setHomeBg(`radial-gradient(ellipse 70% 80% at 85% 20%, ${hexA(T.mapWall, 0.55)}, rgba(0,0,0,0) 70%), linear-gradient(135deg, #ffd9c7, #f7cfe3 35%, #d8d3f7 65%, #c9e3f7)`);
-  }
-}
+let homeSel = null; // 가운데 있는 전시실 id ('new' 면 새 전시실 카드)
+// 홈: 그레이 유리 거울 (시안 15). 전시실 표지가 가운데 크게, 양옆은 비스듬히 서고 유리 바닥에 비친다.
+// 옆으로 밀거나 옆 표지를 누르면 넘어가고, 가운데 표지나 '들어가기'를 누르면 들어간다.
+const flow = $('#home .flow'), fcap = $('#home .fcap');
+let flowItems = [], flowPos = 0, flowAnim = 0;
+function homeList() { return library.exhibitions.filter(ex => !ex.showcase); }
 function renderHome() {
-  const list = $('#home .list');
-  list.innerHTML = '';
-  const exs = library.exhibitions.filter(ex => !ex.showcase);
-  if (!exs.some(ex => ex.id === homeSel)) homeSel = (exs.find(ex => ex.id === library.lastId) || exs[0] || {}).id || null;
-  const select = (pn, id) => {
-    homeSel = id;
-    const ex = exs.find(x => x.id === id);
-    if (ex) homeBgFor(ex);
-    for (const x of list.children) x.classList.toggle('on', x === pn);
-    // 펼친 띠가 보이게
-    const left = pn.offsetLeft - 20, right = pn.offsetLeft + 340 - list.clientWidth;
-    if (list.scrollLeft > left) list.scrollLeft = left;
-    else if (list.scrollLeft < right) list.scrollLeft = right;
-  };
-  for (const ex of exs) {
-    const st = exhibitionStats(ex);
-    const pn = document.createElement('div');
-    pn.className = 'pn' + (ex.id === homeSel ? ' on' : '');
-    pn.innerHTML = `<i class="ph"></i><span class="lb"></span><div class="info"><b></b><span class="st">방 ${st.rooms} · 사진 ${st.photos}</span><p></p>`
-      + `<div class="acts"><button class="go">들어가기 →</button><button class="more" aria-label="전시실 메뉴">⋯</button></div></div>`;
-    const title = ex.title || '이름 없는 전시';
-    pn.querySelector('.lb').textContent = title;
-    pn.querySelector('b').textContent = title;
-    pn.querySelector('p').textContent = (ex.intro || '').split('\n')[0] || '';
-    const ph = pn.querySelector('.ph');
-    if (st.cover) thumbURL(st.cover, 1400).then(u => { if (u) ph.style.backgroundImage = `url("${u}")`; });
+  const exs = homeList();
+  if (!exs.some(ex => ex.id === homeSel) && homeSel !== 'new') homeSel = (exs.find(ex => ex.id === library.lastId) || exs[0] || {}).id || 'new';
+  flow.innerHTML = '';
+  flowItems = [...exs.map(ex => ({ ex })), { add: true }];
+  flowItems.forEach((it, i) => {
+    const el = document.createElement('div');
+    el.className = 'cv' + (it.add ? ' add' : '');
+    el.setAttribute('role', 'option');
+    if (it.add) el.innerHTML = '<span>+</span>';
     else {
-      // 사진이 없으면 첫 방 색으로
-      // 사진이 없으면 첫 방 색을 입힌 유리 띠
-      const T = themeOf(ex.rooms[0]);
-      ph.style.background = `linear-gradient(160deg, ${hexA(T.mapWall, 0.55)}, rgba(255,255,255,0.08))`;
-      pn.classList.add('empty');
+      const st = exhibitionStats(it.ex);
+      if (st.cover) thumbURL(st.cover, 900).then(u => { if (u) el.style.backgroundImage = `url("${u}")`; });
+      else { const T = themeOf(it.ex.rooms[0]); el.style.backgroundImage = `linear-gradient(160deg, ${T.mapWall}, ${T.mapFloor})`; }
+      el.setAttribute('aria-label', it.ex.title || '이름 없는 전시');
     }
-    pn.addEventListener('click', e => {
-      if (e.target.closest('.more')) {
-        openSheet([
-          { title: true, label: title },
-          { label: '들어가기', fn: () => enterExhibition(ex) },
-          { label: '대표 사진 바꾸기', fn: () => openCoverPicker(ex) },
-          { label: '이름·설명 고치기', fn: () => editExhibitionText(ex) },
-          { label: '전시실 지우기', danger: true, fn: () => confirmDeleteExhibition(ex) },
-          { label: '닫기', quiet: true },
-        ]);
-        return;
-      }
-      if (!pn.classList.contains('on')) { select(pn, ex.id); return; }
-      enterExhibition(ex);
-    });
-    list.appendChild(pn);
-  }
-  const cur = exs.find(x => x.id === homeSel);
-  if (cur) homeBgFor(cur);
-  else setHomeBg('linear-gradient(135deg, #ffd9c7, #f7cfe3 35%, #d8d3f7 65%, #c9e3f7)');
-  const add = document.createElement('div');
-  add.className = 'pn add';
-  add.innerHTML = '<span class="plus">+</span><span class="lb">새 전시실</span>';
-  add.addEventListener('click', () => {
-    const ex = newExhibition('');
-    editExhibitionText(ex, () => {
-      library.exhibitions.push(ex);
-      persist();
-      enterExhibition(ex);
-    });
+    it.el = el;
+    flow.appendChild(el);
   });
-  list.appendChild(add);
+  const idx = Math.max(0, flowItems.findIndex(it => (it.add ? 'new' : it.ex.id) === homeSel));
+  flowPos = idx;
+  layoutFlow(false);
 }
+function flowSize() {
+  const H = flow.clientHeight || 260, W = flow.clientWidth || 700;
+  return { S: Math.min(H * 0.78, W * 0.3, 260), W };
+}
+// pos: 실수 (끄는 중엔 사이 값)
+function layoutFlow(animate = true) {
+  const { S } = flowSize();
+  const gap1 = S * 0.78, gapN = S * 0.42;
+  // 유리 바닥 선을 표지 아랫단에 맞춘다
+  const fl = $('#home .hbg2 .floor');
+  if (fl && flow.clientHeight) fl.style.top = (flow.offsetTop + flow.clientHeight * 0.8) + 'px';
+  flowItems.forEach((it, i) => {
+    const d = i - flowPos, a = Math.abs(d), sg = Math.sign(d);
+    const x = a < 1 ? d * gap1 : sg * (gap1 + (a - 1) * gapN);
+    const rot = -Math.max(-1, Math.min(1, d)) * 55;
+    const sc = a < 1 ? 1.15 - 0.15 * a : 1;
+    const el = it.el;
+    el.style.width = el.style.height = S + 'px';
+    el.style.transition = animate ? '' : 'none';
+    el.style.transform = `translateX(calc(-50% + ${x}px)) rotateY(${rot}deg) scale(${sc})`;
+    el.style.zIndex = String(100 - Math.round(a * 10));
+    el.style.opacity = a > 4.5 ? 0 : String(Math.max(0.35, 1 - Math.max(0, a - 1) * 0.18));
+    el.classList.toggle('on', a < 0.5);
+  });
+  const sel = flowItems[Math.round(Math.max(0, Math.min(flowItems.length - 1, flowPos)))];
+  if (sel) {
+    homeSel = sel.add ? 'new' : sel.ex.id;
+    if (sel.add) { fcap.querySelector('b').textContent = '새 전시실'; fcap.querySelector('span').textContent = '이름을 정하고 바로 들어가요'; fcap.querySelector('.go').textContent = '만들기 →'; fcap.querySelector('.more').hidden = true; }
+    else {
+      const st = exhibitionStats(sel.ex);
+      fcap.querySelector('b').textContent = sel.ex.title || '이름 없는 전시';
+      fcap.querySelector('b').style.fontFamily = fontFamily(sel.ex.font);
+      if (sel.ex.font) ensureFont(sel.ex.font);
+      fcap.querySelector('span').textContent = `방 ${st.rooms} · 사진 ${st.photos}` + ((sel.ex.intro || '').split('\n')[0] ? ' · ' + sel.ex.intro.split('\n')[0] : '');
+      fcap.querySelector('.go').textContent = '들어가기 →'; fcap.querySelector('.more').hidden = false;
+    }
+  }
+}
+function flowTo(i) {
+  flowPos = Math.max(0, Math.min(flowItems.length - 1, i));
+  layoutFlow(true);
+}
+function flowOpen() {
+  const sel = flowItems[Math.round(flowPos)];
+  if (!sel) return;
+  if (sel.add) {
+    const ex = newExhibition('');
+    editExhibitionText(ex, () => { library.exhibitions.push(ex); persist(); enterExhibition(ex); });
+  } else enterExhibition(sel.ex);
+}
+function flowMenu() {
+  const sel = flowItems[Math.round(flowPos)];
+  if (!sel || sel.add) return;
+  const ex = sel.ex, title = ex.title || '이름 없는 전시';
+  openSheet([
+    { title: true, label: title },
+    { label: '들어가기', fn: () => enterExhibition(ex) },
+    { label: '대표 사진 바꾸기', fn: () => openCoverPicker(ex) },
+    { label: '이름·설명 고치기', fn: () => editExhibitionText(ex) },
+    { label: '전시실 지우기', danger: true, fn: () => confirmDeleteExhibition(ex) },
+    { label: '닫기', quiet: true },
+  ]);
+}
+fcap.querySelector('.go').addEventListener('click', flowOpen);
+fcap.querySelector('.more').addEventListener('click', flowMenu);
+// 끌어서 넘기기 (돌린 화면에서도 맞는 방향으로)
+(function flowSwipe() {
+  let d = null;
+  flow.addEventListener('pointerdown', e => {
+    d = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, pos0: flowPos, dx: 0, t: performance.now(), v: 0 };
+    try { flow.setPointerCapture(e.pointerId); } catch (er) {}
+  });
+  flow.addEventListener('pointermove', e => {
+    if (!d || e.pointerId !== d.id) return;
+    const [mx, my] = controls.mapDelta(e.clientX - d.x, e.clientY - d.y);
+    d.x = e.clientX; d.y = e.clientY;
+    d.moved += Math.abs(mx) + Math.abs(my);
+    d.dx += mx;
+    const now = performance.now(); d.v = d.v * 0.6 + (mx / Math.max(1, now - d.t)) * 0.4; d.t = now;
+    if (d.moved < 6) return;
+    const { S } = flowSize();
+    flowPos = Math.max(-0.4, Math.min(flowItems.length - 0.6, d.pos0 - d.dx / (S * 0.6)));
+    layoutFlow(false);
+  });
+  const end = e => {
+    if (!d || e.pointerId !== d.id) return;
+    const dd = d; d = null;
+    if (dd.moved < 8 && e.type === 'pointerup') {
+      // 누른 표지
+      const hit = document.elementFromPoint(e.clientX, e.clientY);
+      const i = flowItems.findIndex(it => it.el === (hit && hit.closest && hit.closest('.cv')));
+      if (i < 0) return;
+      if (i === Math.round(flowPos)) flowOpen(); else flowTo(i);
+      return;
+    }
+    flowTo(Math.round(flowPos - Math.max(-1.2, Math.min(1.2, dd.v)) * 0.7)); // 휙 넘기면 한 칸 더
+  };
+  flow.addEventListener('pointerup', end);
+  flow.addEventListener('pointercancel', end);
+  flow.addEventListener('wheel', e => {
+    e.preventDefault();
+    clearTimeout(flowAnim);
+    flowPos += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) / 180;
+    flowPos = Math.max(0, Math.min(flowItems.length - 1, flowPos));
+    layoutFlow(false);
+    flowAnim = setTimeout(() => flowTo(Math.round(flowPos)), 140);
+  }, { passive: false });
+  window.addEventListener('keydown', e => {
+    if (!homeOpen || editor.classList.contains('open') || sheetOpen()) return;
+    if (e.key === 'ArrowRight') flowTo(Math.round(flowPos) + 1);
+    if (e.key === 'ArrowLeft') flowTo(Math.round(flowPos) - 1);
+    if (e.key === 'Enter') flowOpen();
+  });
+  window.addEventListener('resize', () => { if (homeOpen) requestAnimationFrame(() => layoutFlow(false)); });
+})();
 // 대표 사진 고르기: 그 전시실에 걸린 사진들 중에서
 function openCoverPicker(ex) {
   const photos = ex.rooms.flatMap(r => r.photos).filter(p => p.imageId);
