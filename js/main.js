@@ -5,9 +5,10 @@ import { viewingSpot, INTRO_S, INTRO_W, LOBBY_L, ROOM_W, WALL_T } from './layout
 import { MuseumMap, thumbURL } from './map.js';
 import { Guide } from './guide.js';
 import { EXAMPLE } from './example.js';
+import { DEMO, DEMO_VERSION } from './demo.js';
 import { loadFonts, ensureFont, ensureGlyphs, isFontReady, fontFamily, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
 import {
-  loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid,
+  loadLibrary, saveLibrary, putImage, deleteImage, clearImages, prepareImage, requestPersistence, uid,
   newPhoto, newRoom, newExhibition, EMPTY_ASPECT, HD,
 } from './store.js';
 
@@ -938,6 +939,11 @@ function hideHint() {
 async function start() {
   requestPersistence();
   [library] = await Promise.all([loadLibrary(), loadFonts()]);
+  // 예시 전시실로 새로 시작 (한 번만): 지금까지의 전시실과 사진을 지우고 예시 5개를 만든다
+  if (library.demoVersion !== DEMO_VERSION) {
+    try { await buildDemoLibrary(); }
+    catch (e) { console.error(e); $('#loading').textContent = '예시 사진을 불러오지 못했어요. 새로 고침해 주세요'; return; }
+  }
   persist();
   openHome();
   $('#loading').classList.add('done');
@@ -1243,6 +1249,51 @@ async function buildShowcase() {
     return room;
   });
   return ex;
+}
+
+// 앱을 아껴 쓰는 사람이 만들었을 법한 예시 전시실들 (js/demo.js)
+async function buildDemoLibrary() {
+  const total = DEMO.reduce((a, ex) => a + ex.rooms.reduce((b, r) => b + r.photos.length, 0), 0);
+  let done = 0;
+  const say = () => { $('#loading').textContent = `예시 전시실을 준비하고 있어요 · ${done} / ${total}`; };
+  say();
+  await clearImages();
+  const cache = new Map(); // 같은 파일은 한 번만
+  const exs = [];
+  for (const D of DEMO) {
+    const ex = newExhibition(D.title);
+    ex.intro = D.intro || '';
+    if (D.font) ex.font = D.font;
+    ex.rooms = [];
+    for (const R of D.rooms) {
+      const room = newRoom(0, R.theme || 'white');
+      room.name = R.name; if (R.intro) room.intro = R.intro; if (R.font) room.font = R.font;
+      for (const P of R.photos) {
+        let rec = cache.get(P.file);
+        if (!rec) {
+          const blob = await (await fetch(P.file)).blob();
+          const { blob: small, hd, aspect } = await prepareImage(blob);
+          const imageId = uid('img_');
+          await putImage(imageId, small);
+          if (hd) await putImage(imageId + HD, hd);
+          rec = { imageId, aspect };
+          cache.set(P.file, rec);
+        }
+        const photo = newPhoto(rec.imageId, rec.aspect);
+        if (P.caption) photo.caption = P.caption;
+        if (P.cover) ex.coverId = photo.id;
+        room.photos.push(photo);
+        done++; say();
+      }
+      ex.rooms.push(room);
+    }
+    ex.guestbook = (D.guestbook || []).map((g, k) => ({ id: uid('g_'), name: g.name, text: g.text, color: g.color || k % 6, at: Date.now() - (D.guestbook.length - k) * 86400000 }));
+    exs.push(ex);
+  }
+  library.exhibitions = exs;
+  library.demoVersion = DEMO_VERSION;
+  library.lastId = exs[0]?.id;
+  for (const k of Object.keys(localStorage)) if (k.startsWith('pm-pose-')) try { localStorage.removeItem(k); } catch (e) {}
 }
 
 async function startShowcase() {

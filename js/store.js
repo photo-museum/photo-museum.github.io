@@ -106,6 +106,11 @@ export async function getImage(id) {
   return null;
 }
 
+// 저장된 사진을 모두 지운다 (예시 전시실로 새로 시작할 때)
+export function clearImages() {
+  return tx('images', 'readwrite', s => s.clear()).catch(() => {});
+}
+
 export function deleteImage(id) {
   tx('images', 'readwrite', s => s.delete(id + HD)).catch(() => {});
   return tx('images', 'readwrite', s => s.delete(id)).catch(() => {});

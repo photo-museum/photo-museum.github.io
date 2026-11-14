@@ -298,7 +298,7 @@ function makeLobbyText(museum, FONTS, light = false) {
   const title = (museum.title || '').trim() || '이름 없는 전시';
   const intro = (museum.intro || '').trim();
   let y = drawTextBlock(g, 0, 40, CW, [
-    { text: 'photo-museum', font: FONTS.mark(42), color: sub, lh: 60, track: 3 },
+    { text: 'Photo Museum', font: FONTS.mark(42), color: sub, lh: 60, track: 3 },
     { text: title, font: FONTS.title(112), color: ink, lh: 140, gap: 26, max: 2 },
   ]);
   g.fillStyle = 'rgba(255,217,160,0.65)';

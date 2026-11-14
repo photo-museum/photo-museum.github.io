@@ -653,3 +653,8 @@ body.light-room #home-btn, body.light-room #tools button { background: rgba(255,
 /* 두 손가락 확대에 쓰인 조이스틱: 손잡이가 따라 움직이지 않게 */
 #joy.blocked .front { transform: none !important; }
 #joy.blocked { opacity: 0.35 !important; }
+
+/* 홈 이름: 영문 세리프 워드마크 */
+#home header h1.wordmark { font-family: "Cormorant Garamond", "Times New Roman", serif; font-weight: 600; font-size: clamp(30px, 4.6vw, 40px);
+  letter-spacing: .01em; line-height: 1; margin-top: 4px; }
+#home header h1.wordmark i { font-style: italic; font-weight: 500; }
