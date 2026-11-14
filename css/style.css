@@ -525,3 +525,122 @@ body.home-open .nav { display: none; }
 @media (prefers-reduced-motion: reduce) { #home .hbg .water { animation: none; } }
 #home header h1, #home header .eyebrow { color: #fff; text-shadow: 0 2px 14px rgba(10,60,110,.35); }
 #home .hbtns button:not(.main) { background: rgba(10,70,120,.22); }
+
+
+/* =====================================================================
+   유리 재질 (아이폰 같은 글라스모피즘): 서리 유리 + 얇은 빛 테두리 + 부드러운 그림자
+   ===================================================================== */
+:root {
+  --glass: rgba(255,255,255,0.16);
+  --glass-strong: rgba(255,255,255,0.26);
+  --glass-edge: rgba(255,255,255,0.42);
+  --glass-hi: inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(255,255,255,0.08);
+  --glass-shadow: 0 10px 34px rgba(18,40,80,0.18);
+  --glass-blur: blur(24px) saturate(180%);
+  --glass-dark: rgba(28,30,36,0.42);
+}
+
+/* ---------- 홈: 아이폰 배경화면 같은 하늘빛 색 번짐 ---------- */
+#home { background: #9fd7f2; }
+#home .hbg i { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .95; transition: none; }
+#home .hbg .m1 { width: 70%; height: 90%; left: -12%; top: -25%; background: #c7f1ff; animation: mesh1 26s ease-in-out infinite alternate; }
+#home .hbg .m2 { width: 60%; height: 80%; right: -15%; top: -10%; background: #8ec5ff; animation: mesh2 31s ease-in-out infinite alternate; }
+#home .hbg .m3 { width: 65%; height: 75%; left: 20%; bottom: -35%; background: #a9e9e4; animation: mesh3 29s ease-in-out infinite alternate; }
+#home .hbg .m4 { width: 45%; height: 55%; right: 5%; bottom: -20%; background: #c4c8ff; opacity: .75; animation: mesh1 35s ease-in-out infinite alternate-reverse; }
+@keyframes mesh1 { to { transform: translate(8%, 10%) scale(1.08); } }
+@keyframes mesh2 { to { transform: translate(-10%, 8%) scale(1.1); } }
+@keyframes mesh3 { to { transform: translate(6%, -10%) scale(.95); } }
+#home .hbg .water.w1 { opacity: .16; }
+#home .hbg .veil { background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0) 40%, rgba(10,40,80,.08)); }
+@media (prefers-reduced-motion: reduce) { #home .hbg i { animation: none; } }
+
+#home header .eyebrow { color: rgba(12,40,70,.62); text-shadow: none; letter-spacing: .06em; font-weight: 600; }
+#home header h1 { color: #0e2a44; text-shadow: none; font-weight: 800; letter-spacing: -.03em; }
+#home .hbtns button, #home .hbtns button:not(.main) {
+  background: var(--glass-strong); color: #0e2a44; border: 1px solid var(--glass-edge);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); box-shadow: var(--glass-hi), 0 4px 16px rgba(18,40,80,.12);
+  font-weight: 600; letter-spacing: -.01em;
+}
+#home .hbtns button.main { background: rgba(255,255,255,.72); color: #0e2a44; }
+
+/* 띠: 유리 액자 안에 사진 (가장자리 6px 가 유리) */
+#home .pn {
+  padding: 6px; background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 24px;
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-hi), var(--glass-shadow);
+}
+#home .pn::before { content: none; }
+#home .pn .ph { position: absolute; inset: 6px; border-radius: 18px; background: #c9dfee center / cover no-repeat; overflow: hidden; }
+#home .pn .ph::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.42), rgba(0,0,0,0) 45%); }
+#home .pn.on { box-shadow: var(--glass-hi), 0 18px 46px rgba(18,40,80,.26), 0 0 0 1.5px rgba(255,255,255,.75); }
+#home .pn .lb { z-index: 2; }
+/* 펼친 띠 아래: 유리 판 위에 제목 */
+#home .pn .info {
+  left: 14px; right: 14px; bottom: 14px; z-index: 2; padding: 12px 14px 12px; border-radius: 16px;
+  background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.38);
+  backdrop-filter: blur(20px) saturate(170%); -webkit-backdrop-filter: blur(20px) saturate(170%); box-shadow: var(--glass-hi);
+}
+#home .pn .info b { font-size: 20px; text-shadow: 0 1px 10px rgba(0,0,0,.25); }
+#home .pn .acts .go { background: rgba(255,255,255,.9); color: #0e2a44; }
+#home .pn .acts .more { background: rgba(255,255,255,.22); border: 1px solid rgba(255,255,255,.4); }
+#home .pn.add { background: var(--glass); border: 1px solid var(--glass-edge); }
+#home .pn.add .plus, #home .pn.add .lb { color: #0e2a44; }
+
+/* ---------- 전시장 안: 버튼·메뉴·안내도 유리 ---------- */
+#home-btn, #tools button, #minimap, .nav.show, #goto {
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+}
+#home-btn, #tools button {
+  background: var(--glass-dark); border: 1px solid rgba(255,255,255,.22); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 6px 20px rgba(0,0,0,.18);
+}
+body.light-room #home-btn, body.light-room #tools button { background: rgba(255,255,255,.45); color: #1d1f24; border-color: rgba(255,255,255,.7); box-shadow: var(--glass-hi), 0 6px 20px rgba(0,0,0,.08); }
+#minimap { background: rgba(28,30,36,.28); border: 1px solid rgba(255,255,255,.22); border-radius: 12px; }
+
+/* 아래 메뉴: 아이폰 동작 시트처럼 */
+#sheet {
+  background: rgba(36,38,44,.62); border: 1px solid rgba(255,255,255,.16); border-bottom: 0;
+  backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 -10px 40px rgba(0,0,0,.25); border-radius: 22px 22px 0 0;
+}
+#sheet button { border-radius: 12px; }
+#sheet button:hover { background: rgba(255,255,255,.08); }
+#toast { background: rgba(36,38,44,.6); border: 1px solid rgba(255,255,255,.16); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); }
+
+/* 지도, 안내 창, 편집 창, 방명록 */
+#map { background: rgba(14,16,22,.55); backdrop-filter: blur(30px) saturate(160%); -webkit-backdrop-filter: blur(30px) saturate(160%); }
+#map .bar button { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.22); }
+#guide-modal .card {
+  background: rgba(38,40,48,.55); border: 1px solid rgba(255,255,255,.22);
+  backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 24px 70px rgba(0,0,0,.4);
+}
+#guide { background: rgba(38,40,48,.55); border-color: rgba(255,255,255,.24); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); }
+#editor .box, #guestbook .box {
+  background: rgba(36,38,44,.72); border: 1px solid rgba(255,255,255,.18);
+  backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 24px 70px rgba(0,0,0,.4); border-radius: 22px;
+}
+#editor input, #editor textarea, #guestbook input, #guestbook textarea { background: rgba(0,0,0,.25); border-color: rgba(255,255,255,.14); }
+#editor, #guestbook { background: rgba(0,0,0,.35); }
+
+/* 홈 목록: 스크롤바 숨기기 (밀어서 넘긴다) */
+#home .list { scrollbar-width: none; -ms-overflow-style: none; }
+#home .list::-webkit-scrollbar { display: none; }
+
+/* 대표 사진 고르기 (유리 창) */
+#cover-pick { position: absolute; inset: 0; z-index: 44; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(10,30,50,.18); }
+#cover-pick.open { display: flex; }
+#cover-pick .box {
+  width: min(620px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 14px; border-radius: 24px;
+  background: rgba(255,255,255,.3); border: 1px solid rgba(255,255,255,.55); color: #0e2a44;
+  backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 24px 60px rgba(18,40,80,.25);
+}
+#cover-pick .top { display: flex; align-items: center; justify-content: space-between; }
+#cover-pick .top b { font-size: 17px; font-weight: 700; }
+#cover-pick .close { appearance: none; border: 0; background: rgba(255,255,255,.5); color: #0e2a44; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 13px; }
+#cover-pick p { margin: 0; font-size: 12.5px; color: rgba(14,42,68,.7); }
+#cover-pick .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; overflow-y: auto; min-height: 0; padding: 2px; }
+#cover-pick .cp { aspect-ratio: 4 / 3; border: 0; border-radius: 12px; background: rgba(255,255,255,.4) center / cover no-repeat; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(18,40,80,.15); }
+#cover-pick .cp.on { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #3a8ee0; }

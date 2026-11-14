@@ -980,7 +980,9 @@ function enterExhibition(ex) {
 
 function exhibitionStats(ex) {
   const photos = ex.rooms.flatMap(r => r.photos).filter(p => p.imageId);
-  return { rooms: ex.rooms.length, photos: photos.length, cover: photos[0] };
+  // 대표 사진: 고른 게 있으면 그것, 없으면 첫 사진
+  const cover = photos.find(p => p.id === ex.coverId) || photos[0];
+  return { rooms: ex.rooms.length, photos: photos.length, cover };
 }
 
 // 홈 카드 목록 넘기기. 휴대폰을 세로로 들면 화면을 돌려 보여 주기 때문에 기본 스크롤은 방향이 틀어진다.
@@ -1070,18 +1072,19 @@ function renderHome() {
     const st = exhibitionStats(ex);
     const pn = document.createElement('div');
     pn.className = 'pn' + (ex.id === homeSel ? ' on' : '');
-    pn.innerHTML = `<span class="lb"></span><div class="info"><b></b><span class="st">방 ${st.rooms} · 사진 ${st.photos}</span><p></p>`
+    pn.innerHTML = `<i class="ph"></i><span class="lb"></span><div class="info"><b></b><span class="st">방 ${st.rooms} · 사진 ${st.photos}</span><p></p>`
       + `<div class="acts"><button class="go">들어가기 →</button><button class="more" aria-label="전시실 메뉴">⋯</button></div></div>`;
     const title = ex.title || '이름 없는 전시';
     pn.querySelector('.lb').textContent = title;
     pn.querySelector('b').textContent = title;
     pn.querySelector('p').textContent = (ex.intro || '').split('\n')[0] || '';
-    if (st.cover) thumbURL(st.cover, 1400).then(u => { if (u) pn.style.backgroundImage = `url("${u}")`; });
+    const ph = pn.querySelector('.ph');
+    if (st.cover) thumbURL(st.cover, 1400).then(u => { if (u) ph.style.backgroundImage = `url("${u}")`; });
     else {
       // 사진이 없으면 첫 방 색으로
       // 사진이 없으면 첫 방 색을 입힌 유리 띠
       const T = themeOf(ex.rooms[0]);
-      pn.style.background = `linear-gradient(160deg, ${hexA(T.mapWall, 0.55)}, rgba(255,255,255,0.12))`;
+      ph.style.background = `linear-gradient(160deg, ${hexA(T.mapWall, 0.55)}, rgba(255,255,255,0.08))`;
       pn.classList.add('empty');
     }
     pn.addEventListener('click', e => {
@@ -1089,6 +1092,7 @@ function renderHome() {
         openSheet([
           { title: true, label: title },
           { label: '들어가기', fn: () => enterExhibition(ex) },
+          { label: '대표 사진 바꾸기', fn: () => openCoverPicker(ex) },
           { label: '이름·설명 고치기', fn: () => editExhibitionText(ex) },
           { label: '전시실 지우기', danger: true, fn: () => confirmDeleteExhibition(ex) },
           { label: '닫기', quiet: true },
@@ -1116,6 +1120,34 @@ function renderHome() {
   });
   list.appendChild(add);
 }
+// 대표 사진 고르기: 그 전시실에 걸린 사진들 중에서
+function openCoverPicker(ex) {
+  const photos = ex.rooms.flatMap(r => r.photos).filter(p => p.imageId);
+  if (!photos.length) { toast('먼저 전시실에 사진을 걸어 주세요', 2500); return; }
+  const box = $('#cover-pick');
+  const grid = box.querySelector('.grid');
+  grid.innerHTML = '';
+  const cur = exhibitionStats(ex).cover;
+  for (const p of photos) {
+    const b = document.createElement('button');
+    b.className = 'cp' + (p === cur ? ' on' : '');
+    b.setAttribute('aria-label', (p.caption || '사진').split('\n')[0] + ' 대표 사진으로');
+    thumbURL(p, 400).then(u => { if (u) b.style.backgroundImage = `url("${u}")`; });
+    b.addEventListener('click', () => {
+      ex.coverId = p.id;
+      persist();
+      box.classList.remove('open');
+      renderHome();
+      toast('대표 사진을 바꿨어요');
+    });
+    grid.appendChild(b);
+  }
+  box.querySelector('.ttl').textContent = `'${ex.title || '이름 없는 전시'}' 대표 사진`;
+  box.classList.add('open');
+}
+$('#cover-pick .close').addEventListener('click', () => $('#cover-pick').classList.remove('open'));
+$('#cover-pick').addEventListener('click', e => { if (e.target.id === 'cover-pick') e.currentTarget.classList.remove('open'); });
+
 $('#h-tour').addEventListener('click', () => startTutorial());
 $('#h-styles').addEventListener('click', () => startShowcase());
 
@@ -1325,7 +1357,9 @@ function loop(t) {
     const nm = museum.rooms[ri]?.name;
     $('#room').textContent = ri < 0 ? '입구' : ri >= museum.rooms.length ? '출구'
       : `ROOM ${String(ri + 1).padStart(2, '0')}${nm ? ' · ' + nm : ''}`;
-    document.body.classList.toggle('light-room', !!(museum.rooms[ri] && themeOf(museum.rooms[ri]).light));
+    const L = museumScene.layout;
+    const here = ri < 0 ? L.lobby : ri >= L.length ? L.exit : museum.rooms[ri];
+    document.body.classList.toggle('light-room', !!(here && themeOf(here).light));
   }
   applyZoom();
   if ((loop.n = (loop.n || 0) + 1) % 8 === 0) { updateGoto(); updateNav(); }

@@ -27,7 +27,7 @@ export function newPhoto(imageId = null, aspect = EMPTY_ASPECT) {
   return { id: uid('p_'), imageId, aspect };
 }
 
-export function newRoom(photoCount = 4, theme = 'dark') {
+export function newRoom(photoCount = 4, theme = 'white') { // 기본은 하얀 방
   return { id: uid('r_'), theme, photos: Array.from({ length: photoCount }, () => newPhoto()) };
 }
 

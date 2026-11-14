@@ -281,7 +281,7 @@ function drawTextBlock(g, x, y, maxW, lines) {
 
 // 로비 정면 벽의 전시 소개 (투명 바탕, 벽 위에 붙임)
 const LOBBY_TEXT = { w: 3.9, h: 2.9, x: -1.25, y: 1.75 };
-function makeLobbyText(museum, FONTS) {
+function makeLobbyText(museum, FONTS, light = false) {
   const ppm = 300;
   const c = document.createElement('canvas');
   const S = 1.7; // 글씨를 더 촘촘하게 그려 선명하게
@@ -290,7 +290,9 @@ function makeLobbyText(museum, FONTS) {
   const g = c.getContext('2d');
   g.scale(S, S);
   g.textBaseline = 'top';
-  const ink = 'rgba(238,231,219,0.95)', sub = 'rgba(214,206,193,0.8)', faint = 'rgba(214,206,193,0.42)';
+  const ink = light ? 'rgba(34,30,26,0.94)' : 'rgba(238,231,219,0.95)';
+  const sub = light ? 'rgba(60,54,48,0.8)' : 'rgba(214,206,193,0.8)';
+  const faint = light ? 'rgba(60,54,48,0.42)' : 'rgba(214,206,193,0.42)';
   const title = (museum.title || '').trim() || '이름 없는 전시';
   const intro = (museum.intro || '').trim();
   let y = drawTextBlock(g, 0, 40, CW, [
@@ -444,7 +446,7 @@ function paintFloorShadow(L, b) {
 const EXIT_DOOR = { x: 2.35, w: 1.1, h: 2.3 };
 const GB_DESK = { w: 1.2, h: 0.95, d: 0.6, s: 3.4 }; // s: 방 시작에서 거리
 
-function makeExitText(museum, FONTS) {
+function makeExitText(museum, FONTS, light = false) {
   const ppm = 300, S = 1.7, CW = Math.round(3.6 * ppm), CH = Math.round(1.5 * ppm);
   const c = document.createElement('canvas');
   c.width = Math.round(CW * S); c.height = Math.round(CH * S);
@@ -452,7 +454,8 @@ function makeExitText(museum, FONTS) {
   g.scale(S, S);
   g.textBaseline = 'top';
   g.textAlign = 'center';
-  const ink = 'rgba(238,231,219,0.95)', sub = 'rgba(214,206,193,0.75)';
+  const ink = light ? 'rgba(34,30,26,0.94)' : 'rgba(238,231,219,0.95)';
+  const sub = light ? 'rgba(60,54,48,0.75)' : 'rgba(214,206,193,0.75)';
   const line = (t, font, color, y) => { g.font = font; g.fillStyle = color; g.fillText(t, CW / 2, y); };
   line('관람해 주셔서 고맙습니다', FONTS.title(96), ink, 40);
   line((museum.title || '').trim(), FONTS.text(44), sub, 190);
@@ -550,7 +553,7 @@ export class MuseumScene {
     const { zStart, zEnd } = room;
     const F = fontsFor(room.font);
     // 인사 글
-    const t = makeExitText(this.museum, F);
+    const t = makeExitText(this.museum, F, !!themeOf(room).light);
     keep(t.geometry, t.material, t.material.map);
     t.position.set(-0.6, 2.75, zEnd + 0.004);
     group.add(t);
@@ -772,7 +775,7 @@ export class MuseumScene {
       group.add(sign);
     }
     if (room.lobby) {
-      const t = makeLobbyText(this.museum, fontsFor(room.font));
+      const t = makeLobbyText(this.museum, fontsFor(room.font), !!T.light);
       keep(t.geometry, t.material, t.material.map);
       t.position.set(LOBBY_TEXT.x, LOBBY_TEXT.y, zEnd + 0.004);
       t.userData = { wallText: 'exhibition' };
