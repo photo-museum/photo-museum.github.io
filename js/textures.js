@@ -140,3 +140,56 @@ export function shadowTexture() {
   // 가장자리는 더 부드럽게 보이도록 가로세로로 늘려 쓰면 된다
   return canvasTex(c, { srgb: false, repeat: false });
 }
+
+// 밝은 원목 마루. 판이 v(방 길이) 방향으로 길게 놓인다. 한 장 = 가로 2m x 세로 4m 를 덮는다고 보고 그림
+export function oakFloorTexture(w = 512, h = 1024, seed = 51) {
+  const c = makeCanvas(w, h);
+  const g = c.getContext('2d');
+  const img = g.createImageData(w, h);
+  const PLANKS = 14;                 // 2m / 14 ≈ 14cm 폭
+  const pw = w / PLANKS;
+  for (let x = 0; x < w; x++) {
+    const k = Math.floor(x / pw);
+    const inX = x - k * pw;
+    const gapX = inX < 1 ? 0.8 : 1;
+    // 판마다 끝 이음새 위치를 엇갈리게 (한 판 길이 = 한 장 높이의 절반~전체)
+    const off = hash(k, 3, seed) * h;
+    for (let y = 0; y < h; y++) {
+      const yy = (y + off) % h;
+      const seg = Math.floor(yy / (h / 2));
+      const inY = yy - seg * (h / 2);
+      const gapY = inY < 1.5 ? 0.82 : 1;
+      const tone = hash(k * 7 + seg, 5, seed);
+      const grain = fbm(inX / pw * 1.5 + k * 3.3, yy / h * 6, 64, 6, seed + k, 3);
+      const streak = fbm(inX / pw * 9 + k, yy / h * 1.2, 64, 2, seed + 200 + k, 2);
+      const l = (0.93 + tone * 0.09) * (0.9 + grain * 0.1 + (streak - 0.5) * 0.07) * gapX * gapY;
+      const i = (y * w + x) * 4;
+      img.data[i] = Math.min(255, 212 * l);
+      img.data[i + 1] = Math.min(255, 170 * l);
+      img.data[i + 2] = Math.min(255, 120 * l);
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return canvasTex(c);
+}
+
+// 빛나는 격자 유리 천장. 한 장 = 격자 한 칸
+export function lightGridTexture(size = 256) {
+  const c = makeCanvas(size, size);
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(size / 2, size / 2, size * 0.1, size / 2, size / 2, size * 0.75);
+  grd.addColorStop(0, '#fbfcfc');
+  grd.addColorStop(1, '#e4e8e9');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, size, size);
+  // 테두리 살 (반쪽씩 → 이어 붙이면 한 줄)
+  g.fillStyle = '#9c9b95';
+  const t = 3;
+  g.fillRect(0, 0, size, t); g.fillRect(0, size - t, size, t);
+  g.fillRect(0, 0, t, size); g.fillRect(size - t, 0, t, size);
+  g.fillStyle = 'rgba(120,118,112,0.35)';
+  g.fillRect(0, t, size, 2); g.fillRect(0, size - t - 2, size, 2);
+  g.fillRect(t, 0, 2, size); g.fillRect(size - t - 2, 0, 2, size);
+  return canvasTex(c);
+}

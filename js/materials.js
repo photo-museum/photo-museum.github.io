@@ -82,6 +82,7 @@ const photoFrag = /* glsl */`
   uniform vec3 lightColor;
   uniform float aspect;
   uniform float rot;          // 시계 방향 90도 몇 번 (사진만)
+  uniform float spotMix;      // 1 = 스포트라이트 받은 느낌, 0 = 고른 빛
   varying vec2 vUv;
   void main() {
     vec2 uv = vUv;
@@ -91,7 +92,7 @@ const photoFrag = /* glsl */`
     vec3 c = texture2D(map, uv * tile).rgb;
     vec2 d = (vUv - vec2(0.5, 0.62)) * vec2(aspect, 1.0);
     float spot = 1.0 - smoothstep(0.35, 1.25, length(d));
-    vec3 light = lightColor * intensity * (0.8 + 0.25 * spot);
+    vec3 light = lightColor * intensity * mix(0.95, 0.8 + 0.25 * spot, spotMix);
     gl_FragColor = vec4(c * light, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -111,6 +112,7 @@ export function photoMaterial(map, { tile = [1, 1], intensity = 1.0, aspect = 1 
       lightColor: { value: new THREE.Color(0xfff0dc) },
       aspect: { value: aspect },
       rot: { value: 0 },
+      spotMix: { value: 1 },
     },
     vertexShader: photoVert,
     fragmentShader: photoFrag,

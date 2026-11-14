@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {
   ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, PANEL_GAP, layoutMuseum,
 } from './layout.js';
-import { concreteTexture, woodSlatsTexture, plasterTexture } from './textures.js';
+import { concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture } from './textures.js';
 import { surfaceMaterial, photoMaterial } from './materials.js';
 import { getImage } from './store.js';
 
@@ -17,12 +17,15 @@ export const THEMES = {
     wallMap: 'wall', wallTint: 0x707274, wallAmb: 0.27, wallLm: 3.0, endAmb: 0.19, endLm: 2.2,
     floorMap: 'floor', floorTint: 0x6a6866, floorAmb: 0.2, floorLm: 2.4, reflect: 0.26,
     ceil: 'ceilingDark', jambTint: 0x6a6662, jambAmb: 0.2, edges: 'edgesDark',
+    spots: true, benches: false,
   },
   white: {
     label: '하얀 방',
-    wallMap: 'wallWhite', wallTint: 0xffffff, wallAmb: 0.9, wallLm: 0.55, endAmb: 0.86, endLm: 0.35,
-    floorMap: 'floorWhite', floorTint: 0xffffff, floorAmb: 0.78, floorLm: 0.45, reflect: 0.14,
-    ceil: 'ceilingWhite', jambTint: 0xf2f0ec, jambAmb: 0.8, edges: 'edgesWhite',
+    // 레퍼런스: 흰 벽, 밝은 원목 마루, 빛나는 격자 유리 천장, 스포트라이트 없이 고른 빛, 나무 벤치
+    wallMap: 'wallWhite', wallTint: 0xffffff, wallAmb: 0.82, wallLm: 0.32, endAmb: 0.8, endLm: 0.3,
+    floorMap: 'oak', floorTint: 0xffffff, floorAmb: 0.92, floorLm: 0, reflect: 0.07, floorTile: [2.0, 4.0],
+    ceil: 'ceilingGrid', jambTint: 0xf2f0ec, jambAmb: 0.75, edges: 'edgesWhite',
+    spots: false, benches: true, skyGlow: true,
   },
 };
 export function themeOf(room) { return THEMES[room && room.theme] || THEMES.dark; }
@@ -37,11 +40,13 @@ function getShared(maxAniso) {
   const plaster = plasterTexture();
   const wallWhite = concreteTexture(512, 31, false, 0.93, 0.22);
   const floorWhite = concreteTexture(512, 41, false, 0.8, 0.55);
-  for (const t of [wall, floor, wood, plaster, wallWhite, floorWhite]) t.anisotropy = Math.min(8, maxAniso);
+  const oak = oakFloorTexture();
+  const grid = lightGridTexture();
+  for (const t of [wall, floor, wood, plaster, wallWhite, floorWhite, oak, grid]) t.anisotropy = Math.min(8, maxAniso);
   const black = new THREE.DataTexture(new Uint8Array([0, 255, 0, 255]), 1, 1);
   black.needsUpdate = true;
   shared = {
-    wall, floor, wood, plaster, black, wallWhite, floorWhite,
+    wall, floor, wood, plaster, black, wallWhite, floorWhite, oak, grid,
     edgesDark: {
       top: new THREE.MeshBasicMaterial({ color: 0x8c8274 }),
       side: new THREE.MeshBasicMaterial({ color: 0x3e3933 }),
@@ -55,6 +60,12 @@ function getShared(maxAniso) {
     fixtureMat: new THREE.MeshBasicMaterial({ color: 0x141414 }),
     fixtureGeo: new THREE.CylinderGeometry(0.055, 0.065, 0.2, 14),
     stemGeo: new THREE.BoxGeometry(0.02, 0.12, 0.02),
+    // 빛나는 천장: 1.2m 격자, 스스로 밝다
+    ceilingGrid: surfaceMaterial({ map: grid, tile: [1.2, 1.2], tint: 0xffffff, lightMap: black, ambient: 1.18, lmIntensity: 0 }),
+    benchTop: new THREE.MeshBasicMaterial({ color: 0xd8b07c }),
+    benchSide: new THREE.MeshBasicMaterial({ color: 0xbb8f5d }),
+    benchEnd: new THREE.MeshBasicMaterial({ color: 0xa57b4d }),
+    benchBottom: new THREE.MeshBasicMaterial({ color: 0x3a3128 }),
     ceilingWhite: surfaceMaterial({ map: wallWhite, tile: [3.0, 3.0], tint: 0xffffff, lightMap: black, ambient: 0.8, lmIntensity: 0 }),
     ceilingDark: surfaceMaterial({ map: wood, tile: [1.0, 3.2], tint: 0x8c8274, lightMap: black, ambient: 0.3, lmIntensity: 0 }),
   };
@@ -119,10 +130,21 @@ function glow(g, cx, cy, rx, ry, stops) {
 
 // 벽에 떨어지는 스포트라이트 + 판 아래 옅은 그림자를 빛 무늬에 그린다
 // u: 벽 가로 위치(m), y: 높이(m)
-function paintWallSpot(L, u, p) {
+function paintWallSpot(L, u, p, spots = true) {
   const { g, ppm, c } = L;
   const X = u * ppm, Y = c.height - p.y * ppm;
   const hw = p.w / 2, hh = p.h / 2;
+  if (!spots) {
+    // 고른 빛: 판 바로 아래로 아주 옅고 넓게 퍼진 그림자만
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,0.5)';
+    g.shadowBlur = 0.14 * ppm;
+    g.shadowOffsetY = 0.05 * ppm;
+    g.fillStyle = 'rgba(0,0,0,0.5)';
+    g.fillRect(X - hw * ppm, Y - hh * ppm, p.w * ppm, p.h * ppm);
+    g.restore();
+    return;
+  }
   // 넓고 옅은 번짐
   glow(g, X, Y - 0.35 * ppm, (hw + 1.25) * ppm, (hh + 1.55) * ppm,
     [[0, 0.62], [0.45, 0.42], [0.8, 0.12], [1, 0]]);
@@ -193,6 +215,40 @@ function makeLabel(text, light) {
   return mesh;
 }
 
+// 위 천장에서 내려오는 빛: 벽 위쪽이 조금 더 밝다
+function paintSkyGlow(L) {
+  const { g, c } = L;
+  const grd = g.createLinearGradient(0, 0, 0, c.height);
+  grd.addColorStop(0, 'rgba(255,0,0,0.85)');
+  grd.addColorStop(0.55, 'rgba(255,0,0,0.35)');
+  grd.addColorStop(1, 'rgba(255,0,0,0.12)');
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  g.fillStyle = grd;
+  g.fillRect(0, 0, c.width, c.height);
+  g.restore();
+}
+
+const BENCH = { w: 0.55, h: 0.44, l: 2.4 };
+// 방 길이에 맞춰 벤치 위치 (방 시작에서 거리 s). 문 앞은 비운다.
+function benchSpots(Lr) {
+  const n = Math.max(1, Math.floor((Lr - 4) / 9));
+  const out = [];
+  for (let i = 0; i < n; i++) out.push({ x: 0, s: Lr * (i + 1) / (n + 1) });
+  return out;
+}
+// 바닥 빛 무늬 G 채널에 벤치 그림자
+function paintFloorShadow(L, b) {
+  const { g, ppm, c } = L;
+  const X = (b.x + ROOM_W / 2) * ppm, Y = c.height - b.s * ppm;
+  g.save();
+  g.shadowColor = 'rgba(0,0,0,0.7)';
+  g.shadowBlur = 0.18 * ppm;
+  g.fillStyle = 'rgba(0,0,0,0.7)';
+  g.fillRect(X - (BENCH.w / 2 + 0.04) * ppm, Y - (BENCH.l / 2 + 0.04) * ppm, (BENCH.w + 0.08) * ppm, (BENCH.l + 0.08) * ppm);
+  g.restore();
+}
+
 export class MuseumScene {
   constructor(renderer, scene) {
     this.renderer = renderer;
@@ -245,10 +301,14 @@ export class MuseumScene {
     const lmL = lightCanvas(Lr, ROOM_H);
     const lmR = lightCanvas(Lr, ROOM_H);
     const lmF = lightCanvas(ROOM_W, Lr, 24);
+    if (T.skyGlow) { paintSkyGlow(lmL); paintSkyGlow(lmR); }
+    const benches = T.benches ? benchSpots(Lr) : [];
+    for (const b of benches) paintFloorShadow(lmF, b);
     for (const p of room.panels) {
       const s = p.sAlong;
-      if (p.wall === 'L') paintWallSpot(lmL, s, p);         // 왼벽: u = 방 시작부터 거리
-      else paintWallSpot(lmR, Lr - s, p);                   // 오른벽: u 가 반대 방향
+      if (p.wall === 'L') paintWallSpot(lmL, s, p, T.spots);    // 왼벽: u = 방 시작부터 거리
+      else paintWallSpot(lmR, Lr - s, p, T.spots);              // 오른벽: u 가 반대 방향
+      if (!T.spots) continue;
       // 바닥: 벽 밑에 밝게 번진 띠
       const { g, ppm, c } = lmF;
       const fx = (p.wall === 'L' ? 0.0 : ROOM_W) * ppm;
@@ -261,7 +321,7 @@ export class MuseumScene {
     // ----- 바닥 (반투명: 아래 거울 세계가 은은히 비친다) -----
     const floorGeo = keep(meterPlane(ROOM_W, Lr));
     const floorMat = keep(surfaceMaterial({
-      map: R[T.floorMap], tile: [3.2, 3.2], tint: T.floorTint, lightMap: texF, lmSize: [ROOM_W, Lr],
+      map: R[T.floorMap], tile: T.floorTile || [3.2, 3.2], tint: T.floorTint, lightMap: texF, lmSize: [ROOM_W, Lr],
       ambient: T.floorAmb, lmIntensity: T.floorLm, lightColor: SPOT_COLOR, reflectAlpha: T.reflect,
     }));
     const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -293,6 +353,7 @@ export class MuseumScene {
     const endLight = (withDoor) => {
       const L = lightCanvas(ROOM_W, ROOM_H, 32);
       const { g, ppm, c } = L;
+      if (T.skyGlow) paintSkyGlow(L);
       glow(g, ROOM_W / 2 * ppm, c.height - (withDoor ? DOOR_H + 0.2 : 1.9) * ppm, 3.2 * ppm, 2.6 * ppm,
         [[0, withDoor ? 0.42 : 0.34], [0.6, 0.18], [1, 0]]);
       return keep(lightTex(c));
@@ -326,16 +387,31 @@ export class MuseumScene {
       const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(0, 0.0005, zc); group.add(th);
     }
 
-    // ----- 조명 레일 -----
-    const railGeo = keep(new THREE.BoxGeometry(0.035, 0.035, Lr - 0.6));
-    for (const sx of [-1, 1]) {
-      const rail = new THREE.Mesh(railGeo, R.fixtureMat);
-      rail.position.set(sx * (ROOM_W / 2 - TRACK_INSET), ROOM_H - 0.03, zMid);
-      group.add(rail);
+    // ----- 조명 레일 (스포트라이트 방만) -----
+    if (T.spots) {
+      const railGeo = keep(new THREE.BoxGeometry(0.035, 0.035, Lr - 0.6));
+      for (const sx of [-1, 1]) {
+        const rail = new THREE.Mesh(railGeo, R.fixtureMat);
+        rail.position.set(sx * (ROOM_W / 2 - TRACK_INSET), ROOM_H - 0.03, zMid);
+        group.add(rail);
+      }
+    }
+
+    // ----- 나무 벤치 (방 가운데 줄) -----
+    for (const b of benches) {
+      const geo = keep(new THREE.BoxGeometry(BENCH.w, BENCH.h, BENCH.l));
+      // 면 순서: +x, -x, +y, -y, +z, -z
+      const mats = [R.benchSide, R.benchSide, R.benchTop, R.benchBottom, R.benchEnd, R.benchEnd];
+      const mesh = new THREE.Mesh(geo, mats);
+      mesh.position.set(b.x, BENCH.h / 2, zStart - b.s);
+      both(mesh);
+      const z0 = zStart - b.s - BENCH.l / 2, z1 = zStart - b.s + BENCH.l / 2;
+      const x0 = b.x - BENCH.w / 2, x1 = b.x + BENCH.w / 2;
+      this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
     }
 
     // ----- 사진 판 -----
-    for (const p of room.panels) this.buildPanel(room, p, group, mirror, keep);
+    for (const p of room.panels) this.buildPanel(room, p, group, mirror, keep, T);
 
     // ----- 충돌 벽 (x,z 선분) -----
     const hw = ROOM_W / 2, hd = DOOR_W / 2;
@@ -356,7 +432,7 @@ export class MuseumScene {
     this.rooms.push({ layout: room, group, mirror, disposables });
   }
 
-  buildPanel(room, p, group, mirror, keep) {
+  buildPanel(room, p, group, mirror, keep, T) {
     const R = this.res;
     const geo = keep(new THREE.BoxGeometry(p.w, p.h, PANEL_D));
     const empty = !p.photo.imageId;
@@ -388,10 +464,12 @@ export class MuseumScene {
         front.uniforms.map.value = tex;
         front.uniforms.tile.value.set(1, 1);
         front.uniforms.rot.value = ((p.photo.rot || 0) % 4 + 4) % 4;
+        if (!T.spots) front.uniforms.spotMix.value = 0; // 고른 빛: 사진 가장자리도 똑같이 밝게
         front.uniforms.intensity.value = 0.95;
       });
     }
 
+    if (!T.spots) return;
     // 천장 조명 하나: 사진을 향해 기울어진 검은 통
     const sx = p.wall === 'L' ? -1 : 1;
     const fx = sx * (ROOM_W / 2 - TRACK_INSET);

@@ -90,7 +90,7 @@ body.light-room #hint b { color: #222; }
 #loading.done { opacity: 0; pointer-events: none; }
 
 body.sheet-open #joy { visibility: hidden; }
-body.light-room .vignette { opacity: 0.35; }
+body.light-room .vignette { opacity: 0.12; }
 .vignette { transition: opacity .6s; }
 
 /* 설명 쓰기 창 (돌린 화면 밖, 항상 똑바로) */
