@@ -2,7 +2,7 @@
 // 걷는 느낌을 위해 속도/시선은 바로 바뀌지 않고 부드럽게 따라간다.
 import { EYE_H } from './layout.js';
 
-const WALK = 1.6;       // m/s  미술관에서 걷는 속도
+const WALK = 1.9;       // m/s  미술관에서 걷는 속도
 const FAST = 3.4;       // 달리기: Shift, 또는 조이스틱을 끝까지 밀 때
 const RUN_FROM = 0.8;   // 조이스틱을 이만큼 넘게 밀면 달리기 시작
 const ACCEL = 5.0;      // 속도가 목표에 다가가는 빠르기
