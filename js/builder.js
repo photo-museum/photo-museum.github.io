@@ -293,7 +293,7 @@ export class MuseumScene {
 
     if (!empty) {
       this.loadTexture(p.photo.imageId).then(tex => {
-        if (!tex) return;
+        if (!tex) { if (this.onTextureError) this.onTextureError(p.photo); return; }
         front.uniforms.map.value = tex;
         front.uniforms.tile.value.set(1, 1);
         front.uniforms.intensity.value = 0.95;
@@ -319,26 +319,46 @@ export class MuseumScene {
 
   loadTexture(imageId) {
     if (this.textureCache.has(imageId)) return this.textureCache.get(imageId);
-    const pr = getImage(imageId).then(blob => {
-      if (!blob) return null;
-      const url = URL.createObjectURL(blob);
-      return new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => {
-          const t = new THREE.Texture(img);
-          t.colorSpace = THREE.SRGBColorSpace;
-          t.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
-          t.minFilter = THREE.LinearMipmapLinearFilter;
-          t.needsUpdate = true;
-          URL.revokeObjectURL(url);
-          resolve(t);
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-        img.src = url;
-      });
-    }).catch(() => null);
+    const pr = getImage(imageId).then(blob => (blob ? this.textureFromBlob(blob) : null)).catch(e => {
+      console.warn('사진 불러오기 실패', imageId, e);
+      return null;
+    });
+    this.textureCache.set(imageId, pr);
+    // 실패한 것은 다음에 다시 시도할 수 있게 캐시에서 뺀다
+    pr.then(t => { if (!t && this.textureCache.get(imageId) === pr) this.textureCache.delete(imageId); });
+    return pr;
+  }
+
+  // 방금 고른 사진은 저장소를 다시 거치지 않고 바로 텍스처로 만든다
+  primeTexture(imageId, blob) {
+    const pr = this.textureFromBlob(blob).catch(() => null);
     this.textureCache.set(imageId, pr);
     return pr;
+  }
+
+  async textureFromBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => reject(new Error('image decode failed'));
+        im.src = url;
+      });
+      const t = new THREE.Texture(img);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      t.minFilter = THREE.LinearMipmapLinearFilter;
+      t.needsUpdate = true;
+      return t;
+    } finally {
+      // 이미지가 GPU 로 올라간 뒤에 풀어야 아이폰에서 안전하다
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+  }
+
+  resetTextures() {
+    this.textureCache.clear();
   }
 
   forgetTexture(imageId) {

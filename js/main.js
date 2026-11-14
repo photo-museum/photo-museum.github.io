@@ -21,6 +21,14 @@ $('#app').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 120);
 const museumScene = new MuseumScene(renderer, scene);
+museumScene.onTextureError = () => toast('사진 하나를 불러오지 못했어요. 판을 눌러 다시 넣어 주세요', 4000);
+
+// 아이폰은 사진 고르는 동안 WebGL 을 잃어버릴 수 있다 → 돌아오면 다시 짓는다
+renderer.domElement.addEventListener('webglcontextlost', e => e.preventDefault());
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  museumScene.resetTextures();
+  if (museum) rebuild();
+});
 const controls = new WalkControls(camera, renderer.domElement);
 
 function resize() {
@@ -77,10 +85,12 @@ fileInput.addEventListener('change', async () => {
   try {
     const { blob, aspect } = await prepareImage(file);
     const imageId = uid('img_');
+    const tex = await museumScene.primeTexture(imageId, blob);
+    if (!tex) throw new Error('사진을 화면에 올리지 못했어요');
     await putImage(imageId, blob);
     const room = museum.rooms[target.roomIndex];
     const photo = room && room.photos.find(p => p.id === target.photoId);
-    if (!photo) return;
+    if (!photo) throw new Error('판을 찾지 못했어요');
     const old = photo.imageId;
     photo.imageId = imageId;
     photo.aspect = aspect;
