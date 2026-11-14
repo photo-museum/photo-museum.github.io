@@ -63,7 +63,8 @@ export class WalkControls {
     el.addEventListener('pointermove', e => {
       const p = ptrs.get(e.pointerId);
       if (!p) return;
-      const dx = e.clientX - p.x, dy = e.clientY - p.y;
+      let dx = e.clientX - p.x, dy = e.clientY - p.y;
+      if (this.mapDelta) [dx, dy] = this.mapDelta(dx, dy);
       p.x = e.clientX; p.y = e.clientY;
       p.moved += Math.abs(dx) + Math.abs(dy);
       const touch = e.pointerType === 'touch';
@@ -83,7 +84,7 @@ export class WalkControls {
   }
 
   update(dt) {
-    dt = Math.min(dt, 0.05);
+    dt = Math.min(dt, 0.1);
     const k = this.keys;
     let f = 0, s = 0, turn = 0;
     if (k.has('KeyW') || k.has('ArrowUp')) f += 1;

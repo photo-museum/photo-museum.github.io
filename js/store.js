@@ -23,8 +23,8 @@ export function newPhoto(imageId = null, aspect = EMPTY_ASPECT) {
   return { id: uid('p_'), imageId, aspect };
 }
 
-export function newRoom(photoCount = 3) {
-  return { id: uid('r_'), photos: Array.from({ length: photoCount }, () => newPhoto()) };
+export function newRoom(photoCount = 3, theme = 'dark') {
+  return { id: uid('r_'), theme, photos: Array.from({ length: photoCount }, () => newPhoto()) };
 }
 
 export function defaultMuseum() {

@@ -63,7 +63,7 @@ export function layoutMuseum(museum) {
     }
     panels.sort((a, b) => a.index - b.index);
     rooms.push({
-      index: ri, id: room.id, zStart, zEnd, length, panels,
+      index: ri, id: room.id, theme: room.theme || 'dark', zStart, zEnd, length, panels,
       doorIn: ri > 0,
       doorOut: ri < museum.rooms.length - 1,
     });

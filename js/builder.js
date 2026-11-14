@@ -10,6 +10,23 @@ import { getImage } from './store.js';
 const SPOT_COLOR = 0xffe9cf;   // 따뜻한 할로겐 빛
 const TRACK_INSET = 1.5;       // 조명 레일: 벽에서 안쪽으로
 
+// 방 테마. 방마다 room.theme 으로 고른다.
+export const THEMES = {
+  dark: {
+    label: '어두운 방',
+    wallMap: 'wall', wallTint: 0x707274, wallAmb: 0.27, wallLm: 3.0, endAmb: 0.19, endLm: 2.2,
+    floorMap: 'floor', floorTint: 0x6a6866, floorAmb: 0.2, floorLm: 2.4, reflect: 0.26,
+    ceil: 'ceilingDark', jambTint: 0x6a6662, jambAmb: 0.2, edges: 'edgesDark',
+  },
+  white: {
+    label: '하얀 방',
+    wallMap: 'wallWhite', wallTint: 0xffffff, wallAmb: 0.9, wallLm: 0.55, endAmb: 0.86, endLm: 0.35,
+    floorMap: 'floorWhite', floorTint: 0xffffff, floorAmb: 0.78, floorLm: 0.45, reflect: 0.14,
+    ceil: 'ceilingWhite', jambTint: 0xf2f0ec, jambAmb: 0.8, edges: 'edgesWhite',
+  },
+};
+export function themeOf(room) { return THEMES[room && room.theme] || THEMES.dark; }
+
 // ---------- 공용 자원 (한 번만 만든다) ----------
 let shared = null;
 function getShared(maxAniso) {
@@ -18,18 +35,28 @@ function getShared(maxAniso) {
   const floor = concreteTexture(512, 21, false);
   const wood = woodSlatsTexture();
   const plaster = plasterTexture();
-  for (const t of [wall, floor, wood, plaster]) t.anisotropy = Math.min(8, maxAniso);
-  const black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+  const wallWhite = concreteTexture(512, 31, false, 0.93, 0.22);
+  const floorWhite = concreteTexture(512, 41, false, 0.8, 0.55);
+  for (const t of [wall, floor, wood, plaster, wallWhite, floorWhite]) t.anisotropy = Math.min(8, maxAniso);
+  const black = new THREE.DataTexture(new Uint8Array([0, 255, 0, 255]), 1, 1);
   black.needsUpdate = true;
   shared = {
-    wall, floor, wood, plaster, black,
-    edgeTop: new THREE.MeshBasicMaterial({ color: 0x8c8274 }),
-    edgeSide: new THREE.MeshBasicMaterial({ color: 0x3e3933 }),
-    edgeBottom: new THREE.MeshBasicMaterial({ color: 0x100e0c }),
+    wall, floor, wood, plaster, black, wallWhite, floorWhite,
+    edgesDark: {
+      top: new THREE.MeshBasicMaterial({ color: 0x8c8274 }),
+      side: new THREE.MeshBasicMaterial({ color: 0x3e3933 }),
+      bottom: new THREE.MeshBasicMaterial({ color: 0x100e0c }),
+    },
+    edgesWhite: {
+      top: new THREE.MeshBasicMaterial({ color: 0xe6e1d8 }),
+      side: new THREE.MeshBasicMaterial({ color: 0xa8a39a }),
+      bottom: new THREE.MeshBasicMaterial({ color: 0x6e6a64 }),
+    },
     fixtureMat: new THREE.MeshBasicMaterial({ color: 0x141414 }),
     fixtureGeo: new THREE.CylinderGeometry(0.055, 0.065, 0.2, 14),
     stemGeo: new THREE.BoxGeometry(0.02, 0.12, 0.02),
-    ceilingMat: surfaceMaterial({ map: wood, tile: [1.0, 3.2], tint: 0x8c8274, lightMap: black, ambient: 0.3, lmIntensity: 0 }),
+    ceilingWhite: surfaceMaterial({ map: wallWhite, tile: [3.0, 3.0], tint: 0xffffff, lightMap: black, ambient: 0.8, lmIntensity: 0 }),
+    ceilingDark: surfaceMaterial({ map: wood, tile: [1.0, 3.2], tint: 0x8c8274, lightMap: black, ambient: 0.3, lmIntensity: 0 }),
   };
   return shared;
 }
@@ -63,7 +90,8 @@ function lightCanvas(wMeters, hMeters, ppmMax = 56) {
   c.width = Math.max(4, Math.round(wMeters * ppm));
   c.height = Math.max(4, Math.round(hMeters * ppm));
   const g = c.getContext('2d');
-  g.fillStyle = '#000';
+  // R = 스포트라이트 빛, G = 주변광이 닿는 정도(그림자면 낮아짐)
+  g.fillStyle = 'rgb(0,255,0)';
   g.fillRect(0, 0, c.width, c.height);
   return { c, g, ppm };
 }
@@ -82,7 +110,7 @@ function glow(g, cx, cy, rx, ry, stops) {
   g.translate(cx, cy);
   g.scale(rx, ry);
   const grd = g.createRadialGradient(0, 0, 0, 0, 0, 1);
-  for (const [o, v] of stops) grd.addColorStop(o, `rgba(255,255,255,${v})`);
+  for (const [o, v] of stops) grd.addColorStop(o, `rgba(255,0,0,${v})`);
   g.fillStyle = grd;
   g.globalCompositeOperation = 'lighter';
   g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill();
@@ -148,6 +176,7 @@ export class MuseumScene {
 
   buildRoom(room) {
     const R = this.res;
+    const T = themeOf(room);
     const { length: Lr, zStart, zEnd } = room;
     const zMid = (zStart + zEnd) / 2;
     const group = new THREE.Group();
@@ -179,8 +208,8 @@ export class MuseumScene {
     // ----- 바닥 (반투명: 아래 거울 세계가 은은히 비친다) -----
     const floorGeo = keep(meterPlane(ROOM_W, Lr));
     const floorMat = keep(surfaceMaterial({
-      map: R.floor, tile: [3.2, 3.2], tint: 0x6a6866, lightMap: texF, lmSize: [ROOM_W, Lr],
-      ambient: 0.2, lmIntensity: 2.4, lightColor: SPOT_COLOR, reflectAlpha: 0.26,
+      map: R[T.floorMap], tile: [3.2, 3.2], tint: T.floorTint, lightMap: texF, lmSize: [ROOM_W, Lr],
+      ambient: T.floorAmb, lmIntensity: T.floorLm, lightColor: SPOT_COLOR, reflectAlpha: T.reflect,
     }));
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
@@ -190,14 +219,14 @@ export class MuseumScene {
 
     // ----- 천장 -----
     const ceilGeo = keep(meterPlane(ROOM_W, Lr));
-    const ceil = new THREE.Mesh(ceilGeo, R.ceilingMat);
+    const ceil = new THREE.Mesh(ceilGeo, R[T.ceil]);
     ceil.rotation.x = Math.PI / 2;
     ceil.position.set(0, ROOM_H, zMid);
     both(ceil);
 
     // ----- 옆벽 -----
     const wallGeo = keep(meterPlane(Lr, ROOM_H));
-    const wallOpts = { map: R.wall, tile: [3.0, 3.0], tint: 0x707274, lmSize: [Lr, ROOM_H], ambient: 0.27, lmIntensity: 3.0, lightColor: SPOT_COLOR };
+    const wallOpts = { map: R[T.wallMap], tile: [3.0, 3.0], tint: T.wallTint, lmSize: [Lr, ROOM_H], ambient: T.wallAmb, lmIntensity: T.wallLm, lightColor: SPOT_COLOR };
     const matL = keep(surfaceMaterial({ ...wallOpts, lightMap: texL }));
     const matR = keep(surfaceMaterial({ ...wallOpts, lightMap: texR }));
     const wl = new THREE.Mesh(wallGeo, matL);
@@ -216,8 +245,8 @@ export class MuseumScene {
       return keep(lightTex(c));
     };
     const endMat = (withDoor) => keep(surfaceMaterial({
-      map: R.wall, tile: [3.0, 3.0], tint: 0x707274, lightMap: endLight(withDoor), lmSize: [ROOM_W, ROOM_H],
-      ambient: 0.19, lmIntensity: 2.2, lightColor: SPOT_COLOR,
+      map: R[T.wallMap], tile: [3.0, 3.0], tint: T.wallTint, lightMap: endLight(withDoor), lmSize: [ROOM_W, ROOM_H],
+      ambient: T.endAmb, lmIntensity: T.endLm, lightColor: SPOT_COLOR,
     }));
     // 시작 벽 (방 안쪽을 보며 +z 쪽에 있음 → -z 를 향해야 함)
     const startGeo = keep(endWallGeometry(room.doorIn));
@@ -232,7 +261,7 @@ export class MuseumScene {
 
     // ----- 문틀 (벽 두께) + 문턱 바닥 -----
     if (room.doorOut) {
-      const jambMat = keep(surfaceMaterial({ map: R.wall, tile: [3, 3], tint: 0x6a6662, lightMap: R.black, ambient: 0.2, lmIntensity: 0 }));
+      const jambMat = keep(surfaceMaterial({ map: R[T.wallMap], tile: [3, 3], tint: T.jambTint, lightMap: R.black, ambient: T.jambAmb, lmIntensity: 0 }));
       const jambGeo = keep(meterPlane(WALL_T, DOOR_H));
       const zc = zEnd - WALL_T / 2;
       const jl = new THREE.Mesh(jambGeo, jambMat); jl.rotation.y = Math.PI / 2; jl.position.set(-DOOR_W / 2, DOOR_H / 2, zc); both(jl);
@@ -240,7 +269,7 @@ export class MuseumScene {
       const topGeo = keep(meterPlane(DOOR_W, WALL_T));
       const jt = new THREE.Mesh(topGeo, jambMat); jt.rotation.x = Math.PI / 2; jt.position.set(0, DOOR_H, zc); both(jt);
       const thGeo = keep(meterPlane(DOOR_W, WALL_T));
-      const thMat = keep(surfaceMaterial({ map: R.floor, tile: [3.2, 3.2], tint: 0x6a6866, lightMap: R.black, ambient: 0.2, lmIntensity: 0 }));
+      const thMat = keep(surfaceMaterial({ map: R[T.floorMap], tile: [3.2, 3.2], tint: T.floorTint, lightMap: R.black, ambient: T.floorAmb, lmIntensity: 0 }));
       const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(0, 0.0005, zc); group.add(th);
     }
 
@@ -280,7 +309,8 @@ export class MuseumScene {
     const empty = !p.photo.imageId;
     const front = keep(photoMaterial(R.plaster, { tile: [p.w / 1.3, p.h / 1.3], intensity: 1.0, aspect: p.w / p.h }));
     // BoxGeometry 면 순서: +x, -x, +y, -y, +z(앞), -z(뒤)
-    const mats = [R.edgeSide, R.edgeSide, R.edgeTop, R.edgeBottom, front, R.edgeBottom];
+    const E = R[themeOf(room).edges];
+    const mats = [E.side, E.side, E.top, E.bottom, front, E.bottom];
     const mesh = new THREE.Mesh(geo, mats);
     mesh.position.set(p.x, p.y, p.z);
     mesh.rotation.y = p.rotY;

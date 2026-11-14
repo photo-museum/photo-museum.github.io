@@ -30,9 +30,10 @@ const surfaceFrag = /* glsl */`
   void main() {
     vec3 albedo = texture2D(map, vUv / tile).rgb * tint;
     vec2 luv = (vUv - lmOrigin) / lmSize;
-    float lm = texture2D(lightMap, luv).r;
-    lm = lm * lm;   // 빛이 끝으로 갈수록 빨리 사그라들게
-    vec3 light = vec3(ambient) + lightColor * lm * lmIntensity;
+    vec4 lmt = texture2D(lightMap, luv);
+    float lm = lmt.r * lmt.r;   // 빛이 끝으로 갈수록 빨리 사그라들게
+    float occ = mix(0.35, 1.0, lmt.g); // 판 아래 그림자
+    vec3 light = vec3(ambient) * occ + lightColor * lm * lmIntensity;
     vec3 col = albedo * light;
     float alpha = 1.0;
     if (reflectAlpha > 0.0) {

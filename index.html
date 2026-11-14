@@ -12,6 +12,7 @@
   </script>
 </head>
 <body>
+  <div id="stage">
   <div id="app"></div>
   <div class="vignette"></div>
 
@@ -21,18 +22,21 @@
   </header>
 
   <p id="hint"></p>
-  <div id="joy"></div>
   <div id="toast"></div>
 
-  <div id="sheet" role="dialog" aria-label="사진">
-    <button data-act="view">앞에 가서 보기</button>
-    <button data-act="replace">사진 바꾸기</button>
-    <button data-act="remove" class="quiet">사진 내리기</button>
-    <button data-act="close" class="quiet">닫기</button>
+  <nav id="tools">
+    <button data-act="photos">+ 사진</button>
+    <button data-act="room">+ 방</button>
+    <button data-act="theme" aria-label="이 방 색 바꾸기">◐ 방 색</button>
+  </nav>
+
+  <div id="sheet" role="dialog" aria-label="메뉴"></div>
+  <div id="loading">전시장을 준비하고 있어요</div>
   </div>
 
-  <input id="file" type="file" accept="image/*" hidden>
-  <div id="loading">전시장을 준비하고 있어요</div>
+  <!-- 조이스틱은 돌린 화면 밖에 둔다 (실제 화면 좌표로 동작) -->
+  <div id="joy"></div>
+  <input id="file" type="file" accept="image/*" multiple hidden>
 
   <script src="vendor/nipplejs.js"></script>
   <script type="module" src="js/main.js"></script>

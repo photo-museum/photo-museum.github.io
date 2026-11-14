@@ -47,7 +47,7 @@ function makeCanvas(w, h) {
 }
 
 // 콘크리트 / 미장 벽. 회색 얼룩 + 세로로 흘러내린 자국
-export function concreteTexture(size = 512, seed = 1, streak = true) {
+export function concreteTexture(size = 512, seed = 1, streak = true, base = 0.5, contrast = 1) {
   const c = makeCanvas(size, size);
   const g = c.getContext('2d');
   const img = g.createImageData(size, size);
@@ -59,7 +59,7 @@ export function concreteTexture(size = 512, seed = 1, streak = true) {
       if (streak) n = n * 0.7 + 0.3 * fbm(u * 3, v * 0.35, P * 3, Math.max(1, Math.round(P * 0.35)), seed + 99, 3);
       const blot = fbm(u * 0.5, v * 0.5, P / 2, P / 2, seed + 5, 3);
       const grain = hash(x, y, seed + 7);
-      let l = 0.5 + (n - 0.5) * 0.2 + (blot - 0.5) * 0.12 + (grain - 0.5) * 0.05;
+      let l = base + ((n - 0.5) * 0.2 + (blot - 0.5) * 0.12 + (grain - 0.5) * 0.05) * contrast;
       l = Math.max(0, Math.min(1, l));
       const i = (y * size + x) * 4;
       const val = l * 255;
