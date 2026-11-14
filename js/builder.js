@@ -8,7 +8,10 @@ import { fontsFor } from './fonts.js';
 import {
   concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture,
   herringboneTexture, parquetTexture, marbleTexture, terracottaTexture, louverTexture,
+  plankTexture, slabTexture, terrazzoTexture, checkerTexture, hexTexture, tatamiTexture, brickTexture, fabricTexture,
+  trackTexture, stripTexture, cofferTexture, beamsTexture, darkSpotsTexture, starsTexture, skyTexture,
 } from './textures.js';
+import { WALL_BY, CEIL_BY, FLOOR_BY, styleOf } from './styles.js';
 import { surfaceMaterial, photoMaterial } from './materials.js';
 import { getImage, getImageHD } from './store.js';
 
@@ -24,42 +27,51 @@ const rgbToHex = ([r, g, b]) => (Math.round(Math.min(1, r) * 255) << 16) | (Math
 const css = h => '#' + h.toString(16).padStart(6, '0');
 // 무늬(밝기 base)에 곱해 원하는 색이 나오도록 색을 나눠 둔다
 const tintFor = (hex, base) => rgbToHex(hexToRgb(hex).map(v => v / base));
-const FLOOR_WHITE = 0xe8e2d8; // 모든 방 바닥: 따뜻한 흰색
-function colorRoom({ label, desc, wall, floor, ceil, dark = false }) {
-  const [r, g, b] = hexToRgb(wall);
-  const light = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45;
-  return {
-    label, desc, light, mapFloor: css(FLOOR_WHITE), mapWall: css(wall),
-    // 벽 색이 그대로 보이도록 주변광은 차분하게, 사진 둘레 빛은 은은하게 (색이 들뜨지 않게)
-    wallMap: 'wallWhite', wallTint: tintFor(wall, 0.93), wallAmb: dark ? 0.56 : 0.7, wallLm: dark ? 0.75 : 0.42,
-    endAmb: dark ? 0.52 : 0.66, endLm: dark ? 0.6 : 0.35,
-    // 바닥은 모든 방이 같은 따뜻한 흰색, 천장은 벽과 같은 색. 입체감은 구석 그림자로만.
-    floorMap: 'floorWhite', floorTint: tintFor(FLOOR_WHITE, 0.8), floorAmb: 0.7, floorLm: dark ? 0.35 : 0.25, reflect: 0, floorTile: [3.2, 3.2],
-    ceil: 'ceilingWhite', ceilSpec: { map: 'wallWhite', tile: [3, 3], tint: tintFor(wall, 0.93), amb: dark ? 0.62 : 0.74 },
-    jambTint: tintFor(wall, 0.93), jambAmb: 0.62, edges: light ? 'edgesWhite' : 'edgesDark',
-    wash: true, ao: true, introBg: css(rgbToHex(hexToRgb(wall).map(v => v * 0.86))),
+// 벽·천장·바닥 고른 것(styles.js)을 그리기 설정 T 로 바꾼다
+const themeCache = new Map();
+function composeTheme(st) {
+  const key = st.wall + '|' + st.ceil + '|' + st.floor;
+  if (themeCache.has(key)) return themeCache.get(key);
+  const W = WALL_BY[st.wall], C = CEIL_BY[st.ceil], F = FLOOR_BY[st.floor];
+  const [r, g, b] = hexToRgb(W.color);
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const dark = lum < 0.3, light = lum > 0.45;
+  const wallBase = W.map === 'brick' ? 0.92 : W.map === 'fabric' ? 0.93 : W.map === 'plaster' ? 0.9 : 0.93;
+  const ceilTint = C.tint === 'wall' ? tintFor(W.color, 0.93) : C.tex === 'wallWhite' ? tintFor(C.tint, 0.93) : C.tint;
+  const T = {
+    label: W.label, desc: `${C.label} · ${F.label}`, light, mapFloor: css(F.map), mapWall: css(W.color),
+    wallMap: W.map || 'wallWhite', wallTile: W.tile || [3, 3], wallTint: tintFor(W.color, wallBase),
+    wallAmb: dark ? 0.56 : 0.7, wallLm: dark ? 0.75 : 0.42, endAmb: dark ? 0.52 : 0.66, endLm: dark ? 0.6 : 0.35,
+    floorMap: F.tex, floorTint: F.base ? tintFor(F.tint, F.base) : F.tint, floorAmb: dark ? 0.66 : 0.72, floorLm: dark ? 0.35 : 0.25,
+    reflect: 0, floorTile: F.tile,
+    ceil: 'ceilingWhite', ceilSpec: { map: C.tex, tile: C.tile, tint: ceilTint, amb: C.bright ? 1.0 : C.dark ? 0.95 : (dark ? 0.62 : 0.76) },
+    skyGlow: !!C.bright, jambTint: tintFor(W.color, wallBase), jambAmb: 0.62,
+    edges: W.crown === 0xc9a45a || W.crown === 0xb99a5a ? 'edgesGold' : light ? 'edgesWhite' : 'edgesDark',
+    wash: true, ao: true, introBg: css(rgbToHex(hexToRgb(W.color).map(v => v * 0.86))),
+    wainscot: W.wainscot || null, crown: W.crown || null,
   };
+  themeCache.set(key, T);
+  return T;
 }
-export const THEMES = {
-  white: colorRoom({ label: '하얀 방', desc: '따뜻한 아이보리', wall: 0xebe3d5, floor: 0xcbbca6, ceil: 0xf2ece2 }),
-  dark: colorRoom({ label: '검은 방', desc: '따뜻한 숯빛, 사진만 환하게', wall: 0x2e2a27, floor: 0x211e1c, ceil: 0x2a2724, dark: true }),
-  burgundy: colorRoom({ label: '버건디', desc: '깊은 와인색', wall: 0x6c2430, floor: 0x471a20, ceil: 0x75323c, dark: true }),
-  red: colorRoom({ label: '빨간 방', desc: '벽돌빛 붉은색', wall: 0x983b2d, floor: 0x5c261d, ceil: 0xa24a3b }),
-  orange: colorRoom({ label: '주황 방', desc: '구운 흙빛 주황', wall: 0xb2643b, floor: 0x6c3b23, ceil: 0xbd7450 }),
-  yellow: colorRoom({ label: '노란 방', desc: '부드러운 황토색', wall: 0xc79f4f, floor: 0x7d5f2d, ceil: 0xd2b067 }),
-  green: colorRoom({ label: '초록 방', desc: '깊은 숲 초록', wall: 0x2f4a39, floor: 0x1f3026, ceil: 0x3a5645, dark: true }),
-  blue: colorRoom({ label: '파란 방', desc: '깊은 코발트 블루', wall: 0x2d4b77, floor: 0x1d304d, ceil: 0x3a5783, dark: true }),
-  navy: colorRoom({ label: '남색 방', desc: '밤하늘 남색', wall: 0x212c46, floor: 0x161d30, ceil: 0x28344f, dark: true }),
-  purple: colorRoom({ label: '보라 방', desc: '자두빛 보라', wall: 0x4f3053, floor: 0x331f36, ceil: 0x5b3b5f, dark: true }),
+export function themeOf(room) { return composeTheme(styleOf(room)); }
+
+// 카탈로그 무늬는 처음 쓸 때 만든다
+const LAZY_TEX = {
+  track: () => trackTexture(false), trackDark: () => trackTexture(true), strip: stripTexture,
+  coffer: () => cofferTexture(false, false), cofferGold: () => cofferTexture(true, false), cofferSky: () => cofferTexture(false, true),
+  beams: beamsTexture, darkSpots: darkSpotsTexture, stars: starsTexture, sky: skyTexture,
+  slabLight: () => slabTexture([216, 210, 199]), slabDark: () => slabTexture([78, 77, 74]),
+  maple: () => plankTexture([226, 192, 142], 53, 18), walnut: () => plankTexture([122, 84, 56], 57),
+  terrazzo: () => terrazzoTexture('#ebe7e0', ['#8a8a8a', '#d9c7a8', '#b46a52', '#ffffff', '#6f8597']),
+  terrazzoDark: () => terrazzoTexture('#5a5754', ['#8c8c8c', '#c9b48e', '#a6584a', '#dddddd']),
+  checkerBW: () => checkerTexture('#f1efea', '#262626'), checkerCream: () => checkerTexture('#efe9dd', '#7c6a57'),
+  hex: () => hexTexture('#e6e0d4', '#bdb3a2'), tatami: tatamiTexture, brick: brickTexture, fabric: fabricTexture,
 };
-export const THEME_ORDER = ['white', 'dark', 'burgundy', 'red', 'orange', 'yellow', 'green', 'blue', 'navy', 'purple'];
-// 예전 방 스타일 이름 → 지금 색깔 방
-const THEME_ALIAS = {
-  cove: 'dark', water: 'dark', salon: 'burgundy', conservatory: 'white', oakgallery: 'white',
-  hall: 'white', cube: 'white', fold: 'white', lounge: 'white',
-};
-export function themeId(room) { const t = room && room.theme; return THEMES[t] ? t : (THEME_ALIAS[t] || 'dark'); }
-export function themeOf(room) { return THEMES[themeId(room)]; }
+let ANISO = 8;
+export function texOf(R, key) {
+  if (!R[key] && LAZY_TEX[key]) { R[key] = LAZY_TEX[key](); R[key].anisotropy = Math.min(8, ANISO); }
+  return R[key];
+}
 
 // ---------- 공용 자원 (한 번만 만든다) ----------
 let shared = null;
@@ -530,6 +542,7 @@ export class MuseumScene {
     this.mirrorRoot.scale.y = -1;   // 바닥 아래로 뒤집힌 세계 = 바닥 반사
     scene.add(this.mirrorRoot, this.root);
     this.res = getShared(renderer.capabilities.getMaxAnisotropy());
+    ANISO = renderer.capabilities.getMaxAnisotropy();
     MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
     this.fronts = new Map();  // photoId -> { front 재질, photo } (선명한 판 바꿔 끼우기용)
     this.hd = null;           // { photoId, tex }
@@ -696,7 +709,7 @@ export class MuseumScene {
     // ----- 바닥 (반투명: 아래 거울 세계가 은은히 비친다) -----
     const floorGeo = keep(meterPlane(ROOM_W, Lr));
     const floorMat = keep(surfaceMaterial({
-      map: R[T.floorMap], tile: T.floorTile || [3.2, 3.2], tint: T.floorTint, lightMap: texF, lmSize: [ROOM_W, Lr],
+      map: texOf(R, T.floorMap), tile: T.floorTile || [3.2, 3.2], tint: T.floorTint, lightMap: texF, lmSize: [ROOM_W, Lr],
       ambient: T.floorAmb, lmIntensity: T.floorLm, lightColor: SPOT_COLOR, reflectAlpha: T.reflect,
     }));
     const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -713,7 +726,7 @@ export class MuseumScene {
       const lmC = lightCanvas(ROOM_W, Lr, 16);
       paintEdgeAO(lmC, { l: [1.8, 0.55], r: [1.8, 0.55], t: [1.4, 0.4], b: [1.4, 0.4] });
       const C = T.ceilSpec || { map: 'wallWhite', tile: [3, 3], tint: 0xf2ece2, amb: 0.82 };
-      ceilMat = keep(surfaceMaterial({ map: R[C.map], tile: C.tile, tint: C.tint, lightMap: keep(lightTex(lmC.c)), lmSize: [ROOM_W, Lr], ambient: C.amb, lmIntensity: 0 }));
+      ceilMat = keep(surfaceMaterial({ map: texOf(R, C.map), tile: C.tile, tint: C.tint, lightMap: keep(lightTex(lmC.c)), lmSize: [ROOM_W, Lr], ambient: C.amb, lmIntensity: 0 }));
     }
     const ceil = new THREE.Mesh(ceilGeo, ceilMat);
     ceil.rotation.x = Math.PI / 2;
@@ -722,7 +735,7 @@ export class MuseumScene {
 
     // ----- 옆벽 -----
     const wallGeo = keep(meterPlane(Lr, ROOM_H));
-    const wallOpts = { map: R[T.wallMap], tile: [3.0, 3.0], tint: T.wallTint, lmSize: [Lr, ROOM_H], ambient: T.wallAmb, lmIntensity: T.wallLm, lightColor: SPOT_COLOR };
+    const wallOpts = { map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lmSize: [Lr, ROOM_H], ambient: T.wallAmb, lmIntensity: T.wallLm, lightColor: SPOT_COLOR };
     const matL = keep(surfaceMaterial({ ...wallOpts, lightMap: texL }));
     const matR = keep(surfaceMaterial({ ...wallOpts, lightMap: texR }));
     const wl = new THREE.Mesh(wallGeo, matL);
@@ -754,7 +767,7 @@ export class MuseumScene {
       return keep(lightTex(c));
     };
     const endMat = (withDoor, u0, lobbyText) => keep(surfaceMaterial({
-      map: R[T.wallMap], tile: [3.0, 3.0], tint: T.wallTint, lightMap: endLight(withDoor, u0, lobbyText), lmSize: [ROOM_W, ROOM_H],
+      map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lightMap: endLight(withDoor, u0, lobbyText), lmSize: [ROOM_W, ROOM_H],
       ambient: T.endAmb, lmIntensity: T.endLm, lightColor: SPOT_COLOR,
     }));
     // 시작 벽 (방 안쪽을 보며 +z 쪽에 있음 → -z 를 향해야 함)
@@ -793,9 +806,36 @@ export class MuseumScene {
       this.pickables.push(t);
     }
 
+    // ----- 징두리판(아래)과 몰딩(위): 벽 앞에 얇은 띠 -----
+    if (T.wainscot || T.crown) {
+      const bandMat = (color, k = 1) => keep(surfaceMaterial({ map: R.wallWhite, tile: [3, 3], tint: rgbToHex(hexToRgb(tintFor(color, 0.93)).map(v => Math.min(1, v * k))), lightMap: R.black, ambient: T.wallAmb, lmIntensity: 0 }));
+      const band = (len, h, y, x, z, ry, mat) => {
+        if (len <= 0.01) return;
+        const m = new THREE.Mesh(keep(meterPlane(len, h)), mat);
+        m.position.set(x, y, z); m.rotation.y = ry; both(m);
+      };
+      const e = 0.006;
+      const spans = (dx, door) => door ? [[-ROOM_W / 2, dx - DOOR_W / 2 - 0.06], [dx + DOOR_W / 2 + 0.06, ROOM_W / 2]] : [[-ROOM_W / 2, ROOM_W / 2]];
+      const ring = (h, y, mat, avoidDoors) => {
+        band(Lr, h, y, -ROOM_W / 2 + e, zMid, Math.PI / 2, mat);
+        band(Lr, h, y, ROOM_W / 2 - e, zMid, -Math.PI / 2, mat);
+        for (const [a, b] of spans(room.doorInX || 0, avoidDoors && room.doorIn)) band(b - a, h, y, (a + b) / 2, zStart - e, Math.PI, mat);
+        for (const [a, b] of spans(room.doorOutX || 0, avoidDoors && room.doorOut)) band(b - a, h, y, (a + b) / 2, zEnd + e, 0, mat);
+      };
+      if (T.wainscot) {
+        const h = T.wainscot.h;
+        ring(h, h / 2, bandMat(T.wainscot.c), true);
+        ring(0.035, h + 0.0175, bandMat(T.wainscot.c, 1.35), true); // 위 테
+      }
+      if (T.crown) {
+        ring(0.3, ROOM_H - 0.15, bandMat(T.crown), false);
+        ring(0.03, ROOM_H - 0.315, bandMat(T.crown, 0.7), false); // 아래 그림자 줄
+      }
+    }
+
     // ----- 문틀 (벽 두께) + 문턱 바닥 -----
     if (room.doorOut) {
-      const jambMat = keep(surfaceMaterial({ map: R[T.wallMap], tile: [3, 3], tint: T.jambTint, lightMap: R.black, ambient: T.jambAmb, lmIntensity: 0 }));
+      const jambMat = keep(surfaceMaterial({ map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.jambTint, lightMap: R.black, ambient: T.jambAmb, lmIntensity: 0 }));
       const jambGeo = keep(meterPlane(WALL_T, DOOR_H));
       const zc = zEnd - WALL_T / 2;
       const dx = room.doorOutX || 0;
@@ -804,7 +844,7 @@ export class MuseumScene {
       const topGeo = keep(meterPlane(DOOR_W, WALL_T));
       const jt = new THREE.Mesh(topGeo, jambMat); jt.rotation.x = Math.PI / 2; jt.position.set(dx, DOOR_H, zc); both(jt);
       const thGeo = keep(meterPlane(DOOR_W, WALL_T));
-      const thMat = keep(surfaceMaterial({ map: R[T.floorMap], tile: [3.2, 3.2], tint: T.floorTint, lightMap: R.black, ambient: T.floorAmb, lmIntensity: 0 }));
+      const thMat = keep(surfaceMaterial({ map: texOf(R, T.floorMap), tile: [3.2, 3.2], tint: T.floorTint, lightMap: R.black, ambient: T.floorAmb, lmIntensity: 0 }));
       const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(dx, 0.0005, zc); group.add(th);
     }
 

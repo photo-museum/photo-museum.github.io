@@ -289,3 +289,159 @@ export function louverTexture(size = 256) {
   }
   return canvasTex(c);
 }
+
+// ---------- 방 꾸미기 카탈로그용 무늬 (모두 이어 붙여도 이음새 없게) ----------
+const rgbs = (r, g, b, k = 1) => `rgb(${Math.min(255, r * k) | 0},${Math.min(255, g * k) | 0},${Math.min(255, b * k) | 0})`;
+
+// 마루: 판 폭 w(m), 한 장 = 2m × 4m 에 그린다
+export function plankTexture([r, g, b], seed = 51, planks = 14) {
+  const W = 512, H = 1024, c = makeCanvas(W, H), x = c.getContext('2d');
+  const pw = W / planks;
+  for (let k = 0; k < planks; k++) {
+    const off = hash(k, 3, seed) * H;
+    for (let s = -1; s < 3; s++) {
+      const y = s * H / 2 + off % (H / 2);
+      x.fillStyle = rgbs(r, g, b, 0.86 + hash(k, s + 9, seed) * 0.22);
+      x.fillRect(k * pw, y, pw - 1.2, H / 2 - 2);
+    }
+  }
+  x.globalAlpha = 0.06;
+  for (let i = 0; i < 2500; i++) { x.fillStyle = hash(i, 1, seed) > .5 ? '#fff' : '#000'; x.fillRect(hash(i, 2, seed) * W, hash(i, 3, seed) * H, 1, 6 + hash(i, 4, seed) * 20); }
+  x.globalAlpha = 1;
+  return canvasTex(c);
+}
+// 엇갈린 석판: 한 장 = 2.4m × 1.2m (판 1.2 × 0.6)
+export function slabTexture([r, g, b], seed = 7) {
+  const W = 512, H = 256, c = makeCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = rgbs(r, g, b, 0.7); x.fillRect(0, 0, W, H);
+  const tw = W / 2, th = H / 2;
+  for (let j = 0; j < 2; j++) for (let i = -1; i < 3; i++) {
+    const ox = (j % 2 ? tw / 2 : 0) + i * tw;
+    x.fillStyle = rgbs(r, g, b, 0.9 + hash(i + 5, j, seed) * 0.16);
+    x.fillRect(ox + 1.5, j * th + 1.5, tw - 3, th - 3);
+  }
+  x.globalAlpha = 0.05; for (let i = 0; i < 4000; i++) { x.fillStyle = hash(i, 5, seed) > .5 ? '#fff' : '#000'; x.fillRect(hash(i, 6, seed) * W, hash(i, 7, seed) * H, 2, 2); }
+  x.globalAlpha = 1;
+  return canvasTex(c);
+}
+// 테라조: 바탕에 색 조각 (가장자리 조각은 반대편에도 그려 이음새 없게)
+export function terrazzoTexture(base, chips, seed = 13) {
+  const S = 512, c = makeCanvas(S, S), x = c.getContext('2d');
+  x.fillStyle = base; x.fillRect(0, 0, S, S);
+  for (let i = 0; i < 1400; i++) {
+    const px = hash(i, 1, seed) * S, py = hash(i, 2, seed) * S, rr = 1.5 + hash(i, 3, seed) * 4.5;
+    x.fillStyle = chips[i % chips.length];
+    for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { x.beginPath(); x.ellipse(px + dx, py + dy, rr, rr * 0.7, hash(i, 4, seed) * 3, 0, 7); x.fill(); }
+  }
+  return canvasTex(c);
+}
+// 체크: 한 장 = 2칸 × 2칸
+export function checkerTexture(a, b) {
+  const S = 256, c = makeCanvas(S, S), x = c.getContext('2d');
+  x.fillStyle = a; x.fillRect(0, 0, S, S); x.fillStyle = b; x.fillRect(0, 0, S / 2, S / 2); x.fillRect(S / 2, S / 2, S / 2, S / 2);
+  x.strokeStyle = 'rgba(0,0,0,.12)'; x.lineWidth = 1.5; x.strokeRect(0, 0, S / 2, S / 2); x.strokeRect(S / 2, S / 2, S / 2, S / 2);
+  return canvasTex(c);
+}
+// 육각 타일: 한 장 = 3r × √3r
+export function hexTexture(fill, line) {
+  const r = 64, W = 3 * r, H = Math.round(Math.sqrt(3) * r), c = makeCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = fill; x.fillRect(0, 0, W, H); x.strokeStyle = line; x.lineWidth = 3;
+  const hexAt = (cx, cy) => { x.beginPath(); for (let k = 0; k < 7; k++) x.lineTo(cx + r * Math.cos(k * Math.PI / 3), cy + r * Math.sin(k * Math.PI / 3)); x.stroke(); };
+  for (const [cx, cy] of [[0, 0], [W, 0], [0, H], [W, H], [1.5 * r, H / 2]]) hexAt(cx, cy);
+  return canvasTex(c);
+}
+// 다다미: 한 장 = 3.64m × 1.82m
+export function tatamiTexture() {
+  const W = 512, H = 256, c = makeCanvas(W, H), x = c.getContext('2d');
+  for (let j = 0; j < 2; j++) for (let i = -1; i < 2; i++) {
+    const ox = (j ? W / 4 : 0) + i * W / 2, oy = j * H / 2;
+    x.fillStyle = rgbs(205, 191, 134, 0.93 + hash(i + 3, j, 5) * 0.1); x.fillRect(ox, oy, W / 2, H / 2);
+    x.fillStyle = 'rgba(0,0,0,.05)'; for (let k = 0; k < H / 2; k += 3) x.fillRect(ox, oy + k, W / 2, 1);
+    x.fillStyle = '#2f3a2c'; x.fillRect(ox, oy, W / 2, 4); x.fillRect(ox, oy + H / 2 - 4, W / 2, 4);
+  }
+  return canvasTex(c);
+}
+// 벽돌 (흰 바탕 무늬, 벽 색을 곱해 쓴다)
+export function brickTexture() {
+  const W = 512, H = 256, c = makeCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#cfc8be'; x.fillRect(0, 0, W, H);
+  const bw = W / 4, bh = H / 8;
+  for (let j = 0; j < 8; j++) for (let i = -1; i < 5; i++) {
+    x.fillStyle = rgbs(255, 255, 255, 0.86 + hash(i + 7, j, 3) * 0.14);
+    x.fillRect(i * bw + (j % 2 ? bw / 2 : 0) + 2, j * bh + 2, bw - 4, bh - 4);
+  }
+  return canvasTex(c);
+}
+// 천 바른 벽 (가는 가로결)
+export function fabricTexture() {
+  const S = 256, c = makeCanvas(S, S), x = c.getContext('2d');
+  x.fillStyle = '#f4f4f4'; x.fillRect(0, 0, S, S);
+  for (let y = 0; y < S; y += 2) { x.fillStyle = `rgba(0,0,0,${0.03 + hash(y, 1, 9) * 0.05})`; x.fillRect(0, y, S, 1); }
+  for (let i = 0; i < S; i += 3) { x.fillStyle = `rgba(255,255,255,${hash(i, 2, 9) * 0.06})`; x.fillRect(i, 0, 1, S); }
+  return canvasTex(c);
+}
+
+// ---- 천장 (가로 한 장 = 방 폭 7m 에 맞춘 것들) ----
+// 트랙 조명: 레일 두 줄 + 1.4m 마다 조명 (흰 바탕, 벽 색을 곱해 쓴다)
+export function trackTexture(dark = false) {
+  const W = 700, H = 140, c = makeCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+  for (const u of [1.6, 5.4]) {
+    x.fillStyle = dark ? '#1c1c1c' : '#cfccc5'; x.fillRect(u * 100 - 2, 0, 4, H);
+    x.fillStyle = dark ? '#151515' : '#bdbab3'; x.beginPath(); x.arc(u * 100, 70, 8, 0, 7); x.fill();
+    x.fillStyle = '#fff6e2'; x.beginPath(); x.arc(u * 100, 70, 3.5, 0, 7); x.fill();
+  }
+  return canvasTex(c);
+}
+// 가운데 빛의 띠
+export function stripTexture() {
+  const W = 700, H = 240, c = makeCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#e7e5e0'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#fbfcfd'; x.fillRect(190, 0, 320, H);
+  x.fillStyle = '#d2cfc8'; x.fillRect(345, 0, 10, H); x.fillRect(190, 0, 320, 3);
+  x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(186, 0, 4, H); x.fillRect(510, 0, 4, H);
+  return canvasTex(c);
+}
+// 우물 반자 (코퍼). glass: 가운데 천창, gold: 금선
+export function cofferTexture(gold = false, glass = false) {
+  const W = 700, H = 140, c = makeCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#d9d3c7'; x.fillRect(0, 0, W, H);
+  for (let i = 0; i < 5; i++) {
+    const cx = i * 140;
+    x.fillStyle = '#c7c0b2'; x.fillRect(cx + 8, 8, 124, 124);
+    x.fillStyle = '#f3efe7'; x.fillRect(cx + 20, 20, 100, 100);
+    if (gold) { x.strokeStyle = '#c9a45a'; x.lineWidth = 3; x.strokeRect(cx + 26, 26, 88, 88); }
+  }
+  if (glass) { x.fillStyle = '#f6fafc'; x.fillRect(230, 0, 240, H); x.strokeStyle = '#b6ac98'; x.lineWidth = 3; x.beginPath(); x.moveTo(230, 70); x.lineTo(470, 70); x.moveTo(350, 0); x.lineTo(350, H); x.stroke(); x.fillStyle = 'rgba(0,0,0,.2)'; x.fillRect(226, 0, 4, H); x.fillRect(470, 0, 4, H); }
+  return canvasTex(c);
+}
+// 나무 보: 1.1m 마다 짙은 보
+export function beamsTexture() {
+  const W = 128, H = 220, c = makeCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#efe6d4'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#6b4c34'; x.fillRect(0, 0, W, 44); x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(0, 44, W, 8);
+  x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(0, 0, W, 3);
+  return canvasTex(c);
+}
+// 어두운 천장 + 스포트 점
+export function darkSpotsTexture() {
+  const W = 700, H = 150, c = makeCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#141414'; x.fillRect(0, 0, W, H);
+  for (const u of [2.3, 4.7]) { const g = x.createRadialGradient(u * 100, 75, 0, u * 100, 75, 10); g.addColorStop(0, '#fff9ea'); g.addColorStop(.5, 'rgba(255,240,210,.7)'); g.addColorStop(1, 'rgba(255,240,210,0)'); x.fillStyle = g; x.fillRect(u * 100 - 12, 63, 24, 24); }
+  return canvasTex(c);
+}
+export function starsTexture() {
+  const S = 512, c = makeCanvas(S, S), x = c.getContext('2d');
+  x.fillStyle = '#131a33'; x.fillRect(0, 0, S, S);
+  for (let i = 0; i < 260; i++) { x.fillStyle = `rgba(255,${230 + hash(i, 1, 3) * 25 | 0},210,${0.4 + hash(i, 2, 3) * 0.6})`; x.beginPath(); x.arc(hash(i, 3, 3) * S, hash(i, 4, 3) * S, 0.5 + hash(i, 5, 3) * 1.6, 0, 7); x.fill(); }
+  return canvasTex(c);
+}
+export function skyTexture() {
+  const S = 512, c = makeCanvas(S, S), x = c.getContext('2d');
+  x.fillStyle = '#bfe2f5'; x.fillRect(0, 0, S, S);
+  for (let i = 0; i < 30; i++) {
+    const px = hash(i, 1, 8) * S, py = hash(i, 2, 8) * S, rr = 30 + hash(i, 3, 8) * 60;
+    for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { const g = x.createRadialGradient(px + dx, py + dy, 0, px + dx, py + dy, rr); g.addColorStop(0, 'rgba(255,255,255,.85)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(px + dx - rr, py + dy - rr, rr * 2, rr * 2); }
+  }
+  return canvasTex(c);
+}

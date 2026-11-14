@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { MuseumScene, THEMES, THEME_ORDER, themeOf, themeId } from './builder.js';
+import { MuseumScene, themeOf, texOf } from './builder.js';
+import { WALLS, WALL_GROUPS, CEILINGS, FLOORS, WALL_BY, CEIL_BY, FLOOR_BY, styleOf } from './styles.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, INTRO_S, INTRO_W, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
 import { MuseumMap, thumbURL } from './map.js';
@@ -421,15 +422,100 @@ function addRoom(theme) {
   persist();
   rebuild();
   const n = museum.rooms.length;
-  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. ROOM ${String(n - 1).padStart(2, '0')} 끝 문으로 들어가요`, 3500);
+  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 그 방에서 ◐ 방 꾸미기로 벽·천장·바닥을 고를 수 있어요`, 3800);
 }
 
-function setRoomTheme(ri, theme) {
-  museum.rooms[ri].theme = theme;
+// ---------- 방 꾸미기: 벽 · 천장 · 바닥 ----------
+// 벽을 고르면 천장·바닥은 추천으로 돌아가고, 천장·바닥은 따로 바꿀 수 있다.
+const stylePanel = $('#style-panel');
+let styleTab = 'wall', styleRi = 0;
+const swCache = new Map();
+function swatchURL(kind, item, wallColor) {
+  const key = kind + item.id + (kind === 'ceil' && item.tint === 'wall' ? wallColor : '');
+  if (swCache.has(key)) return swCache.get(key);
+  const c = document.createElement('canvas'); c.width = c.height = 96;
+  const g = c.getContext('2d');
+  const hex = n => '#' + n.toString(16).padStart(6, '0');
+  if (kind === 'wall') {
+    g.fillStyle = hex(item.color); g.fillRect(0, 0, 96, 96);
+    if (item.map) { const t = texOf(museumScene.res, item.map); if (t && t.image) { g.globalCompositeOperation = 'multiply'; g.drawImage(t.image, 0, 0, 96, item.map === 'brick' ? 48 : 96); if (item.map === 'brick') g.drawImage(t.image, 0, 48, 96, 48); g.globalCompositeOperation = 'source-over'; } }
+    if (item.crown) { g.fillStyle = hex(item.crown); g.fillRect(0, 0, 96, 14); }
+    if (item.wainscot) { g.fillStyle = hex(item.wainscot.c); const h = Math.max(14, item.wainscot.h * 40); g.fillRect(0, 96 - h, 96, h); }
+  } else {
+    const t = texOf(museumScene.res, item.tex);
+    const tint = item.tint === 'wall' ? wallColor : (item.tint ?? 0xffffff);
+    if (t && t.image) {
+      // 한 장 크기에 맞춰 약 1.6m 를 보여 준다
+      const sx = 96 / (item.tile[0] / 1.6), sy = 96 / (item.tile[1] / 1.6);
+      for (let x = 0; x < 96; x += sx) for (let y = 0; y < 96; y += sy) g.drawImage(t.image, x, y, sx + 0.5, sy + 0.5);
+      if (tint !== 0xffffff) { g.globalCompositeOperation = 'multiply'; g.fillStyle = hex(tint); g.fillRect(0, 0, 96, 96); g.globalCompositeOperation = 'source-over'; }
+    } else { g.fillStyle = hex(tint); g.fillRect(0, 0, 96, 96); }
+  }
+  const u = c.toDataURL('image/jpeg', 0.85);
+  swCache.set(key, u);
+  return u;
+}
+function openStylePanel(ri, tab = 'wall') {
+  styleRi = ri; styleTab = tab;
+  closeSheet();
+  stylePanel.classList.add('open');
+  document.body.classList.add('style-open');
+  renderStylePanel();
+}
+function closeStylePanel() { stylePanel.classList.remove('open'); document.body.classList.remove('style-open'); }
+function renderStylePanel() {
+  const room = museum.rooms[styleRi];
+  if (!room) return;
+  const st = styleOf(room);
+  const W = WALL_BY[st.wall];
+  stylePanel.querySelector('.ttl').textContent = `ROOM ${String(styleRi + 1).padStart(2, '0')} 꾸미기`;
+  stylePanel.querySelector('.now').textContent = `${W.label} · ${CEIL_BY[st.ceil].label} · ${FLOOR_BY[st.floor].label}`;
+  for (const b of stylePanel.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === styleTab);
+  const reset = stylePanel.querySelector('.reset');
+  reset.hidden = st.ceilAuto && st.floorAuto;
+  const box = stylePanel.querySelector('.items');
+  box.innerHTML = '';
+  const add = (kind, item, on, rec, groupHead) => {
+    if (groupHead) { const h = document.createElement('span'); h.className = 'gh'; h.textContent = groupHead; box.appendChild(h); }
+    const b = document.createElement('button');
+    b.className = 'sw' + (on ? ' on' : '');
+    b.innerHTML = `<i style="background-image:url('${swatchURL(kind, item, W.color)}')"></i><span></span>${rec ? '<em>추천</em>' : ''}`;
+    b.querySelector('span').textContent = item.label;
+    b.addEventListener('click', () => applyStyle(kind, item.id));
+    box.appendChild(b);
+  };
+  if (styleTab === 'wall') {
+    let g = '';
+    for (const w of WALLS) { add('wall', w, w.id === st.wall, false, w.g !== g ? w.g : ''); g = w.g; }
+  } else if (styleTab === 'ceil') {
+    for (const c of CEILINGS) add('ceil', c, c.id === st.ceil, c.id === W.rec.ceil);
+  } else {
+    for (const f of FLOORS) add('floor', f, f.id === st.floor, f.id === W.rec.floor);
+  }
+  const on = box.querySelector('.sw.on');
+  if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.clientWidth / 2 + on.offsetWidth / 2);
+}
+function applyStyle(kind, id) {
+  const room = museum.rooms[styleRi];
+  const cur = room.style || { wall: styleOf(room).wall };
+  if (kind === 'wall') room.style = { wall: id }; // 천장·바닥은 이 벽의 추천으로
+  else room.style = { ...cur, [kind]: id };
   persist();
   rebuild();
-  toast(`${THEMES[theme].label}으로 바꿨어요`);
+  const keep = museum.rooms[styleRi] ? styleRi : 0;
+  styleRi = keep;
+  renderStylePanel();
 }
+stylePanel.querySelector('.close').addEventListener('click', () => { closeStylePanel(); controls.pitchT = 0.02; });
+stylePanel.querySelector('.reset').addEventListener('click', () => {
+  const room = museum.rooms[styleRi];
+  room.style = { wall: styleOf(room).wall };
+  persist(); rebuild(); renderStylePanel();
+  toast('천장과 바닥을 추천대로 맞췄어요');
+});
+// 탭에 맞춰 시선을 살짝: 천장은 위로, 바닥은 아래로
+const lookFor = tab => { controls.pitchT = tab === 'ceil' ? 0.6 : tab === 'floor' ? -0.5 : 0.02; };
+for (const b of stylePanel.querySelectorAll('.tabs button')) b.addEventListener('click', () => { styleTab = b.dataset.tab; lookFor(styleTab); renderStylePanel(); });
 
 // 사진·방 버튼이 쓸 방 (로비면 첫 방, 출구면 마지막 방)
 function currentRoomIndex() { return Math.max(0, Math.min(museum.rooms.length - 1, museumScene.roomIndexAt(controls.pos.z))); }
@@ -845,13 +931,6 @@ function rotatePhoto(t) {
 const sheet = $('#sheet');
 let sheetItems = [];
 function sheetOpen() { return sheet.classList.contains('open'); }
-// 방 스타일 고르기 항목 (벽·바닥 색 견본 + 이름 + 설명)
-function themeItems(cur, fn) {
-  return THEME_ORDER.map(id => {
-    const T = THEMES[id];
-    return { label: T.label, sub: T.desc, swatch: [T.mapWall, T.mapFloor], on: id === cur, fn: () => fn(id) };
-  });
-}
 function openSheet(items, kind = '') {
   sheetItems = items;
   sheet.innerHTML = '';
@@ -898,21 +977,8 @@ $('#tools').addEventListener('click', e => {
   hideHint();
   const ri = currentRoomIndex();
   if (act === 'photos') pickPhotos({ roomIndex: ri });
-  if (act === 'room') {
-    openSheet([
-      { title: true, label: '어떤 방을 만들까요?' },
-      ...themeItems(null, id => addRoom(id)),
-      { label: '닫기', quiet: true },
-    ], 'grid');
-  }
-  if (act === 'theme') {
-    const cur = themeId(museum.rooms[ri]);
-    openSheet([
-      { title: true, label: `ROOM ${String(ri + 1).padStart(2, '0')} 방 스타일` },
-      ...themeItems(cur, id => setRoomTheme(ri, id)),
-      { label: '닫기', quiet: true },
-    ], 'grid');
-  }
+  if (act === 'room') addRoom('white');
+  if (act === 'theme') openStylePanel(ri);
 });
 
 // ---------- 안내 ----------
@@ -994,8 +1060,7 @@ function exhibitionStats(ex) {
 
 // 홈 카드 목록 넘기기. 휴대폰을 세로로 들면 화면을 돌려 보여 주기 때문에 기본 스크롤은 방향이 틀어진다.
 // 손가락 움직임을 화면 방향으로 바꿔 직접 넘기고, 놓으면 관성으로 조금 더 미끄러진다.
-(function homeSwipe() {
-  const list = $('#home .list');
+function makeSwipe(list) {
   let d = null, vel = 0, raf = 0, dragged = false;
   list.addEventListener('pointerdown', e => {
     cancelAnimationFrame(raf);
@@ -1034,7 +1099,9 @@ function exhibitionStats(ex) {
   list.addEventListener('wheel', e => {
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { list.scrollLeft += e.deltaY; e.preventDefault(); }
   }, { passive: false });
-})();
+}
+makeSwipe($('#home .list'));
+makeSwipe($('#style-panel .items'));
 
 // 홈: 아코디언 (시안 F10). 전시실마다 세로 띠, 고른 하나가 넓게 펼쳐진다.
 // 접힌 띠를 누르면 펼쳐지고, 펼쳐진 띠를 누르면 들어간다.
@@ -1221,6 +1288,7 @@ async function buildExample() {
 
 // 방 스타일 둘러보기: 모든 방 스타일을 한 전시실에 이어 붙여, 걸어 다니며 비교한다.
 // 예시 사진 8장을 한 번만 저장하고 여러 방에서 같이 쓴다.
+const SHOWCASE = ['gallery', 'warmgray', 'stone', 'charcoal', 'louvre', 'dresden', 'salon', 'navy', 'cream', 'rose', 'mustard', 'powder', 'sage', 'hanji', 'brickwall', 'fabric', 'library', 'night'];
 async function buildShowcase() {
   const pics = [];
   for (const R of EXAMPLE.rooms) for (const P of R.photos) {
@@ -1232,14 +1300,14 @@ async function buildShowcase() {
     pics.push({ imageId, aspect, caption: P.caption });
   }
   const ex = newExhibition('방 스타일 둘러보기');
-  ex.intro = `방 스타일 ${THEME_ORDER.length}가지를 차례로 이어 붙인 전시실이에요.\n`
+  ex.intro = `방 스타일 ${SHOWCASE.length}가지를 차례로 이어 붙인 전시실이에요.\n`
     + '걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 색에서 바꿀 수 있어요.';
   ex.showcase = true;
-  ex.rooms = THEME_ORDER.map((id, k) => {
-    const T = THEMES[id];
-    const room = newRoom(0, id);
-    room.name = T.label;
-    room.intro = T.desc + '.';
+  ex.rooms = SHOWCASE.map((id, k) => {
+    const room = newRoom(0, 'white');
+    room.style = { wall: id };
+    room.name = WALL_BY[id].label;
+    room.intro = `${CEIL_BY[WALL_BY[id].rec.ceil].label} · ${FLOOR_BY[WALL_BY[id].rec.floor].label}.`;
     for (let n = 0; n < 4; n++) {
       const P = pics[(k * 2 + n) % pics.length];
       const photo = newPhoto(P.imageId, P.aspect);
@@ -1310,17 +1378,18 @@ async function startShowcase() {
     toast('준비됐어요', 1200);
   }
   // 방 스타일 목록이 바뀌었으면 (예: 색깔 방으로 정리) 같은 사진으로 다시 짠다
-  if (ex.rooms.map(r => r.theme).join() !== THEME_ORDER.join()) {
+  if (ex.rooms.map(r => r.style && r.style.wall).join() !== SHOWCASE.join()) {
     const seen = new Set(), pics = [];
     for (const r of ex.rooms) for (const p of r.photos) if (p.imageId && !seen.has(p.imageId)) { seen.add(p.imageId); pics.push(p); }
     if (pics.length) {
-      ex.rooms = THEME_ORDER.map((id, k) => {
-        const room = newRoom(0, id);
-        room.name = THEMES[id].label; room.intro = THEMES[id].desc + '.';
+      ex.rooms = SHOWCASE.map((id, k) => {
+        const room = newRoom(0, 'white');
+        room.style = { wall: id };
+        room.name = WALL_BY[id].label; room.intro = `${CEIL_BY[WALL_BY[id].rec.ceil].label} · ${FLOOR_BY[WALL_BY[id].rec.floor].label}.`;
         for (let n = 0; n < 4; n++) { const P = pics[(k * 2 + n) % pics.length]; room.photos.push({ ...newPhoto(P.imageId, P.aspect), caption: P.caption }); }
         return room;
       });
-      ex.intro = `방 스타일 ${THEME_ORDER.length}가지를 차례로 이어 붙인 전시실이에요.\n걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 색에서 바꿀 수 있어요.`;
+      ex.intro = `방 스타일 ${SHOWCASE.length}가지를 차례로 이어 붙인 전시실이에요.\n걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 색에서 바꿀 수 있어요.`;
     }
   }
   persist();
@@ -1429,4 +1498,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, setRoomTheme, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };

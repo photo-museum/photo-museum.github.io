@@ -57,7 +57,7 @@
   <nav id="tools">
     <button data-act="photos">+ 사진</button>
     <button data-act="room">+ 방</button>
-    <button data-act="theme" aria-label="이 방 색 바꾸기">◐ 방 색</button>
+    <button data-act="theme" aria-label="이 방 꾸미기">◐ 방 꾸미기</button>
   </nav>
 
   <div id="map" role="dialog" aria-label="전시장 지도">
@@ -68,6 +68,16 @@
       <button data-act="close" class="quiet" aria-label="닫기">✕</button>
     </div>
     <div class="rooms"></div>
+  </div>
+
+  <div id="style-panel" role="dialog" aria-label="방 꾸미기">
+    <div class="top">
+      <div><b class="ttl">방 꾸미기</b><span class="now"></span></div>
+      <div class="tabs" role="tablist"><button data-tab="wall">벽</button><button data-tab="ceil">천장</button><button data-tab="floor">바닥</button></div>
+      <button class="reset" hidden>추천대로</button>
+      <button class="close" aria-label="닫기">✕</button>
+    </div>
+    <div class="items"></div>
   </div>
 
   <div id="sheet" role="dialog" aria-label="메뉴"></div>

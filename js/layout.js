@@ -41,7 +41,7 @@ export function displayAspect(photo) {
 export function layoutMuseum(museum) {
   const rooms = [];
   const lobby = {
-    index: -1, id: 'lobby', lobby: true, theme: (museum.rooms[0] && museum.rooms[0].theme) || 'white', /* 입구는 첫 방과 같은 색 */ font: museum.font || null, zStart: 0, zEnd: -LOBBY_L, length: LOBBY_L, panels: [],
+    index: -1, id: 'lobby', lobby: true, theme: (museum.rooms[0] && museum.rooms[0].theme) || 'white', style: museum.rooms[0] && museum.rooms[0].style, /* 입구는 첫 방과 같은 스타일 */ font: museum.font || null, zStart: 0, zEnd: -LOBBY_L, length: LOBBY_L, panels: [],
     doorIn: false, doorOut: museum.rooms.length > 0, doorInX: 0, doorOutX: LOBBY_DOOR_X,
   };
   let z = -LOBBY_L - WALL_T;
@@ -80,7 +80,7 @@ export function layoutMuseum(museum) {
     }
     panels.sort((a, b) => a.index - b.index);
     rooms.push({
-      index: ri, id: room.id, theme: room.theme || 'dark', zStart, zEnd, length, panels,
+      index: ri, id: room.id, theme: room.theme || 'white', style: room.style, zStart, zEnd, length, panels,
       name: room.name || '', intro: room.intro || '',
       font: room.font || museum.font || null, // 방 글씨 > 전시실 글씨 > 기본
       doorIn: true,
@@ -92,7 +92,7 @@ export function layoutMuseum(museum) {
   });
   rooms.lobby = lobby;
   rooms.exit = {
-    index: rooms.length, id: 'exit', exit: true, theme: (museum.rooms[museum.rooms.length - 1] || {}).theme || 'white', /* 출구는 마지막 방과 같은 색 */ font: museum.font || null,
+    index: rooms.length, id: 'exit', exit: true, theme: (museum.rooms[museum.rooms.length - 1] || {}).theme || 'white', style: (museum.rooms[museum.rooms.length - 1] || {}).style, /* 출구는 마지막 방과 같은 스타일 */ font: museum.font || null,
     zStart: z, zEnd: z - EXIT_L, length: EXIT_L, panels: [],
     doorIn: true, doorOut: false, doorInX: 0, doorOutX: 0,
   };

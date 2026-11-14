@@ -18,6 +18,8 @@
 | `js/map.js` | 작은 지도, 큰 평면도, 방 이동·순서, 사진 자리 바꾸기 |
 | `js/fonts.js` | 고를 수 있는 글씨체 목록, 필요할 때 내려받기 |
 | `assets/fonts/` | 글씨 고르는 칸의 미리보기 그림 |
+| `js/styles.js` | 방 꾸미기 카탈로그 (벽 · 천장 · 바닥, 추천 조합) |
+| `js/demo.js`, `assets/demo/` | 예시 전시실 5개 |
 | `js/guide.js`, `js/example.js` | 튜토리얼 안내와 제주 예시 전시실 |
 | `assets/tutorial/` | 예시 사진 (출처: CREDITS.md) |
 | `js/main.js` | 시작, 화면 조작, 사진 넣기 |
