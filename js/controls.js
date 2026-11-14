@@ -260,6 +260,12 @@ export class WalkControls {
       this.yawT += dy * Math.min(1, dt * 3.2);
       this.pitchT += (-0.02 - this.pitchT) * Math.min(1, dt * 3);
       if (lastLeg && d < 0.03 && Math.abs(dy) < 0.01) this.auto = null;
+      // 벽·안내벽에 걸려 마지막 몇 cm 를 못 가면 거기서 도착한 걸로 친다
+      else if (lastLeg && d < 0.3 && Math.abs(dy) < 0.02 && d > (a.lastD ?? 9) - 0.002) {
+        a.stall = (a.stall || 0) + dt;
+        if (a.stall > 0.5) this.auto = null;
+      } else a.stall = 0;
+      a.lastD = d;
     }
 
     const a = 1 - Math.exp(-ACCEL * dt);

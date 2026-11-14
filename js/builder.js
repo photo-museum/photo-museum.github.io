@@ -11,7 +11,7 @@ import {
   plankTexture, slabTexture, terrazzoTexture, checkerTexture, hexTexture, tatamiTexture, brickTexture, fabricTexture,
   trackTexture, stripTexture, cofferTexture, beamsTexture, darkSpotsTexture, starsTexture, skyTexture,
 } from './textures.js';
-import { WALL_BY, CEIL_BY, FLOOR_BY, styleOf } from './styles.js';
+import { WALL_BY, CEIL_BY, FLOOR_BY, LIGHT_BY, styleOf } from './styles.js';
 import { surfaceMaterial, photoMaterial } from './materials.js';
 import { getImage, getImageHD } from './store.js';
 
@@ -30,9 +30,13 @@ const tintFor = (hex, base) => rgbToHex(hexToRgb(hex).map(v => v / base));
 // 벽·천장·바닥 고른 것(styles.js)을 그리기 설정 T 로 바꾼다
 const themeCache = new Map();
 function composeTheme(st) {
-  const key = st.wall + '|' + st.ceil + '|' + st.floor;
+  const key = st.wall + '|' + st.ceil + '|' + st.floor + '|' + st.light;
   if (themeCache.has(key)) return themeCache.get(key);
-  const W = WALL_BY[st.wall], C = CEIL_BY[st.ceil], F = FLOOR_BY[st.floor];
+  const W = WALL_BY[st.wall], C = CEIL_BY[st.ceil], F = FLOOR_BY[st.floor], Li = LIGHT_BY[st.light] || LIGHT_BY.soft;
+  const A = Li.amb, M = Li.lm;
+  // 빛 색이 방 전체(벽·바닥·천장)에 묻는다: 노을빛·촛불은 따뜻하게, 자연광은 살짝 푸르게
+  const lc = hexToRgb(Li.color), k = Li.tint || 0;
+  const lit = hex => k ? rgbToHex(hexToRgb(hex).map((v, i) => v * (1 - k + k * lc[i] / Math.max(...lc)))) : hex;
   const [r, g, b] = hexToRgb(W.color);
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   const dark = lum < 0.3, light = lum > 0.45;
@@ -40,14 +44,16 @@ function composeTheme(st) {
   const ceilTint = C.tint === 'wall' ? tintFor(W.color, 0.93) : C.tex === 'wallWhite' ? tintFor(C.tint, 0.93) : C.tint;
   const T = {
     label: W.label, desc: `${C.label} · ${F.label}`, light, mapFloor: css(F.map), mapWall: css(W.color),
-    wallMap: W.map || 'wallWhite', wallTile: W.tile || [3, 3], wallTint: tintFor(W.color, wallBase),
-    wallAmb: dark ? 0.56 : 0.7, wallLm: dark ? 0.75 : 0.42, endAmb: dark ? 0.52 : 0.66, endLm: dark ? 0.6 : 0.35,
-    floorMap: F.tex, floorTint: F.base ? tintFor(F.tint, F.base) : F.tint, floorAmb: dark ? 0.66 : 0.72, floorLm: dark ? 0.35 : 0.25,
+    wallMap: W.map || 'wallWhite', wallTile: W.tile || [3, 3], wallTint: lit(tintFor(W.color, wallBase)),
+    wallAmb: (dark ? 0.56 : 0.7) * A, wallLm: (dark ? 0.75 : 0.42) * M * (Li.spots && !dark ? 1.5 : 1),
+    endAmb: (dark ? 0.52 : 0.66) * A, endLm: (dark ? 0.6 : 0.35) * M,
+    floorMap: F.tex, floorTint: lit(F.base ? tintFor(F.tint, F.base) : F.tint), floorAmb: (dark ? 0.66 : 0.72) * A, floorLm: (dark ? 0.35 : 0.25) * M * (Li.spots ? 1.6 : 1),
     reflect: 0, floorTile: F.tile,
-    ceil: 'ceilingWhite', ceilSpec: { map: C.tex, tile: C.tile, tint: ceilTint, amb: C.bright ? 1.0 : C.dark ? 0.95 : (dark ? 0.62 : 0.76) },
-    skyGlow: !!C.bright, jambTint: tintFor(W.color, wallBase), jambAmb: 0.62,
+    ceil: 'ceilingWhite', ceilSpec: { map: C.tex, tile: C.tile, tint: lit(ceilTint), amb: C.bright ? Math.min(1.05, A) : C.dark ? 0.95 * Math.min(1, A + 0.2) : (dark ? 0.62 : 0.76) * A },
+    skyGlow: !!C.bright || !!Li.sky, jambTint: lit(tintFor(W.color, wallBase)), jambAmb: 0.62 * A,
+    spots: !!Li.spots, cove: !!Li.cove, uplight: !!Li.up, lightColor: Li.color, lightId: Li.id,
     edges: W.crown === 0xc9a45a || W.crown === 0xb99a5a ? 'edgesGold' : light ? 'edgesWhite' : 'edgesDark',
-    wash: true, ao: true, introBg: css(rgbToHex(hexToRgb(W.color).map(v => v * 0.86))),
+    wash: !!Li.wash, ao: true, introBg: css(rgbToHex(hexToRgb(W.color).map(v => v * 0.86))),
     wainscot: W.wainscot || null, crown: W.crown || null,
   };
   themeCache.set(key, T);
@@ -537,6 +543,9 @@ export class MuseumScene {
     this.colliders = [];      // [x1, z1, x2, z2]
     this.pickables = [];
     this.textureCache = new Map(); // imageId -> Promise<Texture>
+    this.texReady = new Map();     // imageId -> Texture (이미 올라간 것: 다시 지을 때 한 프레임도 비지 않게)
+    this.photoJobs = [];           // 판마다 사진 붙이기/떼기
+    this.activeRoom = 0;
     this.root = new THREE.Group();
     this.mirrorRoot = new THREE.Group();
     this.mirrorRoot.scale.y = -1;   // 바닥 아래로 뒤집힌 세계 = 바닥 반사
@@ -590,6 +599,7 @@ export class MuseumScene {
     this.colliders = [];
     this.pickables = [];
     this.fronts = new Map();
+    this.photoJobs = [];
     this.setHD(null);
   }
 
@@ -731,7 +741,7 @@ export class MuseumScene {
     const floorGeo = keep(meterPlane(ROOM_W, Lr));
     const floorMat = keep(surfaceMaterial({
       map: texOf(R, T.floorMap), tile: T.floorTile || [3.2, 3.2], tint: T.floorTint, lightMap: texF, lmSize: [ROOM_W, Lr],
-      ambient: T.floorAmb, lmIntensity: T.floorLm, lightColor: SPOT_COLOR, reflectAlpha: T.reflect,
+      ambient: T.floorAmb, lmIntensity: T.floorLm, lightColor: T.lightColor || SPOT_COLOR, reflectAlpha: T.reflect,
     }));
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
@@ -756,7 +766,7 @@ export class MuseumScene {
 
     // ----- 옆벽 -----
     const wallGeo = keep(meterPlane(Lr, ROOM_H));
-    const wallOpts = { map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lmSize: [Lr, ROOM_H], ambient: T.wallAmb, lmIntensity: T.wallLm, lightColor: SPOT_COLOR };
+    const wallOpts = { map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lmSize: [Lr, ROOM_H], ambient: T.wallAmb, lmIntensity: T.wallLm, lightColor: T.lightColor || SPOT_COLOR };
     const matL = keep(surfaceMaterial({ ...wallOpts, lightMap: texL }));
     const matR = keep(surfaceMaterial({ ...wallOpts, lightMap: texR }));
     const wl = new THREE.Mesh(wallGeo, matL);
@@ -789,7 +799,7 @@ export class MuseumScene {
     };
     const endMat = (withDoor, u0, lobbyText) => keep(surfaceMaterial({
       map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lightMap: endLight(withDoor, u0, lobbyText), lmSize: [ROOM_W, ROOM_H],
-      ambient: T.endAmb, lmIntensity: T.endLm, lightColor: SPOT_COLOR,
+      ambient: T.endAmb, lmIntensity: T.endLm, lightColor: T.lightColor || SPOT_COLOR,
     }));
     // 시작 벽 (방 안쪽을 보며 +z 쪽에 있음 → -z 를 향해야 함)
     // 시작 벽은 180도 돌아 있어서 벽 모양 좌표 u = ROOM_W/2 - x
@@ -954,6 +964,8 @@ export class MuseumScene {
     const geo = keep(new THREE.BoxGeometry(p.w, p.h, PANEL_D));
     const empty = !p.photo.imageId;
     const front = keep(photoMaterial(R.plaster, { tile: [p.w / 1.3, p.h / 1.3], intensity: 0.8, aspect: p.w / p.h }));
+    // 조명 색이 사진에도 아주 살짝 묻는다
+    if (T.lightColor && T.lightColor !== 0xffe9cf) front.uniforms.lightColor.value.lerp(new THREE.Color(T.lightColor), 0.22);
     // BoxGeometry 면 순서: +x, -x, +y, -y, +z(앞), -z(뒤)
     const E = R[themeOf(room).edges];
     const mats = [E.side, E.side, E.top, E.bottom, front, E.bottom];
@@ -974,13 +986,23 @@ export class MuseumScene {
     this.fronts.set(p.photo.id, { front, photo: p.photo });
 
     if (!empty) {
-      this.loadTexture(p.photo.imageId).then(tex => {
-        if (!tex) { if (this.onTextureError) this.onTextureError(p.photo); return; }
-        front.uniforms.map.value = tex;
-        front.uniforms.tile.value.set(1, 1);
-        front.uniforms.rot.value = ((p.photo.rot || 0) % 4 + 4) % 4;
-        if (!T.spots) front.uniforms.spotMix.value = T.wash ? 0.55 : 0; // 은은한 조명: 가운데가 조금 더 밝게
-        front.uniforms.intensity.value = 1.0;
+      // 사진은 바로 올리지 않고, 가까운 방이 되면 올린다 (setActiveRoom → syncPhotos)
+      const blank = { map: front.uniforms.map.value, tile: front.uniforms.tile.value.clone(), intensity: front.uniforms.intensity.value };
+      this.photoJobs.push({
+        roomIndex: room.index, imageId: p.photo.imageId, photo: p.photo, front, shown: false,
+        apply: tex => {
+          front.uniforms.map.value = tex;
+          front.uniforms.tile.value.set(1, 1);
+          front.uniforms.rot.value = ((p.photo.rot || 0) % 4 + 4) % 4;
+          front.uniforms.spotMix.value = T.spots ? 1 : T.wash ? 0.55 : 0; // 은은한 조명: 가운데가 조금 더 밝게
+          front.uniforms.intensity.value = 1.0;
+        },
+        unapply: () => {
+          front.uniforms.map.value = blank.map;
+          front.uniforms.tile.value.copy(blank.tile);
+          front.uniforms.rot.value = 0;
+          front.uniforms.intensity.value = blank.intensity;
+        },
       });
     }
 
@@ -1010,7 +1032,7 @@ export class MuseumScene {
     });
     this.textureCache.set(imageId, pr);
     // 실패한 것은 다음에 다시 시도할 수 있게 캐시에서 뺀다
-    pr.then(t => { if (!t && this.textureCache.get(imageId) === pr) this.textureCache.delete(imageId); });
+    pr.then(t => { if (!t && this.textureCache.get(imageId) === pr) this.textureCache.delete(imageId); else if (t && this.textureCache.get(imageId) === pr) this.texReady.set(imageId, t); });
     return pr;
   }
 
@@ -1018,6 +1040,7 @@ export class MuseumScene {
   primeTexture(imageId, blob) {
     const pr = this.textureFromBlob(blob).catch(() => null);
     this.textureCache.set(imageId, pr);
+    pr.then(t => { if (t && this.textureCache.get(imageId) === pr) this.texReady.set(imageId, t); });
     return pr;
   }
 
@@ -1045,17 +1068,51 @@ export class MuseumScene {
 
   resetTextures() {
     this.textureCache.clear();
+    this.texReady.clear();
+    for (const j of this.photoJobs) j.shown = false;
   }
 
   forgetTexture(imageId) {
     const pr = this.textureCache.get(imageId);
     if (pr) pr.then(t => t && t.dispose());
     this.textureCache.delete(imageId);
+    this.texReady.delete(imageId);
+  }
+
+  // 사진 원본은 지금 방 ±LOAD_NEAR 만 그래픽 메모리에 올리고, ±KEEP_FAR 보다 먼 방의 것은 내린다.
+  // (사진이 많은 전시실도 휴대폰 메모리가 넘치지 않게)
+  syncPhotos(i) {
+    const LOAD_NEAR = 2, KEEP_FAR = 4;
+    const need = new Set();
+    for (const j of this.photoJobs) {
+      const d = Math.abs(j.roomIndex - i);
+      if (d <= KEEP_FAR) need.add(j.imageId);
+      if (d > LOAD_NEAR || j.shown) continue;
+      j.shown = true;
+      const ready = this.texReady.get(j.imageId);
+      if (ready) { j.apply(ready); continue; } // 이미 올라가 있으면 바로 (깜빡임 없이)
+      this.loadTexture(j.imageId).then(tex => {
+        if (!this.photoJobs.includes(j) || !j.shown) return;
+        if (!tex) { j.shown = false; if (this.onTextureError) this.onTextureError(j.photo); return; }
+        j.apply(tex);
+      });
+    }
+    // 먼 방 사진 내리기 (같은 사진이 가까운 판에도 걸려 있으면 그대로)
+    for (const [id, t] of this.texReady) {
+      if (need.has(id)) continue;
+      if (this.hd && this.hd.base === t) continue;
+      for (const j of this.photoJobs) if (j.imageId === id && j.shown) { j.unapply(); j.shown = false; }
+      t.dispose();
+      this.texReady.delete(id);
+      this.textureCache.delete(id);
+    }
   }
 
   // 지금 방 ±1 만 그린다 (휴대폰 부담 줄이기)
   // i = -1 은 로비
   setActiveRoom(i) {
+    this.activeRoom = i;
+    this.syncPhotos(i);
     for (const r of this.rooms) {
       // 문이 일직선이라 여러 칸 너머까지 보인다 → 네 칸까지 그려 둔다 (먼 문 너머가 검게 비었다 나타나는 깜빡임 없애기)
       const v = Math.abs(r.layout.index - i) <= 4;

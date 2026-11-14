@@ -111,6 +111,18 @@ export function clearImages() {
   return tx('images', 'readwrite', s => s.clear()).catch(() => {});
 }
 
+// 아무 전시실에서도 쓰지 않는 사진 원본을 지운다 (되돌리기 때문에 미뤄 둔 것들)
+export async function sweepImages(lib) {
+  try {
+    const used = new Set();
+    for (const ex of lib.exhibitions) for (const r of ex.rooms) for (const p of r.photos) if (p.imageId) { used.add(p.imageId); used.add(p.imageId + HD); }
+    const keys = await tx('images', 'readonly', s => s.getAllKeys());
+    const gone = (keys || []).filter(k => !used.has(k));
+    if (gone.length) await tx('images', 'readwrite', s => { for (const k of gone) s.delete(k); });
+    return gone.length;
+  } catch (e) { return 0; }
+}
+
 export function deleteImage(id) {
   tx('images', 'readwrite', s => s.delete(id + HD)).catch(() => {});
   return tx('images', 'readwrite', s => s.delete(id)).catch(() => {});

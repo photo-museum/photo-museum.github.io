@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#050505">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Photo Museum">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="icon" href="assets/icons/icon-192.png">
   <title>Photo Museum</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,8 +59,11 @@
     </div>
   </div>
   <div id="toast"></div>
+  <button id="tour-stop" type="button">■ 관람 멈추기</button>
+  <button id="undo" type="button" aria-label="되돌리기">↶ 되돌리기 <span></span></button>
 
   <nav id="tools">
+    <button data-act="tour" class="tour" aria-label="관람 모드: 사진을 차례로 보여 줘요">▶ 관람</button>
     <button data-act="photos">+ 사진</button>
     <button data-act="room">+ 방</button>
     <button data-act="theme" aria-label="이 방 꾸미기">◐ 방 꾸미기</button>
@@ -73,10 +82,11 @@
   <div id="style-panel" role="dialog" aria-label="방 꾸미기">
     <div class="top">
       <div><b class="ttl">방 꾸미기</b><span class="now"></span></div>
-      <div class="tabs" role="tablist"><button data-tab="wall">벽</button><button data-tab="ceil">천장</button><button data-tab="floor">바닥</button></div>
+      <div class="tabs" role="tablist"><button data-tab="wall">벽</button><button data-tab="ceil">천장</button><button data-tab="floor">바닥</button><button data-tab="light">조명</button></div>
       <button class="reset" hidden>추천대로</button>
       <button class="close" aria-label="닫기">✕</button>
     </div>
+    <p class="rec" hidden></p>
     <div class="items"></div>
   </div>
 
@@ -86,8 +96,9 @@
     <header>
       <div><span class="eyebrow">나만의 사진 전시실</span><h1 class="wordmark"><i>Photo</i> Museum</h1></div>
       <div class="hbtns">
-        <button id="h-styles">방 스타일 둘러보기</button>
-        <button id="h-tour" class="main">✦ 사용법 둘러보기</button>
+        <button id="h-backup" aria-label="백업과 불러오기">⤓ 보관</button>
+        <button id="h-styles"><span class="lg">방 스타일 둘러보기</span><span class="sm">방 스타일</span></button>
+        <button id="h-tour" class="main">✦ <span class="lg">사용법 둘러보기</span><span class="sm">사용법</span></button>
       </div>
     </header>
     <div class="flow" role="listbox" aria-label="전시실"></div>

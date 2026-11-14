@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { MuseumScene, themeOf, texOf } from './builder.js';
-import { WALLS, WALL_GROUPS, CEILINGS, FLOORS, WALL_BY, CEIL_BY, FLOOR_BY, styleOf } from './styles.js';
+import { WALLS, WALL_GROUPS, CEILINGS, FLOORS, LIGHTS, WALL_BY, CEIL_BY, FLOOR_BY, LIGHT_BY, styleOf, recOf } from './styles.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, INTRO_S, INTRO_W, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
 import { MuseumMap, thumbURL } from './map.js';
 import { Guide } from './guide.js';
+import { makeBackup, readBackup, saveFile } from './backup.js';
 import { EXAMPLE } from './example.js';
 import { DEMO, DEMO_VERSION } from './demo.js';
 import { loadFonts, ensureFont, ensureGlyphs, isFontReady, fontFamily, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
 import {
-  loadLibrary, saveLibrary, putImage, deleteImage, clearImages, prepareImage, requestPersistence, uid,
+  loadLibrary, saveLibrary, putImage, deleteImage, clearImages, prepareImage, requestPersistence, uid, sweepImages,
   newPhoto, newRoom, newExhibition, EMPTY_ASPECT, HD,
 } from './store.js';
 
@@ -112,7 +113,7 @@ function makeJoystick() {
     color: 'rgba(235,228,215,0.8)', size: 112, restOpacity: 0.12, fadeTime: 180,
   });
   // 만지지 않을 때는 아주 연하게 (사진 감상을 가리지 않게), 만지면 밝게
-  joystick.on('start', () => zone.classList.add('active'));
+  joystick.on('start', () => { zone.classList.add('active'); if (tour.on) stopTour('관람을 멈췄어요'); });
   joystick.on('end', () => zone.classList.remove('active'));
   joystick.on('move', (e, d) => {
     if (controls.joyBlocked) { controls.joy.x = controls.joy.y = 0; return; } // 두 손가락 벌리는 중
@@ -157,6 +158,8 @@ function rebuild(fallbackRi = 0, fresh = false) {
       controls.setPose(0, r.zStart - 1.4, 0);
     }
   }
+  // 지금 서 있는 방 근처 사진을 바로 붙인다 (이미 올라간 사진은 같은 프레임에)
+  museumScene.setActiveRoom(museumScene.roomIndexAt(controls.pos.z));
   map.invalidate();
   if (map.isOpen) map.render(true);
   ensureMuseumFonts();
@@ -164,6 +167,46 @@ function rebuild(fallbackRi = 0, fresh = false) {
 }
 
 function persist() { return saveLibrary(library); }
+
+// ---------- 되돌리기 ----------
+// 바꾸기 직전의 전체 목록을 기억해 두었다가 되돌린다 (최근 30번).
+// 지운 사진 원본은 되돌릴 수도 있으니 바로 지우지 않고, 다음에 앱을 열 때 아무 데도 안 쓰이면 지운다.
+const undoStack = [];
+let undoTimer = 0;
+function pushUndo(label) {
+  if (!library) return;
+  undoStack.push({ label, lib: JSON.stringify(library), exId: museum && museum.id, at: performance.now() });
+  library.changedAt = Date.now();
+  if (undoStack.length > 30) undoStack.shift();
+  const el = $('#undo');
+  el.querySelector('span').textContent = label;
+  el.classList.add('show');
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => el.classList.remove('show'), 7000);
+}
+$('#undo').addEventListener('click', e => { e.stopPropagation(); undo(); });
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
+    e.preventDefault(); undo();
+  }
+});
+function undo() {
+  const u = undoStack.pop();
+  $('#undo').classList.remove('show');
+  if (!u) { toast('되돌릴 것이 없어요'); return; }
+  library = JSON.parse(u.lib);
+  persist();
+  if (homeOpen) { renderHome(); toast(`되돌렸어요 · ${u.label}`); return; }
+  const ex = library.exhibitions.find(e => e.id === (museum && museum.id)) || library.exhibitions.find(e => e.id === u.exId);
+  if (ex) museum = ex;
+  rebuild();
+  if (map.isOpen) map.open();
+  if (stylePanel.classList.contains('open')) renderStylePanel();
+  if (gb.classList.contains('open')) renderGuestbook();
+  toast(`되돌렸어요 · ${u.label}`);
+  if (undoStack.length) { const el = $('#undo'); el.querySelector('span').textContent = undoStack[undoStack.length - 1].label; }
+}
 
 // 전시실마다 마지막 위치 기억 (이 브라우저에서만, 편의용)
 function savePose() {
@@ -216,6 +259,7 @@ async function hangPhotos(job, files) {
       if (!tex) throw new Error('사진을 화면에 올리지 못했어요');
       await putImage(imageId, blob);
       if (hd) await putImage(imageId + HD, hd);
+      pushUndo('사진 걸기');
       let photo = targets.shift();
       if (!photo) { photo = newPhoto(); room.photos.push(photo); }
       const old = photo.imageId;
@@ -240,6 +284,7 @@ function removePhoto(t) {
   const photo = museum.rooms[t.roomIndex].photos.find(p => p.id === t.photoId);
   if (!photo || !photo.imageId) return;
   const old = photo.imageId;
+  pushUndo('사진 내리기');
   photo.imageId = null;
   photo.aspect = EMPTY_ASPECT;
   delete photo.rot;
@@ -253,6 +298,7 @@ function removePanel(t) {
   const i = room.photos.findIndex(p => p.id === t.photoId);
   if (i < 0) return;
   const [photo] = room.photos.splice(i, 1);
+  pushUndo('판 떼기');
   if (photo.imageId) releaseImage(photo.imageId);
   persist();
   rebuild();
@@ -367,6 +413,7 @@ function openEditor(t) {
     head: '사진 설명',
     body: { label: '사진 옆 벽에 적혀요', value: photo.caption, placeholder: '첫 줄은 제목처럼 보여요\n예) 제주, 겨울 바다\n2025. 1. 아침 7시' },
     onSave: (_, v) => {
+      pushUndo('설명 고치기');
       if (v) photo.caption = v; else delete photo.caption;
       persist();
       rebuild();
@@ -383,6 +430,7 @@ function editRoomText(ri) {
     body: { label: '방 설명 (문 들어서 정면 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
     font: { value: room.font, inherit: museum.font || DEFAULT_FONT },
     onSave: (name, intro, font) => {
+      pushUndo('방 이름·설명');
       if (name) room.name = name; else delete room.name;
       if (intro) room.intro = intro; else delete room.intro;
       if (font) room.font = font; else delete room.font;
@@ -399,6 +447,7 @@ function editExhibitionText(ex, after) {
     body: { label: '전시 설명 (입구 정면 벽에 적혀요)', value: ex.intro, placeholder: '이 전시가 무엇을 담고 있는지 적어 주세요' },
     font: { value: ex.font || DEFAULT_FONT },
     onSave: (title, intro, font) => {
+      pushUndo('전시 이름·소개');
       ex.title = title || '이름 없는 전시';
       ex.intro = intro;
       if (font && font !== DEFAULT_FONT) ex.font = font; else delete ex.font;
@@ -419,6 +468,7 @@ editor.addEventListener('keydown', e => {
 
 // ---------- 방 ----------
 function addRoom(theme) {
+  pushUndo('방 만들기');
   museum.rooms.push(newRoom(4, theme));
   persist();
   rebuild();
@@ -426,8 +476,8 @@ function addRoom(theme) {
   toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 그 방에서 ◐ 방 꾸미기로 벽·천장·바닥을 고를 수 있어요`, 3800);
 }
 
-// ---------- 방 꾸미기: 벽 · 천장 · 바닥 ----------
-// 벽을 고르면 천장·바닥은 추천으로 돌아가고, 천장·바닥은 따로 바꿀 수 있다.
+// ---------- 방 꾸미기: 벽 · 천장 · 바닥 · 조명 ----------
+// 벽·천장·바닥·조명을 따로 고른다. 벽을 바꾸면 추천만 보여 주고, '추천대로'를 눌러야 맞춰진다.
 const stylePanel = $('#style-panel');
 let styleTab = 'wall', styleRi = 0;
 const swCache = new Map();
@@ -437,7 +487,18 @@ function swatchURL(kind, item, wallColor) {
   const c = document.createElement('canvas'); c.width = c.height = 96;
   const g = c.getContext('2d');
   const hex = n => '#' + n.toString(16).padStart(6, '0');
-  if (kind === 'wall') {
+  if (kind === 'light') {
+    // 어두운 벽에 떨어지는 빛 모양
+    const [a, b] = item.sw;
+    g.fillStyle = b; g.fillRect(0, 0, 96, 96);
+    const blob = (x, y, rx, ry, al) => { const gr = g.createRadialGradient(x, y, 0, x, y, 1); g.save(); g.translate(x, y); g.scale(rx, ry); const r = g.createRadialGradient(0, 0, 0, 0, 0, 1); r.addColorStop(0, a); r.addColorStop(1, 'rgba(0,0,0,0)'); g.globalAlpha = al; g.fillStyle = r; g.beginPath(); g.arc(0, 0, 1, 0, 7); g.fill(); g.restore(); };
+    if (item.spots) { blob(30, 50, 22, 34, 0.95); blob(70, 50, 22, 34, 0.95); g.fillStyle = '#111'; g.fillRect(26, 4, 8, 8); g.fillRect(66, 4, 8, 8); }
+    else if (item.sky) { const gr = g.createLinearGradient(0, 0, 0, 96); gr.addColorStop(0, a); gr.addColorStop(1, b); g.fillStyle = gr; g.fillRect(0, 0, 96, 96); }
+    else if (item.cove) { const gr = g.createLinearGradient(0, 0, 0, 60); gr.addColorStop(0, a); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 8, 96, 60); g.fillStyle = a; g.fillRect(0, 6, 96, 3); }
+    else if (item.up) { for (const x of [20, 48, 76]) blob(x, 96, 10, 60, 0.95); }
+    else { blob(48, 48, 60, 60, item.wash ? 0.9 : 0.6); }
+    g.fillStyle = 'rgba(245,240,230,.9)'; g.fillRect(36, 38, 24, 18); // 사진 한 장
+  } else if (kind === 'wall') {
     g.fillStyle = hex(item.color); g.fillRect(0, 0, 96, 96);
     if (item.map) { const t = texOf(museumScene.res, item.map); if (t && t.image) { g.globalCompositeOperation = 'multiply'; g.drawImage(t.image, 0, 0, 96, item.map === 'brick' ? 48 : 96); if (item.map === 'brick') g.drawImage(t.image, 0, 48, 96, 48); g.globalCompositeOperation = 'source-over'; } }
     if (item.crown) { g.fillStyle = hex(item.crown); g.fillRect(0, 0, 96, 14); }
@@ -469,18 +530,24 @@ function renderStylePanel() {
   if (!room) return;
   const st = styleOf(room);
   const W = WALL_BY[st.wall];
+  const rec = recOf(st.wall);
   stylePanel.querySelector('.ttl').textContent = `ROOM ${String(styleRi + 1).padStart(2, '0')} 꾸미기`;
-  stylePanel.querySelector('.now').textContent = `${W.label} · ${CEIL_BY[st.ceil].label} · ${FLOOR_BY[st.floor].label}`;
+  stylePanel.querySelector('.now').textContent = `${W.label} · ${CEIL_BY[st.ceil].label} · ${FLOOR_BY[st.floor].label} · ${LIGHT_BY[st.light].label}`;
   for (const b of stylePanel.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === styleTab);
+  // 추천: 바꾸지는 않고 보여 주기만. '추천대로'를 누르면 천장·바닥·조명을 한꺼번에.
+  const same = st.ceil === rec.ceil && st.floor === rec.floor && st.light === rec.light;
   const reset = stylePanel.querySelector('.reset');
-  reset.hidden = st.ceilAuto && st.floorAuto;
+  reset.hidden = same;
+  const recLine = stylePanel.querySelector('.rec');
+  recLine.hidden = same;
+  recLine.textContent = `${W.label}에 어울리는 추천 · 천장 ${CEIL_BY[rec.ceil].label} · 바닥 ${FLOOR_BY[rec.floor].label} · 조명 ${LIGHT_BY[rec.light].label}`;
   const box = stylePanel.querySelector('.items');
   box.innerHTML = '';
-  const add = (kind, item, on, rec, groupHead) => {
+  const add = (kind, item, on, isRec, groupHead) => {
     if (groupHead) { const h = document.createElement('span'); h.className = 'gh'; h.textContent = groupHead; box.appendChild(h); }
     const b = document.createElement('button');
     b.className = 'sw' + (on ? ' on' : '');
-    b.innerHTML = `<i style="background-image:url('${swatchURL(kind, item, W.color)}')"></i><span></span>${rec ? '<em>추천</em>' : ''}`;
+    b.innerHTML = `<i style="background-image:url('${swatchURL(kind, item, W.color)}')"></i><span></span>${isRec ? '<em>추천</em>' : ''}`;
     b.querySelector('span').textContent = item.label;
     b.addEventListener('click', () => applyStyle(kind, item.id));
     box.appendChild(b);
@@ -489,18 +556,21 @@ function renderStylePanel() {
     let g = '';
     for (const w of WALLS) { add('wall', w, w.id === st.wall, false, w.g !== g ? w.g : ''); g = w.g; }
   } else if (styleTab === 'ceil') {
-    for (const c of CEILINGS) add('ceil', c, c.id === st.ceil, c.id === W.rec.ceil);
+    for (const c of CEILINGS) add('ceil', c, c.id === st.ceil, c.id === rec.ceil);
+  } else if (styleTab === 'floor') {
+    for (const f of FLOORS) add('floor', f, f.id === st.floor, f.id === rec.floor);
   } else {
-    for (const f of FLOORS) add('floor', f, f.id === st.floor, f.id === W.rec.floor);
+    for (const l of LIGHTS) add('light', l, l.id === st.light, l.id === rec.light);
   }
   const on = box.querySelector('.sw.on');
   if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.clientWidth / 2 + on.offsetWidth / 2);
 }
 function applyStyle(kind, id) {
   const room = museum.rooms[styleRi];
-  const cur = room.style || { wall: styleOf(room).wall };
-  if (kind === 'wall') room.style = { wall: id }; // 천장·바닥은 이 벽의 추천으로
-  else room.style = { ...cur, [kind]: id };
+  const st = styleOf(room);
+  pushUndo('방 꾸미기');
+  // 벽을 바꿔도 천장·바닥·조명은 그대로 (추천은 위에 보여 주기만)
+  room.style = { wall: st.wall, ceil: st.ceil, floor: st.floor, light: st.light, [kind]: id };
   persist();
   rebuild();
   const keep = museum.rooms[styleRi] ? styleRi : 0;
@@ -510,12 +580,14 @@ function applyStyle(kind, id) {
 stylePanel.querySelector('.close').addEventListener('click', () => { closeStylePanel(); controls.pitchT = 0.02; });
 stylePanel.querySelector('.reset').addEventListener('click', () => {
   const room = museum.rooms[styleRi];
-  room.style = { wall: styleOf(room).wall };
+  const wall = styleOf(room).wall;
+  pushUndo('추천대로');
+  room.style = { wall, ...recOf(wall) };
   persist(); rebuild(); renderStylePanel();
-  toast('천장과 바닥을 추천대로 맞췄어요');
+  toast('천장·바닥·조명을 추천대로 맞췄어요');
 });
 // 탭에 맞춰 시선을 살짝: 천장은 위로, 바닥은 아래로
-const lookFor = tab => { controls.pitchT = tab === 'ceil' ? 0.6 : tab === 'floor' ? -0.5 : 0.02; };
+const lookFor = tab => { controls.pitchT = tab === 'ceil' ? 0.6 : tab === 'floor' ? -0.5 : tab === 'light' ? 0.15 : 0.02; };
 for (const b of stylePanel.querySelectorAll('.tabs button')) b.addEventListener('click', () => { styleTab = b.dataset.tab; lookFor(styleTab); renderStylePanel(); });
 
 // 사진·방 버튼이 쓸 방 (로비면 첫 방, 출구면 마지막 방)
@@ -588,6 +660,7 @@ function renderGuestbook() {
     m.textContent = (e.name ? e.name + ' · ' : '') + new Date(e.at).toLocaleDateString('ko-KR');
     const x = document.createElement('button'); x.className = 'del'; x.textContent = '지우기'; x.setAttribute('aria-label', '이 글 지우기');
     x.addEventListener('click', () => {
+      pushUndo('방명록 글 지우기');
       museum.guestbook = museum.guestbook.filter(g => g.id !== e.id);
       persist(); rebuild(); renderGuestbook();
     });
@@ -659,7 +732,7 @@ function route(x0, z0, x1, z1) {
 const navPrev = $('#nav-prev'), navNext = $('#nav-next');
 let navTargets = { prev: null, next: null };
 function updateNav() {
-  const show = museum && !homeOpen && controls.enabled && !map.isOpen && !sheetOpen() && !controls.auto
+  const show = museum && !homeOpen && !tour.on && controls.enabled && !map.isOpen && !sheetOpen() && !controls.auto
     && Math.hypot(controls.vel.x, controls.vel.z) < 0.15;
   let prev = null, next = null;
   if (show) {
@@ -695,7 +768,7 @@ let gotoTarget = null;
 function updateGoto() {
   const moving = Math.hypot(controls.vel.x, controls.vel.z) > 0.15 || controls.auto;
   let t = null;
-  if (!moving && controls.enabled && !map.isOpen && !sheetOpen()) {
+  if (!moving && !tour.on && controls.enabled && !map.isOpen && !sheetOpen()) {
     t = bestSpot();
     // 이미 그 자리에서 그쪽을 보고 있으면 띄우지 않는다
     if (t) {
@@ -767,6 +840,7 @@ function reorderRooms(ids) {
   const next = ids.map(id => byId.get(id)).filter(Boolean);
   if (next.length !== museum.rooms.length) return;
   museum.rooms = next;
+  pushUndo('방 순서');
   persist();
   rebuild();
   toast('방 순서를 바꿨어요');
@@ -785,6 +859,7 @@ function swapPhotos(a, b) {
   const A = findPhoto(a), B = findPhoto(b);
   if (!A || !B) return;
   stats.swaps++;
+  pushUndo('사진 자리 바꾸기');
   const pa = A.room.photos[A.i], pb = B.room.photos[B.i];
   A.room.photos[A.i] = pb;
   B.room.photos[B.i] = pa;
@@ -826,12 +901,14 @@ function releaseImage(id) {
   setTimeout(() => {
     const used = library.exhibitions.some(ex => ex.rooms.some(r => r.photos.some(p => p.imageId === id)));
     if (used) return;
+    if (undoStack.some(u => u.lib.includes('"' + id + '"'))) return; // 되돌릴 수 있으니 남겨 둔다 (다음에 열 때 정리)
     deleteImage(id);
     museumScene.forgetTexture(id);
   }, 0);
 }
 function clearRoom(ri) {
   const room = museum.rooms[ri];
+  pushUndo('모두 내리기');
   forgetPhotos(room.photos);
   room.photos = newRoom(4).photos;
   persist();
@@ -840,6 +917,7 @@ function clearRoom(ri) {
 }
 function deleteRoom(ri) {
   if (museum.rooms.length <= 1) return;
+  pushUndo('방 지우기');
   const [room] = museum.rooms.splice(ri, 1);
   forgetPhotos(room.photos);
   persist();
@@ -857,6 +935,7 @@ function visibleChain(o) {
 }
 
 controls.onTap = (sx, sy) => {
+  if (performance.now() - tourSwallow < 1500) { tourSwallow = 0; return; } // 관람을 멈추려고 누른 것
   if (sheetOpen()) { closeSheet(); return; }
   const [cx, cy] = toContent(sx, sy);
   ndc.set(cx / viewW * 2 - 1, -(cy / viewH) * 2 + 1);
@@ -922,6 +1001,7 @@ function openPhotoSheet(t) {
 function rotatePhoto(t) {
   const photo = findPhoto(t.photoId)?.room.photos.find(p => p.id === t.photoId);
   if (!photo) return;
+  pushUndo('사진 돌리기');
   photo.rot = ((photo.rot || 0) + 1) % 4;
   if (!photo.rot) delete photo.rot;
   persist();
@@ -980,7 +1060,59 @@ $('#tools').addEventListener('click', e => {
   if (act === 'photos') pickPhotos({ roomIndex: ri });
   if (act === 'room') addRoom('white');
   if (act === 'theme') openStylePanel(ri);
+  if (act === 'tour') startTour();
 });
+
+// ---------- 관람 모드 ----------
+// 사진 앞에 차례로 저절로 걸어가 잠시 멈춰 보여 준다. 화면을 만지거나 키를 누르면 멈춘다.
+const DWELL = { '사진': 7000, '안내벽': 5500, '전시 소개': 6000, '방명록': 4000 };
+const tour = { on: false, until: 0, last: -1 };
+function startTour() {
+  if (!museum || homeOpen) return;
+  closeStylePanel(); closeSheet();
+  if (map.isOpen) map.close();
+  tour.on = true; tour.until = 0;
+  document.body.classList.add('touring');
+  controls.joy.x = controls.joy.y = 0;
+  hideHint();
+  toast('관람을 시작해요 · 화면을 누르면 멈춰요', 2600);
+  tourStep(true);
+}
+function stopTour(msg) {
+  if (!tour.on) return;
+  tour.on = false;
+  document.body.classList.remove('touring');
+  controls.auto = null;
+  if (msg) toast(msg, 2200);
+}
+function tourStep(first) {
+  const st = museumStops();
+  const px = controls.pos.x, pz = controls.pos.z;
+  let at = -1, best = 0.6;
+  st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz); if (d < best) { best = d; at = i; } });
+  let next = at >= 0 ? (first ? null : st[at + 1]) : st.find(s => s.spot.z < pz - 0.2);
+  if (first && at >= 0) { tour.until = performance.now() + 1500; return; } // 이미 서 있는 자리부터
+  if (!next) { stopTour('관람을 마쳤어요. 방명록에 한마디 남겨 보세요'); return; }
+  controls.walkPath(route(px, pz, next.spot.x, next.spot.z), next.spot.yaw);
+  controls.pitchT = -0.02;
+  tour.kind = next.kind;
+  tour.until = 0;
+}
+function tourTick() {
+  if (!tour.on) return;
+  if (homeOpen || map.isOpen || editor.classList.contains('open')) { stopTour(); return; }
+  if (controls.auto) return; // 걸어가는 중
+  const now = performance.now();
+  if (!tour.until) { tour.until = now + (DWELL[tour.kind] || 5000); return; }
+  if (now >= tour.until) tourStep(false);
+}
+// 사람이 직접 움직이면 관람을 멈춘다
+// (멈추려고 누른 그 한 번은 판·벽 누르기로 치지 않는다)
+let tourSwallow = 0;
+for (const ev of ['pointerdown', 'wheel']) renderer.domElement.addEventListener(ev, () => { if (tour.on) { stopTour('관람을 멈췄어요'); tourSwallow = performance.now(); } }, { capture: true });
+
+window.addEventListener('keydown', e => { if (tour.on && !e.metaKey && !e.ctrlKey) stopTour('관람을 멈췄어요'); }, { capture: true });
+$('#tour-stop').addEventListener('click', () => stopTour('관람을 멈췄어요'));
 
 // ---------- 안내 ----------
 let toastTimer = 0;
@@ -1000,11 +1132,24 @@ function hideHint() {
   if (hintHidden) return;
   hintHidden = true;
   $('#hint').classList.add('hide');
+  try { localStorage.setItem('pm-hint-seen', String(hintSeen + 1)); } catch (e) {}
+}
+// 안내 글은 처음 몇 번만, 그리고 한 번 둘러보거나 9초가 지나면 사라진다
+let hintSeen = 0;
+try { hintSeen = +localStorage.getItem('pm-hint-seen') || 0; } catch (e) {}
+if (hintSeen >= 3) { hintHidden = true; $('#hint').classList.add('hide'); }
+let hintYaw = null;
+function hintTick() {
+  if (hintHidden || homeOpen) return;
+  if (hintYaw === null) { hintYaw = controls.yaw; setTimeout(hideHint, 9000); return; }
+  if (Math.abs(controls.yaw - hintYaw) > 0.5) hideHint();
 }
 
 // ---------- 시작 ----------
 async function start() {
   requestPersistence();
+  // 홈 화면 앱·오프라인용 (http(s) 에서만)
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !/pm\.test$/.test(location.hostname)) navigator.serviceWorker.register('sw.js').catch(() => {});
   [library] = await Promise.all([loadLibrary(), loadFonts()]);
   // 예시 전시실로 새로 시작 (한 번만): 지금까지의 전시실과 사진을 지우고 예시 5개를 만든다
   if (library.demoVersion !== DEMO_VERSION) {
@@ -1012,6 +1157,7 @@ async function start() {
     catch (e) { console.error(e); $('#loading').textContent = '예시 사진을 불러오지 못했어요. 새로 고침해 주세요'; return; }
   }
   persist();
+  sweepImages(library); // 지난번에 지웠던 사진 원본 정리 (아직 아무것도 바꾸기 전에)
   openHome();
   $('#loading').classList.add('done');
   setTimeout(() => $('#loading').remove(), 1200);
@@ -1035,6 +1181,7 @@ function openHome() {
   controls.keys.clear();
   document.body.classList.add('home-open');
   renderHome();
+  nudgeBackup();
 }
 
 function enterExhibition(ex) {
@@ -1049,6 +1196,7 @@ function enterExhibition(ex) {
   const last = layout[layout.length - 1];
   if (pose && pose.z <= 0 && pose.z >= last.zEnd && Math.abs(pose.x) < 3.4) controls.setPose(pose.x, pose.z, pose.yaw);
   else { controls.setPose(0, -1.0, 0); controls.pitchT = controls.pitch = 0.04; }
+  museumScene.setActiveRoom(museumScene.roomIndexAt(controls.pos.z));
   $('#ex-title').textContent = ex.title;
 }
 
@@ -1192,6 +1340,7 @@ function flowMenu() {
     { title: true, label: title },
     { label: '들어가기', fn: () => enterExhibition(ex) },
     { label: '대표 사진 바꾸기', fn: () => openCoverPicker(ex) },
+    { label: '이 전시실 보내기 (파일)', fn: () => exportExhibitions([ex], `${(ex.title || '전시').replace(/[\\/:*?"<>|]/g, '')}.pmbk`, false) },
     { label: '이름·설명 고치기', fn: () => editExhibitionText(ex) },
     { label: '전시실 지우기', danger: true, fn: () => confirmDeleteExhibition(ex) },
     { label: '닫기', quiet: true },
@@ -1279,6 +1428,80 @@ $('#cover-pick').addEventListener('click', e => { if (e.target.id === 'cover-pic
 
 $('#h-tour').addEventListener('click', () => startTutorial());
 $('#h-styles').addEventListener('click', () => startShowcase());
+$('#h-backup').addEventListener('click', () => openBackupMenu());
+
+// ---------- 백업 · 불러오기 · 공유 ----------
+// 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
+// (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
+function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
+function backupAge() {
+  if (!library.lastBackup) return '아직 백업한 적이 없어요';
+  const days = Math.floor((Date.now() - library.lastBackup) / 86400000);
+  return days < 1 ? '오늘 백업했어요' : `마지막 백업 ${days}일 전`;
+}
+function openBackupMenu() {
+  openSheet([
+    { title: true, label: `보관 · ${backupAge()}` },
+    { label: '⤓ 모든 전시실을 백업 파일로 저장', fn: () => exportExhibitions(ownExhibitions(), `PhotoMuseum-백업-${dateTag()}.pmbk`, true) },
+    { label: '⤒ 백업 파일에서 불러오기', fn: () => importPick() },
+    { label: isStandalone() ? '✓ 홈 화면 앱으로 쓰고 있어요' : '홈 화면에 앱으로 추가하는 법', fn: () => installHelp() },
+    { label: '닫기', quiet: true },
+  ]);
+}
+async function exportExhibitions(list, name, full) {
+  if (!list.length) { toast('저장할 전시실이 없어요'); return; }
+  try {
+    const blob = await makeBackup(JSON.parse(JSON.stringify(list)), (i, n) => toast(`사진 묶는 중… ${i} / ${n}`, 4000));
+    const r = await saveFile(blob, name);
+    if (r === 'cancel') { toast('저장을 취소했어요'); return; }
+    if (full) { library.lastBackup = Date.now(); persist(); }
+    toast(r === 'shared' ? '파일을 보냈어요. "파일에 저장"을 고르면 아이폰에 남아요' : `백업 파일을 저장했어요 (${(blob.size / 1048576).toFixed(1)}MB)`, 4200);
+  } catch (e) { console.error(e); toast('백업 파일을 만들지 못했어요: ' + e.message, 4000); }
+}
+const importInput = document.createElement('input');
+importInput.type = 'file'; importInput.hidden = true;
+document.body.appendChild(importInput);
+function importPick() { importInput.value = ''; importInput.click(); }
+importInput.addEventListener('change', async () => {
+  const f = importInput.files && importInput.files[0];
+  if (!f) return;
+  try {
+    const head = await readBackup(f, (i, n) => toast(`사진 넣는 중… ${i} / ${n}`, 4000));
+    pushUndo('백업 불러오기');
+    let added = 0, replaced = 0;
+    for (const ex of head.exhibitions) {
+      const i = library.exhibitions.findIndex(e => e.id === ex.id);
+      if (i >= 0) { library.exhibitions[i] = ex; replaced++; } else { library.exhibitions.push(ex); added++; }
+    }
+    await persist();
+    if (homeOpen) renderHome();
+    toast(`전시실 ${added}개를 불러왔어요${replaced ? ` · ${replaced}개는 백업 내용으로 바꿨어요` : ''}`, 4000);
+  } catch (e) { console.error(e); toast(e.message || '불러오지 못했어요', 4000); }
+});
+function installHelp() {
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  openSheet([
+    { title: true, label: ios
+      ? 'Safari 아래쪽 공유 버튼(□↑) → "홈 화면에 추가". 홈 화면 앱은 사진을 지우지 않고 오래 보관해요. 앱은 Safari 와 저장 공간이 따로라서, 먼저 여기서 백업 파일을 저장한 뒤 앱에서 불러오세요.'
+      : '브라우저 메뉴에서 "앱 설치" 또는 "홈 화면에 추가"를 고르세요. 설치한 앱은 사진을 더 오래 안전하게 보관해요.' },
+    ...(deferredInstall ? [{ label: '지금 설치하기', fn: () => { deferredInstall.prompt(); deferredInstall = null; } }] : []),
+    { label: '먼저 백업 파일 저장', fn: () => exportExhibitions(ownExhibitions(), `PhotoMuseum-백업-${dateTag()}.pmbk`, true) },
+    { label: '닫기', quiet: true },
+  ]);
+}
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
+// 바꾼 것이 있는데 일주일 넘게 백업하지 않았으면 홈에서 한 번 알려 준다
+let backupNudged = false;
+function nudgeBackup() {
+  if (backupNudged || !library.changedAt) return;
+  if (library.lastBackup && library.lastBackup > library.changedAt) return;
+  if (library.lastBackup && Date.now() - library.lastBackup < 7 * 86400000) return;
+  backupNudged = true;
+  setTimeout(() => toast('소중한 사진을 지키려면 오른쪽 위 "보관"에서 백업 파일을 저장해 두세요', 4500), 1200);
+}
 
 function confirmDeleteExhibition(ex) {
   const st = exhibitionStats(ex);
@@ -1286,6 +1509,7 @@ function confirmDeleteExhibition(ex) {
     { title: true, label: `'${ex.title}' 전시실을 지울까요? 방 ${st.rooms}개와 사진 ${st.photos}장이 모두 지워져요` },
     { label: '전시실 지우기', danger: true, fn: () => {
       for (const r of ex.rooms) forgetPhotos(r.photos);
+      pushUndo('전시실 지우기');
       library.exhibitions = library.exhibitions.filter(x => x !== ex);
       if (museum === ex) museum = null;
       try { localStorage.removeItem('pm-pose-' + ex.id); } catch (e) {}
@@ -1381,7 +1605,33 @@ async function buildDemoLibrary() {
   const say = () => { $('#loading').textContent = `예시 전시실을 준비하고 있어요 · ${done} / ${total}`; };
   say();
   await clearImages();
-  const cache = new Map(); // 같은 파일은 한 번만
+  // 사진 파일들을 여러 장씩 한꺼번에 받아 넣는다 (예시 사진은 이미 작게 줄여 둔 것이라 다시 줄이지 않는다)
+  const files = [...new Set(DEMO.flatMap(D => D.rooms.flatMap(R => R.photos.map(P => P.file))))];
+  const cache = new Map();
+  const one = async file => {
+    const blob = await (await fetch(file)).blob();
+    let rec;
+    try {
+      const bmp = await createImageBitmap(blob);
+      const w = bmp.width, h = bmp.height; bmp.close && bmp.close();
+      if (Math.max(w, h) <= 2048 && /jpe?g/.test(blob.type)) {
+        const imageId = uid('img_');
+        await putImage(imageId, blob);
+        rec = { imageId, aspect: w / h };
+      }
+    } catch (e) { /* 아래에서 줄여서 */ }
+    if (!rec) {
+      const { blob: small, hd, aspect } = await prepareImage(blob);
+      const imageId = uid('img_');
+      await putImage(imageId, small);
+      if (hd) await putImage(imageId + HD, hd);
+      rec = { imageId, aspect };
+    }
+    cache.set(file, rec);
+  };
+  const queue = files.slice();
+  const worker = async () => { while (queue.length) { const f = queue.shift(); await one(f); done += DEMO.reduce((a, D) => a + D.rooms.reduce((b, R) => b + R.photos.filter(P => P.file === f).length, 0), 0); say(); } };
+  await Promise.all([worker(), worker(), worker(), worker(), worker(), worker()]);
   const exs = [];
   for (const D of DEMO) {
     const ex = newExhibition(D.title);
@@ -1391,22 +1641,13 @@ async function buildDemoLibrary() {
     for (const R of D.rooms) {
       const room = newRoom(0, R.theme || 'white');
       room.name = R.name; if (R.intro) room.intro = R.intro; if (R.font) room.font = R.font;
+      if (R.style) room.style = { ...R.style };
       for (const P of R.photos) {
-        let rec = cache.get(P.file);
-        if (!rec) {
-          const blob = await (await fetch(P.file)).blob();
-          const { blob: small, hd, aspect } = await prepareImage(blob);
-          const imageId = uid('img_');
-          await putImage(imageId, small);
-          if (hd) await putImage(imageId + HD, hd);
-          rec = { imageId, aspect };
-          cache.set(P.file, rec);
-        }
+        const rec = cache.get(P.file);
         const photo = newPhoto(rec.imageId, rec.aspect);
         if (P.caption) photo.caption = P.caption;
         if (P.cover) ex.coverId = photo.id;
         room.photos.push(photo);
-        done++; say();
       }
       ex.rooms.push(room);
     }
@@ -1527,6 +1768,7 @@ function loop(t) {
   const tip = (guide.active && editor.classList.contains('open') && guide.step.editorTip) || '';
   if (tip !== (loop.tip || '')) { loop.tip = tip; setEditorTip(tip); }
   if (Math.hypot(controls.vel.x, controls.vel.z) > 0.2) hideHint();
+  hintTick();
   const ri = museumScene.roomIndexAt(controls.pos.z);
   if (ri !== currentRoom) {
     currentRoom = ri;
@@ -1540,6 +1782,7 @@ function loop(t) {
   }
   applyZoom();
   if ((loop.n = (loop.n || 0) + 1) % 8 === 0) { updateGoto(); updateNav(); }
+  tourTick();
   if (loop.n % 20 === 0) updateHD();
   map.update();
   renderer.render(scene, camera);
@@ -1553,4 +1796,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { get tour() { return tour; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
