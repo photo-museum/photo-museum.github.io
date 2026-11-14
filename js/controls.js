@@ -167,6 +167,16 @@ export class WalkControls {
     if (mag > 0.05) this.auto = null;
     this.yawT += turn * 1.6 * dt;
 
+    // 걷다가 손을 떼면 onStop (가까운 사진 앞에 서게 돕기)
+    if (mag > 0.05) { this._bout = this._bout || { dist: 0 }; this._idle = 0; }
+    else if (this._bout) {
+      this._idle = (this._idle || 0) + dt;
+      if (this._idle > 0.12) {
+        const b = this._bout; this._bout = null;
+        if (b.dist > 0.4 && this.onStop && this.enabled) this.onStop();
+      }
+    }
+
     let speed = (k.has('ShiftLeft') || k.has('ShiftRight')) ? FAST : WALK;
     // 조이스틱: 조금 밀면 천천히, 끝까지 밀면 달리기
     const jm = Math.min(1, Math.hypot(this.joy.x, this.joy.y));
@@ -200,6 +210,7 @@ export class WalkControls {
     const res = this._collide(nx, nz);
     const moved = Math.hypot(res.x - this.pos.x, res.z - this.pos.z);
     this.pos.x = res.x; this.pos.z = res.z;
+    if (this._bout) this._bout.dist += moved;
 
     // 머리 흔들림: 걸은 거리에 맞춰 (멈추면 서서히 가라앉음)
     const sp = moved / Math.max(dt, 1e-4);

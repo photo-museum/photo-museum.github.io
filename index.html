@@ -29,6 +29,15 @@
   <button id="minimap" aria-label="전시장 지도 열기"><canvas></canvas></button>
 
   <p id="hint"></p>
+
+  <div id="guide" role="status" aria-live="polite">
+    <span class="count"></span>
+    <p class="text"></p>
+    <div class="row">
+      <button data-g="skip" class="quiet">그만 보기</button>
+      <button data-g="next">다음</button>
+    </div>
+  </div>
   <div id="toast"></div>
 
   <nav id="tools">
@@ -67,6 +76,7 @@
   <div id="editor" role="dialog" aria-label="설명 쓰기">
     <div class="box">
       <p class="head" id="ed-head">사진 설명</p>
+      <p id="ed-tip" hidden></p>
       <label for="ed-title" id="ed-title-label" class="t">이름</label>
       <input id="ed-title" class="t" maxlength="60" autocomplete="off">
       <label for="caption" id="ed-body-label">사진 설명</label>
