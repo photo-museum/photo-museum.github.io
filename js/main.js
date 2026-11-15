@@ -6,6 +6,7 @@ import { viewingSpot, INTRO_S, INTRO_W, LOBBY_L, ROOM_W, WALL_T } from './layout
 import { MuseumMap, thumbURL } from './map.js';
 import { Guide } from './guide.js';
 import { makeBackup, readBackup, saveFile } from './backup.js';
+import { Music } from './music.js';
 import { EXAMPLE } from './example.js';
 import { DEMO, DEMO_VERSION } from './demo.js';
 import { loadFonts, ensureFont, ensureGlyphs, isFontReady, fontFamily, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
@@ -1398,6 +1399,7 @@ function openHome() {
   if (map.isOpen) map.close();
   closeSheet();
   homeOpen = true;
+  music.stop();
   controls.enabled = false;
   controls.joy.x = controls.joy.y = 0;
   controls.keys.clear();
@@ -1406,9 +1408,30 @@ function openHome() {
   nudgeBackup();
 }
 
+// ---------- 클래식 음악 ----------
+const musicBtn = $('#music-btn');
+const music = new Music({ onChange: () => {
+  const on = music.enabled;
+  musicBtn.classList.toggle('off', !on);
+  musicBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  musicBtn.setAttribute('aria-label', on ? `음악 끄기 (지금: ${music.track.title})` : '음악 켜기');
+} });
+music.onChange();
+musicBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const on = music.toggle();
+  toast(on ? `♪ ${music.track.title} · ${music.track.who}` : '음악을 껐어요', 2200);
+});
+// 다른 앱으로 가면 멈추고, 돌아오면 다시
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) music.stop();
+  else if (museum && !homeOpen) music.start();
+});
+
 // fresh: '처음부터 보기' — 저장된 자리를 무시하고 입구에서 시작
 function enterExhibition(ex, fresh = false) {
   museum = ex;
+  music.start(); // 누른 순간 안에서 시작해야 휴대폰에서도 소리가 난다
   if (!ex.showcase && !ex.tutorial) { library.lastId = ex.id; persist(); }
   homeOpen = false;
   document.body.classList.remove('home-open');
@@ -1714,7 +1737,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-t'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-v'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -2124,4 +2147,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { get tour() { return tour; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { music, get tour() { return tour; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
