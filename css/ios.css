@@ -349,3 +349,4 @@ body.rotated #home .hstrip { max-width: calc(4 * 48px + 3 * 6px + 12px + 2px); }
 /* 좁은 화면에서 설명이 떠 있으면 '다음' 버튼은 아래(관람·편집 위)로 비켜 준다 */
 body.cap-tight #nav-next { top: auto !important; bottom: calc(20px + env(safe-area-inset-bottom)) !important; right: calc(max(14px, env(safe-area-inset-right)) + 186px) !important; height: 46px; }
 body.rotated.cap-tight #nav-next { bottom: 20px !important; right: 200px !important; }
+#app canvas { -webkit-touch-callout: none; }

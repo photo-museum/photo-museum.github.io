@@ -878,8 +878,11 @@ function placeCapSide(photoId) {
 
 // 사진 앞에 서면 오른쪽에 그 사진 설명을 조금 크게, 연하게 띄운다 (벽의 작은 설명판을 읽기 쉽게)
 const capSide = $('#cap-side');
+const CAP_SIDE_OFF = true;
 let capSideId = null;
 function updateCapSide(t) {
+  // 사용자 요청으로 끔: 사진 앞에 서도 설명이 저절로 뜨지 않는다 (대신 꾹 눌러 확대해서 벽 글씨를 읽는다)
+  if (CAP_SIDE_OFF) { if (capSideId !== null) { capSideId = null; capSide.classList.remove('show'); document.body.classList.remove('cap-tight'); } return; }
   const moving = Math.hypot(controls.vel.x, controls.vel.z) > 0.25 || !!controls.auto;
   let photo = null, room = null;
   if (!moving && !homeOpen && !map.isOpen && !sheetOpen() && controls.zoom < 1.1 && t && t.photoId && t.kind === '사진' && t.d < 0.9 && t.ang < 0.45) {
@@ -1244,7 +1247,7 @@ function toast(msg, ms = 1800) {
 }
 
 $('#hint').innerHTML = isTouch
-  ? '왼쪽 아래 조이스틱으로 걷고, 화면을 끌어 둘러보세요.<br>두 손가락을 벌리면 잠깐 확대돼요. 판을 누르면 사진을 걸 수 있어요.'
+  ? '왼쪽 아래 조이스틱으로 걷고, 화면을 끌어 둘러보세요.<br>꾹 누르거나 두 손가락을 벌리면 잠깐 확대돼요. 판을 누르면 사진을 걸 수 있어요.'
   : '<b>W A S D</b> 또는 방향키로 걷고, 마우스를 끌어 둘러보세요. <b>Shift</b> 빠르게.<br><b>휠</b>이나 <b>오른쪽 버튼</b>으로 잠깐 확대. 판을 누르면 사진을 걸 수 있어요.';
 let hintHidden = false;
 function hideHint() {
@@ -1606,7 +1609,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-d'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-e'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -1935,9 +1938,9 @@ function tutorialSteps() {
     { title: '방 안내벽', text: '방마다 문 앞에 <b>안내벽</b>이 있어요. 이 방이 어떤 방인지 적혀 있어요.<br>벽을 돌아 사진 쪽을 보고 멈추면 오른쪽에 <b>사진 앞으로</b> 버튼이 희미하게 떠요. 눌러 보세요.',
       task: '사진 쪽을 보고 멈춘 뒤, 오른쪽 <b>사진 앞으로</b>를 눌러 보세요', done: atViewingSpot },
     { title: '잠깐 확대해서 보기', text: isTouch
-        ? '두 손가락을 <b>벌리면</b> 그 자리가 확대돼요. 사진 옆 설명 글씨도 또렷하게 볼 수 있어요. 손을 떼면 원래대로 돌아와요.'
+        ? '화면을 <b>꾹 누르고 있거나</b> 두 손가락을 <b>벌리면</b> 그 자리가 확대돼요. 누른 채로 움직이면 확대한 곳을 옮길 수 있어요. 사진 옆 설명 글씨도 또렷하게 볼 수 있어요. 손을 떼면 원래대로 돌아와요.'
         : '<b>휠</b>을 굴리거나 <b>오른쪽 버튼</b>을 누르고 있으면 그 자리가 확대돼요. 사진 옆 설명 글씨도 또렷하게 볼 수 있어요.',
-      task: isTouch ? '두 손가락을 벌려 확대했다가 놓아 보세요' : '휠이나 오른쪽 버튼으로 확대했다가 놓아 보세요',
+      task: isTouch ? '화면을 꾹 눌러(또는 두 손가락을 벌려) 확대했다가 놓아 보세요' : '휠이나 오른쪽 버튼으로 확대했다가 놓아 보세요',
       done: () => { if (controls.zoom > 1.6) seen.zoom = true; return seen.zoom && controls.zoom < 1.05; } },
     { title: '사진 메뉴', text: '사진을 <b>누르면</b> 메뉴가 나와요. 90° 돌리기, 설명 쓰기, 사진 바꾸기, 내리기를 할 수 있어요.',
       task: '사진을 눌러 보세요', done: () => sheetOpen() },
@@ -1951,8 +1954,14 @@ function tutorialSteps() {
       task: '방 아래 <b>이름·설명</b> → 글씨체 고르고 <b>저장</b>',
       editorTip: '맨 아래 <b>글씨체</b>에서 마음에 드는 글씨를 고르고 <b>저장</b>해 보세요.',
       done: () => { if (editorOpen()) seen.ed = true; return seen.ed && !editorOpen(); } },
-    { title: '나만의 전시 꾸미기', text: '지도를 닫으면(✕) 오른쪽 아래에 <b>관람</b>과 <b>편집</b>이 있어요.<br><b>관람</b>은 사진을 차례로 보여 주고, <b>편집</b>을 누르면 사진 넣기 · 방 꾸미기 · 방 만들기가 위로 올라와요.' },
-    { title: '출구와 방명록', text: '마지막 방 끝에는 <b>출구</b>가 있어요. 방명록 책상을 누르면 한마디를 남길 수 있고, 남긴 글은 벽에 쪽지로 붙어요. 초록 <b>출구</b> 문을 누르면 홈으로 나가요.' },
+    { title: '나만의 전시 꾸미기', text: '지도를 닫으면(✕) 오른쪽 아래에 <b>관람</b>과 <b>편집</b>이 있어요.<br><b>관람</b>은 사진을 차례로 보여 주고, <b>편집</b>을 누르면 사진 넣기 · 방 꾸미기 · 방 만들기가 위로 올라와요.',
+      task: '지도를 닫고 <b>편집 → 방 꾸미기</b>를 열어 보세요. 다 보면 <b>✕</b>로 닫아요',
+      done: () => { if (stylePanel.classList.contains('open')) seen.style = true; return seen.style && !stylePanel.classList.contains('open') && !map.isOpen; },
+      onEnter: () => { seen.style = false; } },
+    { title: '출구와 방명록', text: '마지막 방 끝에는 <b>출구</b>가 있어요. 방명록 책상을 누르면 한마디를 남길 수 있고, 남긴 글은 벽에 쪽지로 붙어요. 초록 <b>출구</b> 문을 누르면 홈으로 나가요.',
+      task: '지도에서 마지막 방으로 간 뒤, 출구의 <b>방명록 책상</b>을 눌러 보세요. 다 보면 <b>닫기</b>',
+      done: () => { if (gb.classList.contains('open')) seen.gb = true; return seen.gb && !gb.classList.contains('open'); },
+      onEnter: () => { seen.gb = false; } },
     { title: '다 됐어요 ✦', text: '이제 왼쪽 위 <b>‹</b> 버튼(홈)에서 나만의 전시실을 만들어 보세요.<br>이 예시 전시실은 홈에서 지울 수 있고, <b>사용법 둘러보기</b>로 언제든 다시 볼 수 있어요.' },
   ];
 }

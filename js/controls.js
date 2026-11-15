@@ -149,7 +149,19 @@ export class WalkControls {
       if (!this.enabled) return;
       el.setPointerCapture(e.pointerId);
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), moved: 0 });
-      if (e.pointerType === 'touch' && ptrs.size === 2) startPinch();
+      if (e.pointerType === 'touch' && ptrs.size === 2) { for (const q of ptrs.values()) clearTimeout(q.lpTimer); startPinch(); }
+      // 휴대폰: 한 손가락으로 꾹 누르고 있으면 그 자리 확대 (컴퓨터의 오른쪽 버튼처럼). 손을 떼면 돌아온다.
+      if (e.pointerType === 'touch' && ptrs.size === 1) {
+        const p = ptrs.get(e.pointerId), id = e.pointerId;
+        p.lpTimer = setTimeout(() => {
+          if (ptrs.get(id) !== p || p.moved >= 10 || p.pinched || ptrs.size !== 1 || !this.enabled) return;
+          const [nx, ny] = this.toNorm(p.x, p.y);
+          this._zoomAround(nx, ny, Math.max(this.zoom, 2.5));
+          this.zoomHold = true;
+          p.right = true;
+          if (navigator.vibrate) navigator.vibrate(10);
+        }, 420);
+      }
       if (e.button === 2) { // 오른쪽 버튼을 누르고 있는 동안 확대
         const [nx, ny] = this.toNorm(e.clientX, e.clientY);
         this._zoomAround(nx, ny, Math.max(this.zoom, 2.5));
@@ -177,6 +189,7 @@ export class WalkControls {
       if (this.mapDelta) [dx, dy] = this.mapDelta(dx, dy);
       p.x = rawX; p.y = rawY;
       p.moved += Math.abs(dx) + Math.abs(dy);
+      if (p.lpTimer && p.moved >= 10) { clearTimeout(p.lpTimer); p.lpTimer = 0; }
       if (pinch && ptrs.size >= 2) {
         const { a, b } = two();
         const d = Math.hypot(a.x - b.x, a.y - b.y);
@@ -199,6 +212,7 @@ export class WalkControls {
       const p = ptrs.get(e.pointerId);
       if (!p) return;
       ptrs.delete(e.pointerId);
+      clearTimeout(p.lpTimer);
       if (pinch && ptrs.size < 2) { pinch = null; this.zoomHold = false; } // 손을 떼면 원래대로
       if (p.right) { this.zoomHold = false; return; }
       if (p.pinched) return;
