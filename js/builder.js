@@ -930,9 +930,9 @@ export class MuseumScene {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = MAX_ANISO;
       const front = keep(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
-      const sideC = light ? 0xc9c1b4 : 0x1d1c1b;
-      const side = keep(new THREE.MeshBasicMaterial({ color: sideC }));
-      const back = keep(new THREE.MeshBasicMaterial({ color: light ? 0xcfc8bb : 0x222120 }));
+      // 뒷면·옆면은 그 방 벽과 같은 색·질감 (뒤에서 봐도 이질감 없게)
+      const back = keep(surfaceMaterial({ map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lightMap: R.black, ambient: T.wallAmb, lmIntensity: 0 }));
+      const side = back;
       const geo = keep(new THREE.BoxGeometry(INTRO_W, INTRO_H, INTRO_D));
       // 면 순서: +x, -x, +y, -y, +z(앞: 문 쪽), -z
       const wall = new THREE.Mesh(geo, [side, side, side, side, front, back]);
