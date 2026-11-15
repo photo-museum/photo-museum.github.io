@@ -443,3 +443,12 @@ body.map-open #edit-menu { display: none; }
 /* 지도: 출구 앞 '방 만들기' */
 :root body #map .rooms .door.add { border-style: dashed; background: rgba(255,255,255,.06); box-shadow: none; }
 :root body #map.rooms-mode .rooms .door.add { display: none; }
+
+/* 방 꾸미기 (간단히): 화면 가득 말고 아래 가운데 작은 창 */
+:root body #style-panel.simple { left: 0; right: 0; margin: 0 auto; width: min(400px, calc(100% - 20px)); padding: 14px 12px 10px; border-radius: 24px; }
+:root body #style-panel.simple .items { gap: 8px; padding: 2px 0 0; }
+:root body #style-panel.simple .now { display: none; }
+#style-panel.simple .preset { gap: 10px; padding: 6px; border-radius: 16px; }
+#style-panel.simple .preset i { width: 56px; height: 38px; border-radius: 9px; }
+#style-panel.simple .preset i u { width: 18px; height: 12px; margin-left: -9px; }
+#style-panel.simple .preset b { font-size: 14px; }

@@ -1393,7 +1393,7 @@ async function startTutorial() {
   }
   try { localStorage.removeItem('pm-pose-' + ex.id); } catch (e) {}
   enterExhibition(ex);
-  guide.start(tutorialSteps({ isTouch, controls, museumScene, map, editor, stylePanel, gb, stats, sheetOpen }));
+  guide.start(tutorialSteps({ isTouch, controls, museumScene, map, editor, stylePanel, gb, stats, sheetOpen, get editMode() { return editMode; } }));
 }
 
 // 가만히 보고 있을 때는 휴대폰 화면 원래 해상도(최대 3배)로 또렷하게, 움직이는 동안은 2배로 부드럽게
