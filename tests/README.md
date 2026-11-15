@@ -16,3 +16,7 @@ NODE_PATH=$(npm root -g) node tests/run.js 지도 관람
 - 컴퓨터 화면 14가지 + 휴대폰(돌린 화면·터치) 4가지. 전부 도는 데 5~6분.
 - 기능을 고치거나 더하면 `tests/run.js` 에 시험도 하나 더해 주세요.
 - 버전 표시(보관 메뉴)는 `js/backupui.js` 의 `APP_VERSION`.
+
+## 공유 · 같이 관람
+- `node tests/share.js` 가짜 서버로 공유 흐름 (인터넷 없이). `REAL=1` 을 붙이면 진짜 Supabase 서버.
+- `node tests/together.js` 같이 관람 (진짜 서버만: 주인·손님 두 브라우저가 서로 보이는지).

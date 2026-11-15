@@ -4,6 +4,7 @@ import { WALL_BY, CEIL_BY, FLOOR_BY, PRESETS, simplifyStyles, presetOf, styleOf 
 import { initCaptions } from './captions.js';
 import { MuseumMap2 } from './map2.js';
 import { initShare, fetchShared, postGuest, GUEST_ID } from './share.js';
+import { initTogether } from './together.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, LOBBY_L, ROOM_W, WALL_T, R2, guestDesk } from './layout.js';
 import { MuseumMap } from './map.js';
@@ -1384,6 +1385,7 @@ function openHome() {
   if (map.isOpen) map.close();
   closeSheet();
   homeOpen = true;
+  together.leave();
   keepAwake(false);
   setEditMode(false);
   music.stop();
@@ -1434,9 +1436,57 @@ function enterExhibition(ex, fresh = false) {
   else { controls.setPose(0, -1.0, 0); controls.pitchT = controls.pitch = 0.04; }
   museumScene.setActiveRoom(museumScene.roomIndexAt(controls.pos.z));
   $('#ex-title').textContent = ex.title;
+  togetherReady = startTogether(ex).catch(e => console.warn('같이 관람', e));
   // 공유 중인 내 전시실: 손님들이 남긴 방명록을 받아 온다
   if (!GUEST_ID && share.isShared(ex)) share.pullGuestbook(ex).then(changed => { if (changed && museum === ex && !homeOpen) { saveLibrary(library); rebuild(); } });
 }
+
+// ---------- 같이 관람 (js/together.js) ----------
+// 공유 중인 전시실(주인) · 초대 링크(손님)에서만 켜진다. 그 밖에서는 아무 일도 하지 않는다.
+const peopleBtn = $('#people');
+const together = initTogether({ THREE, scene, controls, wake, onCount: n => {
+  peopleBtn.hidden = n === 0;
+  peopleBtn.querySelector('b').textContent = String(n || 1);
+  document.body.classList.toggle('together', n > 0);
+} });
+// 이름: 한 번 적으면 이 기기에 기억한다. force 면 다시 묻는다 (사람 수 표시를 눌러 이름 바꾸기)
+const namebox = $('#namebox');
+function askName(force) {
+  let saved = '';
+  try { saved = (localStorage.getItem('pm-name') || '').slice(0, 12); } catch (e) {}
+  if (saved && !force) return Promise.resolve(saved);
+  return new Promise(resolve => {
+    const input = $('#nb-name');
+    input.value = saved;
+    namebox.classList.add('open');
+    const was = controls.enabled;
+    controls.enabled = false; controls.joy.x = controls.joy.y = 0; controls.keys.clear();
+    setTimeout(() => input.focus(), 60);
+    namebox.querySelector('form').onsubmit = e => {
+      e.preventDefault();
+      const name = input.value.trim().slice(0, 12) || '관람객';
+      try { localStorage.setItem('pm-name', name); } catch (err) {}
+      namebox.classList.remove('open');
+      input.blur();
+      controls.enabled = was && !map.isOpen && !homeOpen;
+      resolve(name);
+    };
+  });
+}
+namebox.addEventListener('keydown', e => e.stopPropagation()); // 이름을 치는 동안 걷기 키가 새지 않게
+let togetherReady = Promise.resolve();
+async function startTogether(ex) {
+  const id = GUEST_ID || (share.isShared(ex) ? ex.share.id : null);
+  if (!id || ex.tutorial || ex.showcase) { together.leave(); return; }
+  const name = await askName();
+  if (museum !== ex || homeOpen) return;
+  await together.join(id, name, !GUEST_ID);
+}
+peopleBtn.addEventListener('click', async () => {
+  if (!museum || !together.active) return;
+  const ex = museum, name = await askName(true);
+  if (museum === ex && together.active) together.join(GUEST_ID || ex.share.id, name, !GUEST_ID);
+});
 
 // ---------- 공유 (js/share.js) ----------
 function shareMenu(ex) {
@@ -1491,6 +1541,7 @@ async function startGuest() {
   $('#loading').classList.add('done');
   setTimeout(() => $('#loading').remove(), 1200);
   requestAnimationFrame(loop);
+  await togetherReady; // 이름을 먼저 묻고(처음 한 번) 그다음 사용법
   // 처음 온 손님에게는 사용법을 따라 할지 묻는다 (같은 전시에 다시 오면 묻지 않는다)
   let seen = false;
   try { seen = !!localStorage.getItem('pm-guest-seen-' + GUEST_ID); localStorage.setItem('pm-guest-seen-' + GUEST_ID, '1'); } catch (e) {}
@@ -1627,6 +1678,7 @@ function loop(t) {
   lastT = t;
   if (homeOpen || !museum) { requestAnimationFrame(loop); return; } // 홈에서는 그리지 않는다
   controls.update(dt);
+  together.tick(dt, t);
   if (joyZone && joyZone.classList.contains('blocked') !== controls.joyBlocked) joyZone.classList.toggle('blocked', controls.joyBlocked);
   guide.tick();
   const tip = (guide.active && editor.classList.contains('open') && guide.step.editorTip) || '';
@@ -1644,6 +1696,7 @@ function loop(t) {
     const L = museumScene.layout;
     const here = ri < 0 ? L.lobby : ri >= L.length ? L.exit : museum.rooms[ri];
     document.body.classList.toggle('light-room', !!(here && themeOf(here).light));
+    together.setLight(!!(here && themeOf(here).light));
   }
   applyZoom();
   if ((loop.n = (loop.n || 0) + 1) % 8 === 0) { updateGoto(); updateNav(); }
@@ -1672,4 +1725,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { music, openCaptions, share, shareMenu, persist, applyPreset, setEditMode, get editMode() { return editMode; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { music, openCaptions, share, shareMenu, persist, together, applyPreset, setEditMode, get editMode() { return editMode; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };

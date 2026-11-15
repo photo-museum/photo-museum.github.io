@@ -59,6 +59,8 @@ async function fake(route) {
     route.fulfill({ status: 200, body: fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
   });
   if (!REAL) await ctx.route(HOST + '/**', fake);
+  // 같이 관람의 이름 묻기는 여기서 보지 않는다 (tests/together.js 에서 본다): 이미 이름을 적어 둔 기기로 시작
+  await ctx.addInitScript(() => { try { localStorage.setItem('pm-name', '시험'); } catch (e) {} });
   const errs = [];
   const watch = (pg, who) => { pg.on('pageerror', e => errs.push(who + ': ' + e.message)); };
   const owner = await ctx.newPage(); watch(owner, '주인');

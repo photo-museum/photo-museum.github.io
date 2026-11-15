@@ -543,3 +543,25 @@ body.guest #home, body.guest #undo, body.guest #guestbook .del { display: none !
 body.guest #minimap { pointer-events: none; }
 body.guest #tools [data-act=edit] { opacity: .45; }
 :root body #sheet .title { overflow-wrap: anywhere; }
+
+/* 같이 관람: 작은 지도 왼쪽의 사람 수 */
+#people { position: absolute; z-index: 2; top: max(12px, env(safe-area-inset-top)); right: calc(max(14px, env(safe-area-inset-right)) + 126px);
+  display: flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px 0 9px; border-radius: 17px; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+  background: var(--gx-bg); border: 1px solid var(--gx-border); box-shadow: var(--gx-shadow);
+  -webkit-backdrop-filter: blur(16px) saturate(190%); backdrop-filter: blur(16px) saturate(190%); }
+body.rotated #people { top: 12px; right: 140px; }
+#people svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+#people b { font-variant-numeric: tabular-nums; }
+body.home-open #people, body.map-open #people, body.style-open #people, body:has(#loading:not(.done)) #people { display: none; }
+/* 이름 묻기 (돌리지 않은 화면: 자판이 편하게) */
+#namebox { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,.55); }
+#namebox.open { display: flex; }
+#namebox .box { width: min(340px, 100%); display: flex; flex-direction: column; gap: 10px; padding: 20px 18px 16px; box-sizing: border-box; margin: 0;
+  color: var(--label); background: var(--gl-bg); border: 1px solid var(--gl-border); box-shadow: var(--gl-shadow); border-radius: 26px;
+  -webkit-backdrop-filter: blur(30px) saturate(190%); backdrop-filter: blur(30px) saturate(190%); font-family: var(--ui); }
+#namebox .head { margin: 0; font-size: 18px; font-weight: 700; }
+#namebox .sub { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--label2); word-break: keep-all; }
+#namebox input { height: 46px; padding: 0 14px; border: 0; border-radius: 14px; background: rgba(255,255,255,.75); color: var(--label); font: 500 17px var(--ui); }
+#namebox input:focus { outline: 2px solid rgba(229,72,77,.45); }
+#namebox .row { display: flex; justify-content: flex-end; }
+#namebox button { height: 42px; padding: 0 22px; border: 0; border-radius: 21px; background: var(--accent); color: #fff; font: 600 15px var(--ui); cursor: pointer; }

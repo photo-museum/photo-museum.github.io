@@ -41,6 +41,7 @@
   <button id="goto" aria-label="가까운 사진 앞으로 가기"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></i><span>사진 앞으로</span></button>
   <button id="gb-cta" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span>방명록 쓰기</span></button>
   <button id="minimap" aria-label="전시장 지도 열기"><canvas></canvas></button>
+  <button id="people" type="button" aria-label="지금 같이 보는 사람 수" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><b>1</b></button>
 
   <p id="hint"></p>
 
@@ -137,6 +138,15 @@
         <button class="save">저장</button>
       </div>
     </div>
+  </div>
+
+  <div id="namebox" role="dialog" aria-label="같이 관람할 이름">
+    <form class="box">
+      <p class="head">같이 관람</p>
+      <p class="sub">같은 전시를 보는 사람들에게 보일 이름이에요.</p>
+      <input id="nb-name" maxlength="12" autocomplete="nickname" placeholder="이름" aria-label="이름">
+      <div class="row"><button type="submit">들어가기</button></div>
+    </form>
   </div>
 
   <div id="editor" role="dialog" aria-label="설명 쓰기">
