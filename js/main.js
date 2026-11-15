@@ -225,6 +225,11 @@ function savePose() {
 function loadPose(id) {
   try { return JSON.parse(localStorage.getItem('pm-pose-' + id)); } catch (e) { return null; }
 }
+// 이어볼 자리가 있나 (입구 바로 앞에서 멈춘 건 이어보기로 치지 않는다)
+function hasResume(ex) {
+  const p = loadPose(ex.id);
+  return !!(p && isFinite(p.z) && p.z < -2.5);
+}
 
 // ---------- 사진 넣기 (여러 장) ----------
 const fileInput = $('#file');
@@ -1330,7 +1335,8 @@ function openHome() {
   nudgeBackup();
 }
 
-function enterExhibition(ex) {
+// fresh: '처음부터 보기' — 저장된 자리를 무시하고 입구에서 시작
+function enterExhibition(ex, fresh = false) {
   museum = ex;
   if (!ex.showcase && !ex.tutorial) { library.lastId = ex.id; persist(); }
   homeOpen = false;
@@ -1338,7 +1344,7 @@ function enterExhibition(ex) {
   controls.enabled = true;
   controls.auto = null;
   const layout = rebuild(0, true);
-  const pose = loadPose(ex.id);
+  const pose = fresh ? null : loadPose(ex.id);
   const last = layout[layout.length - 1];
   if (pose && pose.z <= 0 && pose.z >= last.zEnd && Math.abs(pose.x) < 3.4) controls.setPose(pose.x, pose.z, pose.yaw);
   else { controls.setPose(0, -1.0, 0); controls.pitchT = controls.pitch = 0.04; }
@@ -1480,6 +1486,7 @@ function layoutFlow(animate = true) {
     fcap.querySelector('b').style.fontFamily = '';
     fcap.querySelector('span').textContent = '이름을 정하고 바로 들어가요';
     fcap.querySelector('.go').textContent = '만들기'; fcap.querySelector('.more').hidden = true;
+    fcap.querySelector('.go2').hidden = true;
   } else {
     const st = exhibitionStats(sel.ex);
     fcap.querySelector('.cnt').textContent = `${i + 1} / ${exs} 전시실`;
@@ -1488,20 +1495,24 @@ function layoutFlow(animate = true) {
     if (sel.ex.font) ensureFont(sel.ex.font);
     const intro = (sel.ex.intro || '').split('\n')[0];
     fcap.querySelector('span').textContent = `방 ${st.rooms} · 사진 ${st.photos}` + (intro ? ' · ' + intro : '');
-    fcap.querySelector('.go').textContent = '들어가기'; fcap.querySelector('.more').hidden = false;
+    // 이어볼 자리가 있으면 [이어보기] [처음부터 보기], 없으면 [처음부터 보기] 하나
+    const resume = hasResume(sel.ex);
+    fcap.querySelector('.go').textContent = resume ? '이어보기' : '처음부터 보기';
+    fcap.querySelector('.go2').hidden = !resume;
+    fcap.querySelector('.more').hidden = false;
   }
 }
 function flowTo(i) {
   flowPos = Math.max(0, Math.min(flowItems.length - 1, i));
   layoutFlow(true);
 }
-function flowOpen() {
+function flowOpen(fresh = false) {
   const sel = flowItems[Math.round(flowPos)];
   if (!sel) return;
   if (sel.add) {
     const ex = newExhibition('');
-    editExhibitionText(ex, () => { library.exhibitions.push(ex); persist(); enterExhibition(ex); });
-  } else enterExhibition(sel.ex);
+    editExhibitionText(ex, () => { library.exhibitions.push(ex); persist(); enterExhibition(ex, true); });
+  } else enterExhibition(sel.ex, fresh);
 }
 function flowMenu() {
   const sel = flowItems[Math.round(flowPos)];
@@ -1509,7 +1520,8 @@ function flowMenu() {
   const ex = sel.ex, title = ex.title || '이름 없는 전시';
   openSheet([
     { title: true, label: title },
-    { label: '들어가기', fn: () => enterExhibition(ex) },
+    ...(hasResume(ex) ? [{ label: '이어보기', fn: () => enterExhibition(ex) }] : []),
+    { label: '처음부터 보기', fn: () => enterExhibition(ex, true) },
     { label: '대표 사진 바꾸기', fn: () => openCoverPicker(ex) },
     { label: '이 전시실 보내기 (파일)', fn: () => exportExhibitions([ex], `${(ex.title || '전시').replace(/[\\/:*?"<>|]/g, '')}.pmbk`, false) },
     { label: '이름·설명 고치기', fn: () => editExhibitionText(ex) },
@@ -1517,7 +1529,8 @@ function flowMenu() {
     { label: '닫기', quiet: true },
   ]);
 }
-fcap.querySelector('.go').addEventListener('click', flowOpen);
+fcap.querySelector('.go').addEventListener('click', () => flowOpen(false));
+fcap.querySelector('.go2').addEventListener('click', () => flowOpen(true));
 fcap.querySelector('.more').addEventListener('click', flowMenu);
 // 끌어서 넘기기 (돌린 화면에서도 맞는 방향으로)
 (function flowSwipe() {
@@ -1630,7 +1643,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-i'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-j'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
