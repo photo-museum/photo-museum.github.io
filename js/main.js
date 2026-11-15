@@ -36,7 +36,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 120);
 const museumScene = new MuseumScene(renderer, scene);
 museumScene.camera = camera; // 미리 셰이더 만들기(warmUp)에 쓴다
-museumScene.onTextureError = () => toast('사진 하나를 불러오지 못했어요. 판을 눌러 다시 넣어 주세요', 4000);
+museumScene.onTextureError = () => toast('사진 하나를 못 불러왔어요\n판을 눌러 다시 넣어 주세요', 4000);
 
 // 아이폰은 사진 고르는 동안 WebGL 을 잃어버릴 수 있다 → 돌아오면 다시 짓는다
 renderer.domElement.addEventListener('webglcontextlost', e => e.preventDefault());
@@ -413,7 +413,7 @@ function ensureMuseumFonts() {
   const m = museum;
   Promise.all(missing.map(id => ensureFont(id).then(ok => { if (!ok) failedFonts.add(id); return ok; }))).then(r => {
     if (museum === m && !homeOpen) rebuild();
-    if (r.some(x => !x)) toast('글씨체를 불러오지 못해 기본 글씨로 보여요. 인터넷 연결을 확인해 주세요', 3500);
+    if (r.some(x => !x)) toast('글씨체를 못 불러와 기본 글씨로 보여요\n인터넷 연결을 확인해 주세요', 3500);
   });
 }
 function openEditor(t) {
@@ -437,7 +437,7 @@ function editRoomText(ri) {
   openText({
     head: `ROOM ${String(ri + 1).padStart(2, '0')} 이름·소개`,
     title: { label: '방 이름', value: room.name, placeholder: '예) 바다, 아침 7시' },
-    body: { label: '방 설명 (들어서자마자 왼쪽 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
+    body: { label: '방 설명 (입구 옆 왼쪽 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
     font: { value: room.font, inherit: museum.font || DEFAULT_FONT },
     onSave: (name, intro, font) => {
       pushUndo('방 이름·설명');
@@ -503,7 +503,7 @@ function addRoom(theme) {
   persist();
   rebuild();
   const n = museum.rooms.length;
-  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 편집을 켜고 방 꾸미기에서 흰 방·어두운 방을 고를 수 있어요`, 3800);
+  toast(`새 방 ROOM ${String(n).padStart(2, '0')}을 만들었어요`, 2400);
 }
 
 // ---------- 방 꾸미기 창 (js/stylepanel.js) ----------
@@ -677,6 +677,40 @@ function goStop(s) {
 navPrev.addEventListener('click', () => goStop(navFromHere().prev));
 navNext.addEventListener('click', () => goStop(navFromHere().next));
 
+// 전시실 안에서는 화면이 저절로 꺼지지 않게 (가만히 서서 사진을 볼 때). 홈에서는 풀어 준다.
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && navigator.wakeLock && document.visibilityState === 'visible') {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) { const w = wakeLock; wakeLock = null; await w.release(); }
+  } catch (e) { wakeLock = null; }
+}
+// 다른 앱에 다녀오면 풀리므로 돌아올 때 다시 건다
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !homeOpen) keepAwake(true); });
+
+// 출구 문 앞까지 걸어가면 (누르지 않아도) 홈으로 갈지 묻는다. 물러났다 다시 와야 또 묻는다.
+function askLeave() {
+  openSheet([
+    { title: true, label: '전시실을 나가 홈으로 갈까요?' },
+    { label: '홈으로 나가기', fn: () => openHome() },
+    { label: '더 둘러보기', quiet: true },
+  ]);
+}
+let exitAsked = false;
+function exitDoorTick() {
+  const E = museumScene.layout && museumScene.layout.exit;
+  if (!E || homeOpen || !controls.enabled) return;
+  const dx = Math.abs(controls.pos.x - 2.35), dz = controls.pos.z - E.zEnd; // 출구 문: builder EXIT_DOOR.x
+  const at = dx < 0.75 && dz < 0.85;
+  if (!at) { if (dx > 1.4 || dz > 1.6) exitAsked = false; return; }
+  if (exitAsked || sheetOpen() || map.isOpen || controls.auto) return;
+  exitAsked = true;
+  controls.joy.x = controls.joy.y = 0; controls.keys.clear();
+  askLeave();
+}
+
 const gotoBtn = $('#goto');
 const gbCta = $('#gb-cta');
 gbCta.addEventListener('click', () => { gbCta.classList.remove('show'); openGuestbook(); });
@@ -761,6 +795,7 @@ const map = new MuseumMap({
   onInsert: (pid, ri, beforePid) => insertPhoto(pid, ri, beforePid),
   onPhotoTap: (ri, pid) => openPanelSheet({ roomIndex: ri, photoId: pid, panel: panelFor(pid) }),
   onRoomAction: (act, ri) => roomAction(act, ri),
+  onAddRoom: () => addRoom('white'),
   onOpen: open => {
     controls.enabled = !open;
     controls.joy.x = controls.joy.y = 0;
@@ -847,9 +882,19 @@ function roomAction(act, ri) {
   const hung = room.photos.filter(p => p.imageId).length;
   if (act === 'fill') pickPhotos({ roomIndex: ri });
   if (act === 'rename') editRoomText(ri);
+  if (act === 'style') {
+    const set = k => { pushUndo(`${name} 꾸미기`); room.style = { ...PRESETS[k].style }; persist(); rebuild(); };
+    const cur = presetOf(styleOf(room));
+    openSheet([
+      { title: true, label: `${name} 꾸미기` },
+      { label: (cur === PRESETS[0] ? '✓ ' : '') + '흰 방', fn: () => set(0) },
+      { label: (cur === PRESETS[1] ? '✓ ' : '') + '어두운 방', fn: () => set(1) },
+      { label: '닫기', quiet: true },
+    ]);
+  }
   if (act === 'clear') {
     openSheet([
-      { title: true, label: `${name}의 사진 ${hung}장을 모두 내릴까요? 빈 판 4개만 남아요` },
+      { title: true, label: `${name}의 사진 ${hung}장을 모두 내릴까요?\n빈 판 4개만 남아요` },
       { label: '모두 내리기', danger: true, fn: () => clearRoom(ri) },
       { label: '취소', quiet: true },
     ]);
@@ -857,7 +902,7 @@ function roomAction(act, ri) {
   if (act === 'delete') {
     if (museum.rooms.length <= 1) { toast('방이 하나뿐이라 지울 수 없어요'); return; }
     openSheet([
-      { title: true, label: hung ? `${name}을 지울까요? 걸린 사진 ${hung}장도 함께 지워져요` : `${name}을 지울까요?` },
+      { title: true, label: hung ? `${name}을 지울까요?\n걸린 사진 ${hung}장도 함께 지워져요` : `${name}을 지울까요?` },
       { label: '방 지우기', danger: true, fn: () => deleteRoom(ri) },
       { label: '취소', quiet: true },
     ]);
@@ -942,14 +987,7 @@ function onSceneTap(sx, sy) {
   if (ud.wallText === 'room') { editRoomText(ud.roomIndex); return; }
   if (ud.wallText === 'exhibition') { editExhibitionText(museum); return; }
   if (ud.wallText === 'exit') { editExitText(); return; }
-  if (ud.exitDoor) {
-    openSheet([
-      { title: true, label: '전시실을 나가 홈으로 갈까요?' },
-      { label: '홈으로 나가기', fn: () => openHome() },
-      { label: '더 둘러보기', quiet: true },
-    ]);
-    return;
-  }
+  if (ud.exitDoor) { askLeave(); return; }
   if (ud.floor) { walkToFloor(hit.point); return; }
   if (!ud.photoId) { walkToFloor(hit.point); return; } // 그냥 벽
   const t = { roomIndex: ud.roomIndex, photoId: ud.photoId, panel: ud.panel };
@@ -961,19 +999,12 @@ function onSceneTap(sx, sy) {
 let emptyHintAt = 0;
 function tapToWalk(ud, hit) {
   const go = sp => { controls.joy.x = controls.joy.y = 0; controls.walkPath(route(controls.pos.x, controls.pos.z, sp.x, sp.z), sp.yaw); controls.pitchT = -0.02; hideHint(); };
-  if (ud.exitDoor) {
-    openSheet([
-      { title: true, label: '전시실을 나가 홈으로 갈까요?' },
-      { label: '홈으로 나가기', fn: () => openHome() },
-      { label: '더 둘러보기', quiet: true },
-    ]);
-    return;
-  }
+  if (ud.exitDoor) { askLeave(); return; }
   const L = museumScene.layout;
   if (ud.photoId) {
     const panel = panelFor(ud.photoId) || ud.panel;
     if (panel) go(viewingSpot(panel));
-    if (ud.empty && performance.now() - emptyHintAt > 6000) { emptyHintAt = performance.now(); toast('사진을 걸려면 오른쪽 아래 편집을 눌러요', 2600); }
+    if (ud.empty && performance.now() - emptyHintAt > 6000) { emptyHintAt = performance.now(); toast('사진을 걸려면 편집을 켜세요', 2600); }
     return;
   }
   if (ud.wallText === 'room' && L[ud.roomIndex]) { go(L[ud.roomIndex].introSpot); return; }
@@ -1124,7 +1155,7 @@ function setEditMode(on, quiet) {
   editBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
   tourBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
   if (!on) closeStylePanel();
-  if (changed && !quiet) toast(on ? '편집 모드 · 사진이나 벽의 글을 누르면 고칠 수 있어요' : '관람 모드', on ? 2800 : 1200);
+  if (changed && !quiet) toast(on ? '편집 모드 · 사진이나 벽 글을 눌러 고쳐요' : '관람 모드', on ? 2800 : 1200);
 }
 setEditMode(false, true);
 $('#tools').addEventListener('click', e => {
@@ -1208,6 +1239,7 @@ function openHome() {
   if (map.isOpen) map.close();
   closeSheet();
   homeOpen = true;
+  keepAwake(false);
   setEditMode(false);
   music.stop();
   controls.enabled = false;
@@ -1242,6 +1274,7 @@ document.addEventListener('visibilitychange', () => {
 function enterExhibition(ex, fresh = false) {
   museum = ex;
   setEditMode(false, true); // 들어갈 때는 늘 관람 모드
+  keepAwake(true); exitAsked = false;
   if (!ex.showcase && simplifyStyles(ex)) persist(); // 예전 색 방은 흰 방 / 어두운 방으로
   music.start(); // 누른 순간 안에서 시작해야 휴대폰에서도 소리가 난다
   if (!ex.showcase && !ex.tutorial) { library.lastId = ex.id; persist(); }
@@ -1274,7 +1307,7 @@ makeSwipe($('#style-panel .items'));
 function confirmDeleteExhibition(ex) {
   const st = exhibitionStats(ex);
   openSheet([
-    { title: true, label: `'${ex.title}' 전시실을 지울까요? 방 ${st.rooms}개와 사진 ${st.photos}장이 모두 지워져요` },
+    { title: true, label: `'${ex.title}' 전시실을 지울까요?\n방 ${st.rooms}개와 사진 ${st.photos}장이 모두 지워져요` },
     { label: '전시실 지우기', danger: true, fn: () => {
       for (const r of ex.rooms) forgetPhotos(r.photos);
       pushUndo('전시실 지우기');
@@ -1316,7 +1349,7 @@ async function startShowcase() {
     buildingExample = true;
     toast('방 스타일 전시실을 준비하고 있어요…', 8000);
     try { ex = await buildShowcase(); }
-    catch (e) { console.error(e); toast('예시 사진을 불러오지 못했어요. 인터넷 연결을 확인해 주세요', 4000); return; }
+    catch (e) { console.error(e); toast('예시 사진을 못 불러왔어요\n인터넷 연결을 확인해 주세요', 4000); return; }
     finally { buildingExample = false; }
     library.exhibitions.unshift(ex);
     persist();
@@ -1351,7 +1384,7 @@ async function startTutorial() {
       ex = await buildExample();
     } catch (e) {
       console.error(e);
-      toast('예시 사진을 불러오지 못했어요. 인터넷 연결을 확인해 주세요', 4000);
+      toast('예시 사진을 못 불러왔어요\n인터넷 연결을 확인해 주세요', 4000);
       return;
     } finally { buildingExample = false; }
     library.exhibitions.unshift(ex);
@@ -1401,6 +1434,7 @@ function loop(t) {
   applyZoom();
   if ((loop.n = (loop.n || 0) + 1) % 8 === 0) { updateGoto(); updateNav(); }
   snapTick();
+  exitDoorTick();
   if (loop.n % 20 === 0) updateHD();
   map.update();
   tapRingTick();

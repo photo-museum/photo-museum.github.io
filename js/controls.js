@@ -157,14 +157,13 @@ export class WalkControls {
           if (ptrs.get(id) !== p || p.moved >= 10 || p.pinched || ptrs.size !== 1 || !this.enabled) return;
           if ([...T.values()].some(v => v.onJoy)) return; // 조이스틱으로 걷는 중엔 꾹 눌러 확대 안 함 (걸으며 둘러보려고 댄 손가락)
           const [nx, ny] = this.toNorm(p.x, p.y);
-          // 글씨(설명판)를 꾹 누르면: 손가락 밑이 아니라 화면 가운데로 가져와 크게 (손가락에 가려 못 읽지 않게)
+          // 꾹 누른 곳을 손가락 밑이 아니라 화면 가운데로 가져와 크게 (손가락에 가려 못 보지 않게).
+          // 글씨(설명판)를 눌렀으면 그 판 가운데를, 판이 화면 절반쯤 차게.
           const tgt = this.longPressTarget && this.longPressTarget(p.x, p.y);
-          if (tgt) {
-            this.zoomFocus = this._pointAt(tgt.x, tgt.y);
-            this.zoom = this.zoomGoal = Math.max(1, Math.min(ZOOM_MAX, tgt.zoom));
-            this.zoomAt = { x: 0.5, y: 0.5 };
-            p.anchor = { fx: nx, fy: ny };
-          } else this._zoomAround(nx, ny, Math.max(this.zoom, 2.5));
+          this.zoomFocus = tgt ? this._pointAt(tgt.x, tgt.y) : this._pointAt(nx, ny);
+          this.zoom = this.zoomGoal = tgt ? Math.max(1, Math.min(ZOOM_MAX, tgt.zoom)) : Math.max(this.zoom, 2.5);
+          this.zoomAt = { x: 0.5, y: 0.5 };
+          p.anchor = { fx: nx, fy: ny };
           this.zoomHold = true;
           p.right = true;
           if (navigator.vibrate) navigator.vibrate(10);

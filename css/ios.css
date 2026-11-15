@@ -431,3 +431,15 @@ body.editing #edit-menu { gap: 6px; }
 #style-panel .preset small { font-size: 12px; color: var(--label2); line-height: 1.35; }
 #style-panel .preset.on { border-color: var(--accent); background: rgba(229,72,77,.07); }
 #home .hbtns button[hidden] { display: none !important; }
+
+/* 글 줄 바꿈: 알림·메뉴 제목의 \n 을 그대로 줄로 */
+:root body #toast { white-space: pre-line; text-align: center; line-height: 1.4; max-width: min(86%, 420px); }
+:root body #sheet .title { white-space: pre-line; }
+#guide-modal .text { line-height: 1.6; word-break: keep-all; }
+#guide .task, #toast, #sheet .title { word-break: keep-all; }
+
+/* 지도가 열려 있으면 편집 메뉴(사진 넣기·방 꾸미기·방 만들기)는 숨긴다: 지도 안에 같은 기능이 있다 */
+body.map-open #edit-menu { display: none; }
+/* 지도: 출구 앞 '방 만들기' */
+:root body #map .rooms .door.add { border-style: dashed; background: rgba(255,255,255,.06); box-shadow: none; }
+:root body #map.rooms-mode .rooms .door.add { display: none; }

@@ -185,7 +185,7 @@ export class MuseumMap {
   _tip() {
     this.el.querySelector('.tip').textContent = this.roomsMode
         ? '방을 꾹 눌러 끌면 다른 방 사이에 넣어요 · 확대하면 사진이 보여요'
-        : '사진을 꾹 눌러 끌어 사진 위에 놓으면 자리 바꾸기, 사이에 놓으면 끼워 넣기 · 축소하면 방만 보여요';
+        : '사진을 꾹 눌러 옮겨요 · 방을 누르면 그 방으로 가요';
   }
   get roomsMode() { return this.zoom < 0.7; }
   // 확대·축소: 화면에서 (ax: 목록 안 x) 자리를 그대로 두고 바꾼다
@@ -297,7 +297,7 @@ export class MuseumMap {
       if (!room.name) nm.className = 'none';
       cap.innerHTML = `<b>${label(i)}</b>`;
       cap.firstChild.after(nm);
-      cap.insertAdjacentHTML('beforeend', `<span>${themeOf(r).label} · 사진 ${hung}${i === here ? ' · 지금 여기' : ''}</span>`);
+      cap.insertAdjacentHTML('beforeend', `<span>사진 ${hung}${i === here ? ' · 지금 여기' : ''}</span>`);
       // 방마다 편집 버튼 (오른쪽 위). 누르면 방 안에 아이콘이 펼쳐진다 — 평소엔 숨김
       const eb = document.createElement('button');
       eb.type = 'button'; eb.className = 'redit'; eb.setAttribute('aria-label', `${label(i)} 편집`);
@@ -310,14 +310,26 @@ export class MuseumMap {
         fill: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M12 9v6M9 12h6"/>',
         clear: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9 12h6"/>',
         delete: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+        style: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor" stroke="none"/>',
       };
       const act = (k, t, dis) => `<button data-act="${k}"${dis ? ' disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic[k]}</svg><small>${t}</small></button>`;
-      acts.innerHTML = act('rename', '이름·설명') + act('fill', '사진 넣기') + act('clear', '모두 내리기', !hung) + act('delete', '방 지우기', layout.length <= 1);
+      acts.innerHTML = act('rename', '이름·설명') + act('style', '방 꾸미기') + act('fill', '사진 넣기') + act('clear', '모두 내리기', !hung) + act('delete', '방 지우기', layout.length <= 1);
       plan.append(eb, acts);
       if (rooms) cap.querySelector('span').textContent = `사진 ${hung}`;
       card.append(plan, cap);
       this.row.appendChild(card);
     });
+    // 마지막 방 뒤: 방 만들기 (+)
+    const add = document.createElement('button');
+    add.type = 'button'; add.className = 'door add'; add.setAttribute('aria-label', '방 만들기');
+    add.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><small>방 만들기</small>';
+    add.addEventListener('click', () => {
+      this._handled = performance.now();
+      this.onAddRoom && this.onAddRoom();
+      const cards = this._cards(); const last = cards[cards.length - 1];
+      if (last) this.row.scrollLeft = last.offsetLeft; // 새 방이 보이게
+    });
+    this.row.appendChild(add);
     this.row.appendChild(door('exit'));
     // 입구·출구 아이콘을 방 카드 가운데 높이에 맞춘다
     const c0 = this.row.querySelector('.mroom');

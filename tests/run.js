@@ -232,6 +232,41 @@ const desktop = {
     assert(await p.evaluate(() => document.querySelector('#guestbook').classList.contains('open')), '방명록 창');
     await p.click('#gb-close');
   },
+  '출구 문: 걸어가면 (안 눌러도) 홈으로 갈지 묻기 · 물러나야 또 묻기': async (p, h) => {
+    await h.enter(0);
+    const open = () => p.evaluate(() => document.querySelector('#sheet').classList.contains('open'));
+    await p.evaluate(() => { const L = window.__pm.museumScene.layout; const c = window.__pm.controls; c.setPose(2.35, L.exit.zEnd + 2.4, 0); });
+    await p.waitForTimeout(500);
+    assert(!(await open()), '멀리서는 안 물음');
+    await p.evaluate(() => { window.__pm.controls.joy.y = -0.8; });
+    await p.waitForFunction(() => document.querySelector('#sheet').classList.contains('open'), null, { timeout: 5000 });
+    assert(/홈으로/.test(await p.textContent('#sheet')), '홈으로 갈지 묻기');
+    await p.mouse.click(40, 300); await p.waitForTimeout(900);
+    assert(!(await open()), '닫은 뒤 그 자리에서는 다시 안 물음');
+  },
+  '지도: 방 만들기(번갈아) · ✎ 방 꾸미기 · 편집 메뉴 숨김 · 빈 곳 눌러도 안 닫힘': async (p, h) => {
+    await h.enter(0);
+    await p.evaluate(() => window.__pm.setEditMode(true, true));
+    await p.evaluate(() => window.__pm.map.open()); await p.waitForTimeout(700);
+    assert(await p.evaluate(() => getComputedStyle(document.querySelector('#edit-menu')).display === 'none'), '지도에서는 편집 메뉴 숨김');
+    const walls = () => p.evaluate(() => window.__pm.museum.rooms.map(r => r.style.wall));
+    const w0 = await walls();
+    await p.evaluate(() => document.querySelector('#map .door.add').click()); await p.waitForTimeout(700);
+    const w1 = await walls();
+    assert(w1.length === w0.length + 1 && w1[w1.length - 1] !== w1[w1.length - 2], '새 방은 앞 방과 다른 색: ' + w1);
+    assert(await p.evaluate(() => window.__pm.map.isOpen), '지도는 그대로 열려 있음');
+    await p.evaluate(() => { const c = document.querySelectorAll('#map .mroom')[0]; c.querySelector('.redit').click(); c.querySelector('.acts [data-act=style]').click(); });
+    await p.waitForTimeout(400);
+    const want = w1[0] === 'gallery' ? '어두운 방' : '흰 방';
+    await p.evaluate(want => [...document.querySelectorAll('#sheet button')].find(b => b.textContent.trim() === want).click(), want);
+    await p.waitForTimeout(700);
+    assert((await walls())[0] !== w1[0], '지도에서 방 꾸미기');
+    const r = await p.evaluate(() => { const e = document.querySelector('#map .rooms').getBoundingClientRect(); return [e.left + 6, e.bottom - 4]; });
+    await p.mouse.click(r[0], r[1]); await p.waitForTimeout(700);
+    assert(await p.evaluate(() => window.__pm.map.isOpen), '빈 곳을 눌러도 안 닫힘');
+    await p.click('#map [data-act=close]'); await p.waitForTimeout(400);
+    await p.evaluate(() => window.__pm.setEditMode(false, true));
+  },
   '음악: 들어가면 켜짐 · ♪ 끄기 · 홈에서 멈춤': async (p, h) => {
     await h.home();
     await p.click('#home .fcap .go'); await p.waitForTimeout(1500);

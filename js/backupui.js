@@ -8,7 +8,7 @@ export function initBackup(a) {
   // ---------- 백업 · 불러오기 · 공유 ----------
   // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
   // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-  const APP_VERSION = '11.16-l'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+  const APP_VERSION = '11.16-o'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
   const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const ownExhibitions = () => a.library.exhibitions.filter(e => !e.showcase && !e.tutorial);
   function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -33,7 +33,7 @@ export function initBackup(a) {
       const r = await saveFile(blob, name);
       if (r === 'cancel') { toast('저장을 취소했어요'); return; }
       if (full) { a.library.lastBackup = Date.now(); persist(); }
-      toast(r === 'shared' ? '파일을 보냈어요. "파일에 저장"을 고르면 아이폰에 남아요' : `백업 파일을 저장했어요 (${(blob.size / 1048576).toFixed(1)}MB)`, 4200);
+      toast(r === 'shared' ? '파일을 보냈어요\n"파일에 저장"을 고르면 아이폰에 남아요' : `백업 파일을 저장했어요 (${(blob.size / 1048576).toFixed(1)}MB)`, 4200);
     } catch (e) { console.error(e); toast('백업 파일을 만들지 못했어요: ' + e.message, 4000); }
   }
   const importInput = document.createElement('input');
@@ -60,8 +60,8 @@ export function initBackup(a) {
     const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     openSheet([
       { title: true, label: ios
-        ? 'Safari 아래쪽 공유 버튼(□↑) → "홈 화면에 추가". 홈 화면 앱은 사진을 지우지 않고 오래 보관해요. 앱은 Safari 와 저장 공간이 따로라서, 먼저 여기서 백업 파일을 저장한 뒤 앱에서 불러오세요.'
-        : '브라우저 메뉴에서 "앱 설치" 또는 "홈 화면에 추가"를 고르세요. 설치한 앱은 사진을 더 오래 안전하게 보관해요.' },
+        ? '1. 먼저 아래에서 백업 파일을 저장해요\n2. Safari 공유 버튼(□↑) → "홈 화면에 추가"\n3. 새 앱을 열고 보관에서 백업 파일을 불러와요\n(앱과 Safari 는 저장 공간이 따로예요)'
+        : '브라우저 메뉴 → "앱 설치" 또는 "홈 화면에 추가"\n설치한 앱은 사진을 더 오래 보관해요' },
       ...(deferredInstall ? [{ label: '지금 설치하기', fn: () => { deferredInstall.prompt(); deferredInstall = null; } }] : []),
       { label: '먼저 백업 파일 저장', fn: () => exportExhibitions(ownExhibitions(), `MyMuseum-백업-${dateTag()}.pmbk`, true) },
       { label: '닫기', quiet: true },
@@ -76,7 +76,7 @@ export function initBackup(a) {
     if (a.library.lastBackup && a.library.lastBackup > a.library.changedAt) return;
     if (a.library.lastBackup && Date.now() - a.library.lastBackup < 7 * 86400000) return;
     backupNudged = true;
-    setTimeout(() => toast('소중한 사진을 지키려면 오른쪽 위 "보관"에서 백업 파일을 저장해 두세요', 4500), 1200);
+    setTimeout(() => toast('사진을 잃지 않게 백업해 두세요\n홈 오른쪽 위 ⤓ 보관', 4500), 1200);
   }
 
   return { openBackupMenu, exportExhibitions, nudgeBackup };
