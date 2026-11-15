@@ -474,6 +474,8 @@ function paintFloorShadow(L, b) {
 const EXIT_DOOR = { x: 2.35, w: 1.1, h: 2.3 };
 const GB_DESK = { w: 1.2, h: 0.95, d: 0.6, s: 3.4 }; // s: 방 시작에서 거리
 
+export const EXIT_TITLE = '관람해 주셔서 고맙습니다';
+export const EXIT_NOTE = '앞의 방명록에 한마디 남겨 주세요';
 function makeExitText(museum, FONTS, light = false) {
   const ppm = 300, S = 1.7, CW = Math.round(3.6 * ppm), CH = Math.round(1.5 * ppm);
   const c = document.createElement('canvas');
@@ -485,10 +487,17 @@ function makeExitText(museum, FONTS, light = false) {
   const ink = light ? 'rgba(34,30,26,0.94)' : 'rgba(238,231,219,0.95)';
   const sub = light ? 'rgba(60,54,48,0.75)' : 'rgba(214,206,193,0.75)';
   const line = (t, font, color, y) => { g.font = font; g.fillStyle = color; g.fillText(t, CW / 2, y); };
-  line('관람해 주셔서 고맙습니다', FONTS.title(96), ink, 40);
-  line((museum.title || '').trim(), FONTS.text(44), sub, 190);
+  // 출구 벽 글은 고칠 수 있다 (museum.exitTitle / exitNote, 없으면 기본 글)
+  const fit = (t, font, max) => { g.font = font; let tt = t; while (tt.length > 1 && g.measureText(tt).width > max) tt = tt.slice(0, -2) + '…'; return tt; };
+  const head = (museum.exitTitle || '').trim() || EXIT_TITLE;
+  const note = (museum.exitNote ?? EXIT_NOTE).trim();
+  line(fit(head, FONTS.title(96), CW - 60), FONTS.title(96), ink, 40);
+  line(fit((museum.title || '').trim(), FONTS.text(44), CW - 80), FONTS.text(44), sub, 190);
   g.fillStyle = 'rgba(255,217,160,0.65)'; g.fillRect(CW / 2 - 50, 270, 100, 3);
-  line('앞의 방명록에 한마디 남겨 주세요', FONTS.text(38), sub, 300);
+  if (note) {
+    const ls = note.split('\n').slice(0, 2);
+    ls.forEach((l, k) => line(fit(l, FONTS.text(38), CW - 80), FONTS.text(38), sub, 300 + k * 56));
+  }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = MAX_ANISO;
   return new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.5),
@@ -610,7 +619,9 @@ export class MuseumScene {
     const t = makeExitText(this.museum, F, !!themeOf(room).light);
     keep(t.geometry, t.material, t.material.map);
     t.position.set(-0.6, 2.75, zEnd + 0.004);
+    t.userData = { wallText: 'exit' };
     group.add(t);
+    this.pickables.push(t);
     // 출구 문 (누르면 홈으로)
     const doorMat = keep(new THREE.MeshBasicMaterial({ color: 0x0b0a09 }));
     const frameMat = keep(new THREE.MeshBasicMaterial({ color: 0x3a3632 }));

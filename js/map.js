@@ -242,7 +242,19 @@ export class MuseumMap {
     const rw = this.row.clientWidth || 600;
     const rh = this.row.clientHeight || 260;
     const pad = 8;
-    const maxLen = Math.max(...layout.map(r => r.length));
+    // 지도에는 사진이 걸린 부분만 그린다 (입구 쪽 안내벽 뒤 통로 같은 빈 공간은 잘라냄)
+    const TH = 1.6;     // 사진을 실제 비율보다 이만큼 크게 (눈이 안 좋아도 알아보게)
+    const span = r => {
+      if (!r.panels.length) return [0, Math.min(r.length, 3)];
+      let a = Infinity, b = -Infinity;
+      for (const p of r.panels) {
+        const c = r.zStart - p.z, hw = p.w * TH / 2;
+        a = Math.min(a, c - hw); b = Math.max(b, c + hw);
+      }
+      return [Math.max(0, a - 0.9), Math.min(r.length, b + 0.9)];
+    };
+    const spans = layout.map(span);
+    const maxLen = Math.max(...spans.map(([a, b]) => b - a));
     const sH = (rh - 112 - pad * 2) / ROOM_W;
     const sW = (rw - 60 - pad * 2) / maxLen;
     const s0 = Math.max(9, Math.min(36, sH, sW));
@@ -260,10 +272,11 @@ export class MuseumMap {
       const plan = document.createElement('div');
       plan.className = 'plan';
       // 방 모드에서도 누를 수 있게 너무 작아지지는 않게
-      const w = Math.max(rooms ? 64 : 0, r.length * s + pad * 2), h = Math.max(rooms ? 64 : 0, ROOM_W * s + pad * 2);
+      const [sa, sb] = spans[i];
+      const w = Math.max(rooms ? 64 : 0, (sb - sa) * s + pad * 2), h = Math.max(rooms ? 64 : 0, ROOM_W * s + pad * 2);
       plan.style.width = w + 'px'; plan.style.height = h + 'px';
       card.style.setProperty('--plan-h', h + 'px');
-      const ox = pad + r.zStart * s, oy = pad + ROOM_W / 2 * s;
+      const ox = pad + (r.zStart - sa) * s, oy = pad + ROOM_W / 2 * s;
       // 시안 M7: 방은 그 방 벽 색의 둥근 카드 (길이는 그 방 길이대로), 지금 방은 빨갛게 빛남
       const T = themeOf(r);
       plan.style.background = T.mapWall;
@@ -271,7 +284,7 @@ export class MuseumMap {
       if (i === here) {
         const me = document.createElement('i');
         me.className = 'me';
-        me.style.left = (ox - c.pos.z * s) + 'px';
+        me.style.left = Math.max(pad + 6, Math.min(w - pad - 6, ox - c.pos.z * s)) + 'px';
         me.style.top = (oy + c.pos.x * s) + 'px';
         plan.appendChild(me);
       }
@@ -280,9 +293,12 @@ export class MuseumMap {
         const t = document.createElement('div');
         t.className = 'thumb' + (p.photo.imageId ? '' : ' empty');
         t.dataset.pid = p.photo.id;
-        const tw = Math.max(10, p.w * s), th = Math.max(8, Math.min(p.h * s * 0.85, ROOM_W * s * 0.3));
+        // 원래 사진 비율대로 크게, 벽 하나가 방 높이의 42% 를 넘지 않게
+        let tw = Math.max(12, p.w * s * TH), th = tw * (p.h / p.w);
+        const thMax = ROOM_W * s * 0.42;
+        if (th > thMax) { th = thMax; tw = th * (p.w / p.h); }
         t.style.width = tw + 'px'; t.style.height = th + 'px';
-        t.style.left = (ox - (p.z + p.w / 2) * s) + 'px';
+        t.style.left = (ox - p.z * s - tw / 2) + 'px';
         t.style.top = (p.wall === 'L' ? oy - ROOM_W / 2 * s + wallPx + 2 : oy + ROOM_W / 2 * s - wallPx - 2 - th) + 'px';
         if (p.photo.imageId) {
           thumbURL(p.photo).then(u => { if (u) t.style.backgroundImage = `url("${u}")`; });

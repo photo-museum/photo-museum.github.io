@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MuseumScene, themeOf, texOf } from './builder.js';
+import { MuseumScene, themeOf, texOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
 import { WALLS, WALL_GROUPS, CEILINGS, FLOORS, LIGHTS, WALL_BY, CEIL_BY, FLOOR_BY, LIGHT_BY, styleOf, recOf } from './styles.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, INTRO_S, INTRO_W, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
@@ -393,7 +393,7 @@ function ensureMuseumGlyphs() {
   const byFont = new Map();
   const add = (id, t) => { if (t) byFont.set(id, (byFont.get(id) || '') + t); };
   const fixed = '0123456789ROOMphotomuseum→—·관람해주셔서고맙습니다앞의방명록에한마디남겨주세요벽을눌러이전시에대한설명을적어이름과';
-  add(exFont, fixed + (m.title || '') + (m.intro || '') + (m.guestbook || []).map(g => g.text + g.name).join(''));
+  add(exFont, fixed + (m.title || '') + (m.intro || '') + (m.exitTitle || '') + (m.exitNote || '') + (m.guestbook || []).map(g => g.text + g.name).join(''));
   for (const r of m.rooms) {
     const f = r.font || exFont;
     add(f, fixed + (r.name || '') + (r.intro || '') + r.photos.map(p => p.caption || '').join(''));
@@ -451,6 +451,22 @@ function editRoomText(ri) {
       persist();
       rebuild();
       toast('안내벽을 고쳤어요');
+    },
+  });
+}
+// 출구 벽 글 (맨 위 인사말 + 아래 한두 줄). 비우면 기본 글로.
+function editExitText() {
+  openText({
+    head: '출구 벽 글',
+    title: { label: '인사말 (크게)', value: museum.exitTitle || '', placeholder: EXIT_TITLE },
+    body: { label: '아래 작은 글 (두 줄까지)', value: museum.exitNote ?? EXIT_NOTE, placeholder: EXIT_NOTE },
+    onSave: (title, note) => {
+      pushUndo('출구 벽 글');
+      if (title) museum.exitTitle = title; else delete museum.exitTitle;
+      museum.exitNote = note || '';
+      persist();
+      rebuild();
+      toast('출구 벽 글을 고쳤어요');
     },
   });
 }
@@ -1116,6 +1132,7 @@ controls.onTap = (sx, sy) => {
   const ud = hit.object.userData;
   if (ud.wallText === 'room') { editRoomText(ud.roomIndex); return; }
   if (ud.wallText === 'exhibition') { editExhibitionText(museum); return; }
+  if (ud.wallText === 'exit') { editExitText(); return; }
   if (ud.guestbook) { openGuestbook(); return; }
   if (ud.exitDoor) {
     openSheet([
@@ -1679,7 +1696,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-n'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-p'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
