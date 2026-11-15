@@ -227,14 +227,21 @@ export class MuseumMap {
       card.dataset.i = i;
       const plan = document.createElement('div');
       plan.className = 'plan';
-      const cv = document.createElement('canvas');
       const w = r.length * s + pad * 2, h = ROOM_W * s + pad * 2;
       plan.style.width = w + 'px'; plan.style.height = h + 'px';
-      const g = fitCanvas(cv, w, h);
+      card.style.setProperty('--plan-h', h + 'px');
       const ox = pad + r.zStart * s, oy = pad + ROOM_W / 2 * s;
-      drawRoom(g, r, s, ox, oy, { current: i === here });
-      if (i === here) drawPlayer(g, ox - c.pos.z * s, oy + c.pos.x * s, c.yaw, Math.max(6, s * 0.38));
-      plan.appendChild(cv);
+      // 시안 M7: 방은 그 방 벽 색의 둥근 카드 (길이는 그 방 길이대로), 지금 방은 빨갛게 빛남
+      const T = themeOf(r);
+      plan.style.background = T.mapWall;
+      if (T.light) plan.classList.add('light');
+      if (i === here) {
+        const me = document.createElement('i');
+        me.className = 'me';
+        me.style.left = (ox - c.pos.z * s) + 'px';
+        me.style.top = (oy + c.pos.x * s) + 'px';
+        plan.appendChild(me);
+      }
       // 액자 자리에 작은 사진
       for (const p of r.panels) {
         const t = document.createElement('div');
@@ -266,6 +273,9 @@ export class MuseumMap {
       card.append(plan, cap, acts);
       this.row.appendChild(card);
     });
+    // 입구·출구 아이콘을 방 카드 가운데 높이에 맞춘다
+    const c0 = this.row.querySelector('.mroom');
+    if (c0) this.row.style.setProperty('--door-y', (c0.querySelector('.plan').offsetHeight / 2 - c0.offsetHeight / 2) + 'px');
     if (keepScroll) { this.row.scrollLeft = scroll; return; }
     // 지금 있는 방이 보이게
     const cur = this.row.children[here];

@@ -295,3 +295,38 @@ body.rotated #home .hstrip { max-width: calc(4 * 48px + 3 * 6px + 12px + 2px); }
 #home .hstrip.more-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 14px), transparent); }
 #home .hstrip.more-l.more-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); }
 #home .hstrip.more-l:not(.more-r) { -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px); mask-image: linear-gradient(90deg, transparent, #000 14px); }
+
+/* ---------- 전시장 지도 (시안 M7): 둥근 방 카드가 짧은 선으로 이어짐 ---------- */
+:root body #map { background: rgba(14,16,22,.55); -webkit-backdrop-filter: blur(30px) saturate(160%); backdrop-filter: blur(30px) saturate(160%); color: #fff; }
+:root body #map .bar { padding: 2px 2px 12px; }
+:root body #map .tip { color: rgba(235,235,245,.6); font-size: 13px; }
+:root body #map .rooms { gap: 22px; padding: 0 22px; scrollbar-width: none; }
+:root body #map .rooms::-webkit-scrollbar { display: none; }
+/* 입구 · 출구: 줄 양 끝의 동그란 유리 아이콘 */
+:root body #map .rooms::before, :root body #map .rooms::after {
+  content: ''; flex: none; width: 40px; height: 40px; border-radius: 20px; align-self: center;
+  transform: translateY(var(--door-y, -40px));
+  background: rgba(255,255,255,.12) center / 18px no-repeat; border: 1px solid rgba(255,255,255,.3);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.45), 0 6px 18px rgba(0,0,0,.25);
+}
+:root body #map .rooms::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21V9l9-6 9 6v12'/%3E%3C/svg%3E"); }
+:root body #map .rooms::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h5v16h-5'/%3E%3Cpath d='M10 8l4 4-4 4M3 12h11'/%3E%3C/svg%3E"); }
+:root body #map .plan { border-radius: 18px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 8px 20px rgba(0,0,0,.3); }
+:root body #map .mroom.here .plan { box-shadow: 0 0 0 3px var(--accent), 0 0 30px rgba(229,72,77,.4); }
+:root body #map .plan .me { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 7px; background: #ff3b30; box-shadow: 0 0 0 3px #fff, 0 0 14px rgba(255,59,48,.9); pointer-events: none; }
+:root body #map .thumb { border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,.45); }
+:root body #map .thumb.empty { border: 1.5px dashed rgba(255,255,255,.45); background: transparent; color: rgba(255,255,255,.7); border-radius: 4px; }
+:root body #map .plan.light .thumb.empty { border-color: rgba(0,0,0,.25); color: rgba(0,0,0,.45); }
+/* 방 사이: 짧은 이음선 (입구·출구 쪽도) */
+:root body #map .mroom::before { content: ''; position: absolute; left: -22px; width: 22px; height: 6px; top: calc(var(--plan-h, 140px) / 2 - 3px); border-radius: 3px; background: rgba(255,255,255,.5); }
+:root body #map .mroom:last-child::after { content: ''; display: block; position: absolute; right: -22px; left: auto; width: 22px; height: 6px; top: calc(var(--plan-h, 140px) / 2 - 3px); border-radius: 3px; background: rgba(255,255,255,.5); }
+:root body #map .mroom:not(:last-child)::after { display: none; }
+:root body #map.editing .mroom::before, :root body #map.editing .mroom::after { opacity: .3; }
+:root body #map .mroom .cap { align-items: center; text-align: center; padding: 0; }
+:root body #map .mroom .cap b { font-size: 11px; font-weight: 700; letter-spacing: 0; color: rgba(235,235,245,.6); }
+:root body #map .mroom.here .cap b { color: #ff7a7e; }
+:root body #map .mroom .cap i { font-family: var(--ui); font-size: 15px; font-weight: 700; color: #fff; }
+:root body #map .mroom .cap span { color: rgba(235,235,245,.55); }
+:root body #map .acts { justify-content: center; }
+:root body #map .acts button { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); color: #fff; }
+:root body #map .acts button[data-act="delete"] { color: #ff8a8d; }

@@ -1242,12 +1242,15 @@ function hintTick() {
 async function start() {
   requestPersistence();
   // 홈 화면 앱·오프라인용 (http(s) 에서만)
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !/pm\.test$/.test(location.hostname)) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !/pm\.test$/.test(location.hostname)) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   [library] = await Promise.all([loadLibrary(), loadFonts()]);
   // 예시 전시실로 새로 시작 (한 번만): 지금까지의 전시실과 사진을 지우고 예시 5개를 만든다
   if (library.demoVersion !== DEMO_VERSION) {
     try { await buildDemoLibrary(); }
     catch (e) { console.error(e); $('#loading').textContent = '예시 사진을 불러오지 못했어요. 새로 고침해 주세요'; return; }
+  }
+  if (!library.bigTest) {
+    try { await addBigTestExhibition(); } catch (e) { console.warn('시험용 전시실을 만들지 못함', e); }
   }
   persist();
   sweepImages(library); // 지난번에 지웠던 사진 원본 정리 (아직 아무것도 바꾸기 전에)
@@ -1577,6 +1580,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
+const APP_VERSION = '11.15-c'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -1587,7 +1591,7 @@ function backupAge() {
 }
 function openBackupMenu() {
   openSheet([
-    { title: true, label: `보관 · ${backupAge()}` },
+    { title: true, label: `보관 · ${backupAge()} · 버전 ${APP_VERSION}` },
     { label: '⤓ 모든 전시실을 백업 파일로 저장', fn: () => exportExhibitions(ownExhibitions(), `PhotoMuseum-백업-${dateTag()}.pmbk`, true) },
     { label: '⤒ 백업 파일에서 불러오기', fn: () => importPick() },
     { label: isStandalone() ? '✓ 홈 화면 앱으로 쓰고 있어요' : '홈 화면에 앱으로 추가하는 법', fn: () => installHelp() },
@@ -1802,6 +1806,32 @@ async function buildDemoLibrary() {
   library.demoVersion = DEMO_VERSION;
   library.lastId = exs[0]?.id;
   for (const k of Object.keys(localStorage)) if (k.startsWith('pm-pose-')) try { localStorage.removeItem(k); } catch (e) {}
+}
+
+// 사진이 아주 많은 시험용 전시실 (한 번만). 이미 저장된 예시 사진을 다시 쓰고, 모자라면 예시 파일을 받는다.
+async function addBigTestExhibition() {
+  const seen = new Map();
+  for (const ex of library.exhibitions) for (const r of ex.rooms) for (const p of r.photos) if (p.imageId && !seen.has(p.imageId)) seen.set(p.imageId, p.aspect);
+  let pool = [...seen].map(([imageId, aspect]) => ({ imageId, aspect }));
+  if (pool.length < 12) {
+    const files = [...new Set(DEMO.flatMap(D => D.rooms.flatMap(R => R.photos.map(P => P.file))))].slice(0, 30);
+    for (const f of files) {
+      $('#loading').textContent = `시험용 전시실을 준비하고 있어요 · ${pool.length + 1} / ${files.length}`;
+      const { blob, hd, aspect } = await prepareImage(await (await fetch(f)).blob());
+      const imageId = uid('img_');
+      await putImage(imageId, blob); if (hd) await putImage(imageId + HD, hd);
+      pool.push({ imageId, aspect });
+    }
+  }
+  if (!pool.length) return;
+  let k = 0;
+  const take = n => Array.from({ length: n }, () => { const q = pool[k++ % pool.length]; const ph = newPhoto(q.imageId, q.aspect); ph.caption = `사진 ${k}\n같은 방에 아주 많이 걸어 본 시험용 사진이에요`; return ph; });
+  const ex = newExhibition('사진이 아주 많은 전시 (시험용)');
+  ex.intro = '사진을 아주 많이 걸었을 때 지도와 걷기가 어떤지 느껴 보는 시험용 전시실이에요.\n마음껏 옮기고 지워 봐도 돼요.';
+  const mk = (name, n, wall) => { const r = newRoom(0, 'white'); r.name = name; r.style = { wall }; r.photos = take(n); return r; };
+  ex.rooms = [mk('보통 방', 6, 'gallery'), mk('아주 긴 방', 36, 'ivory'), mk('작은 방', 3, 'navy'), mk('긴 방', 20, 'sage'), mk('마지막 방', 8, 'charcoal')];
+  library.exhibitions.push(ex);
+  library.bigTest = 1;
 }
 
 async function startShowcase() {
