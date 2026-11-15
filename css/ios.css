@@ -480,3 +480,28 @@ body.map-open #edit-menu { display: none; }
 #captions .row { display: flex; gap: 8px; justify-content: flex-end; }
 #captions .row button { height: 40px; padding: 0 20px; border-radius: 20px; border: 0; background: var(--accent); color: #fff; font: 600 15px var(--ui); }
 #captions .row button.quiet { background: var(--fill); color: var(--label); }
+
+/* ---------- 시험판 R2: 세로 지도 (방을 위에서 아래로, 사진은 순서대로 한 줄) ---------- */
+:root body #map.v .rooms { position: relative; flex-direction: column; align-items: stretch; gap: 10px; padding: 2px 6px 30px; overflow: hidden; }
+:root body #map.v .mroom.v { flex: none; align-self: stretch; width: auto; max-width: none; display: flex; align-items: stretch; flex-direction: column; gap: 5px; position: relative; }
+:root body #map.v .mroom.v::before, :root body #map.v .mroom.v::after { display: none; content: none; }
+:root body #map.v .mroom.v.drag { z-index: 5; opacity: .92; transition: none; filter: drop-shadow(0 10px 20px rgba(0,0,0,.5)); }
+#map.v .rhd { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 2px; color: #fff; }
+#map.v .rhd b { font-size: 12px; font-weight: 700; letter-spacing: .02em; color: rgba(235,235,245,.7); }
+#map.v .rhd i { font-style: normal; font-size: 15px; font-weight: 600; }
+#map.v .rhd i.none { color: rgba(235,235,245,.4); font-weight: 400; }
+#map.v .rhd span { flex: 1; font-size: 12px; color: rgba(235,235,245,.55); }
+#map.v .mroom.v.here .rhd b { color: #ff9a9d; }
+:root body #map.v .rhd .grip { flex: none; width: 34px; height: 30px; padding: 0; border: 0; border-radius: 10px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: grab; touch-action: none; }
+:root body #map.v .rhd .redit { position: static; flex: none; opacity: 1; width: 34px; height: 30px; padding: 0; border: 0; border-radius: 10px; background: rgba(255,255,255,.1); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+:root body #map.v .mroom.acts-open .rhd .redit { background: var(--accent); }
+:root body #map.v .plan.strip { position: relative; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 10px; padding: 10px; width: auto; height: auto; border-radius: 14px; box-sizing: border-box; }
+:root body #map.v .mroom.v.here .plan.strip { box-shadow: 0 0 0 2px var(--accent); }
+:root body #map.v .plan.strip .thumb { position: relative; left: auto; top: auto; flex: none; }
+:root body #map.v .plan.strip .thumb.empty { display: grid; place-items: center; font-size: 18px; }
+:root body #map.v .mroom.acts-open .acts { position: absolute; inset: 0; border-radius: 14px; flex-wrap: wrap; align-content: center; }
+#map.v .row-line { position: absolute; left: 6px; right: 6px; height: 4px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 10px rgba(229,72,77,.8); pointer-events: none; z-index: 4; }
+:root body #map.v .vplace { flex: none; align-self: flex-start; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px 0 12px; border-radius: 18px; font-size: 13px; font-weight: 600; color: #fff; cursor: pointer;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3); }
+:root body #map.v .vplace svg { width: 18px; height: 18px; stroke-width: 2.4; }
+:root body #map.v .vplace.add { border-style: dashed; background: rgba(255,255,255,.06); }

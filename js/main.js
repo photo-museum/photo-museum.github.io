@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MuseumScene, themeOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
 import { WALL_BY, CEIL_BY, FLOOR_BY, PRESETS, simplifyStyles, presetOf, styleOf } from './styles.js';
 import { initCaptions } from './captions.js';
+import { MuseumMap2 } from './map2.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, LOBBY_L, ROOM_W, WALL_T, R2 } from './layout.js';
 import { MuseumMap } from './map.js';
@@ -813,7 +814,7 @@ function updateHD() {
 
 
 // ---------- 지도 ----------
-const map = new MuseumMap({
+const map = new (R2 ? MuseumMap2 : MuseumMap)({ // 시험판 R2 는 세로 지도 (js/map2.js)
   controls,
   getLayout: () => museumScene.layout,
   getMuseum: () => museum,
