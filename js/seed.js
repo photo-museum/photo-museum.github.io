@@ -103,7 +103,7 @@ export async function buildDemoLibrary(library, say0) {
   await Promise.all([worker(), worker(), worker(), worker(), worker(), worker()]);
   const exs = [];
   for (const D of DEMO) {
-    const ex = newExhibition(`[예시] ${D.title}`); // 내가 만든 전시실과 헷갈리지 않게 제목에 표시
+    const ex = newExhibition(`(Sample) ${D.title}`); // 내가 만든 전시실과 헷갈리지 않게 제목에 표시
     ex.intro = D.intro || '';
     if (D.font) ex.font = D.font;
     ex.rooms = [];
