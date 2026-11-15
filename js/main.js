@@ -228,27 +228,37 @@ function hasResume(ex) {
 }
 
 // ---------- 사진 넣기 (여러 장) ----------
-const fileInput = $('#file');
-let pickJob = null; // { roomIndex, startPhotoId?, replace? }
+// 사진을 거는 도중에 다른 방에 또 걸어도 되게:
+//  · 고를 때마다 새 <input> 을 쓴다 (하나를 비우고 다시 쓰면, 아직 다 못 건 앞의 사진 파일이 사라질 수 있다)
+//  · 거는 일은 줄을 세워 하나씩 한다 (둘이 한꺼번에 방을 다시 짓지 않게)
+//  · 방은 고른 순간의 방을 기억한다 (그 사이 방 순서가 바뀌어도 그 방에 건다)
+const fileProto = $('#file');
+let hangQueue = Promise.resolve(), hangWaiting = 0;
 
 function pickPhotos(job) {
-  pickJob = job;
-  fileInput.multiple = !job.replace;
-  fileInput.value = '';
-  fileInput.click();
+  const ex = museum;
+  job.room = ex.rooms[job.roomIndex];
+  const input = fileProto.cloneNode();
+  input.removeAttribute('id');
+  input.multiple = !job.replace;
+  fileProto.after(input);
+  input.addEventListener('change', () => {
+    const files = Array.from(input.files || []);
+    if (!files.length) { input.remove(); return; }
+    if (hangWaiting) toast('앞의 사진을 다 건 뒤에 이어서 걸게요', 2600);
+    hangWaiting++;
+    hangQueue = hangQueue.then(async () => {
+      try { if (museum === ex) await hangPhotos(job, files); }
+      finally { hangWaiting--; input.remove(); }
+    });
+  });
+  input.addEventListener('cancel', () => input.remove());
+  input.click();
 }
-
-fileInput.addEventListener('change', async () => {
-  const files = Array.from(fileInput.files || []);
-  const job = pickJob;
-  pickJob = null;
-  if (!files.length || !job) return;
-  await hangPhotos(job, files);
-});
 
 // 정한 판부터 빈 판을 차례로 채우고, 남는 사진은 판을 새로 만들어 단다 (벽이 길어짐)
 async function hangPhotos(job, files) {
-  const room = museum.rooms[job.roomIndex];
+  const room = job.room && museum.rooms.includes(job.room) ? job.room : museum.rooms[job.roomIndex];
   if (!room) return;
   const targets = [];
   if (job.replace) {
@@ -793,6 +803,7 @@ const map = new MuseumMap({
   isBlocked: () => { if (sheetOpen()) { closeSheet(); return true; } return editor.classList.contains('open') || gb.classList.contains('open'); },
   onSwap: (a, b) => swapPhotos(a, b),
   onInsert: (pid, ri, beforePid) => insertPhoto(pid, ri, beforePid),
+  onInsertMany: (pids, ri, beforePid) => insertPhotos(pids, ri, beforePid),
   onPhotoTap: (ri, pid) => openPanelSheet({ roomIndex: ri, photoId: pid, panel: panelFor(pid) }),
   onRoomAction: (act, ri) => roomAction(act, ri),
   onAddRoom: () => addRoom('white'),
@@ -872,6 +883,29 @@ function insertPhoto(pid, ri, beforePid) {
   persist();
   rebuild();
   toast(A.room === room ? '사진 순서를 바꿨어요' : `ROOM ${String(ri + 1).padStart(2, '0')}에 넣었어요`);
+}
+
+// 지도에서 고른 여러 장을 한꺼번에 옮긴다 (지금 걸린 차례 그대로, beforePid 앞에. 없으면 방 끝에)
+function insertPhotos(pids, ri, beforePid) {
+  const room = museum.rooms[ri];
+  if (!room || !pids.length) return;
+  const want = new Set(pids);
+  if (want.has(beforePid)) return;
+  pushUndo('사진 여러 장 옮기기');
+  const moved = [];
+  for (const r of museum.rooms) {
+    const keep = [];
+    for (const p of r.photos) (want.has(p.id) ? moved : keep).push(p);
+    r.photos = keep;
+  }
+  let k = beforePid ? room.photos.findIndex(p => p.id === beforePid) : -1;
+  if (k < 0) k = room.photos.length;
+  room.photos.splice(k, 0, ...moved);
+  for (const r of museum.rooms) if (!r.photos.length) r.photos.push(newPhoto()); // 방이 텅 비지 않게 빈 판 하나
+  stats.inserts = (stats.inserts || 0) + 1;
+  persist();
+  rebuild();
+  toast(`${moved.length}장을 ROOM ${String(ri + 1).padStart(2, '0')}로 옮겼어요`);
 }
 
 // 지도의 방 아래 버튼들

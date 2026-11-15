@@ -215,6 +215,37 @@ const desktop = {
     assert((await h.photos()) !== mid, '자리 바꾸기');
     await p.evaluate(() => window.__pm.map.close());
   },
+  '지도: 여러 장 골라 다른 방으로 한꺼번에 옮기기 · 빈 곳 누르면 취소': async (p, h) => {
+    await h.enter(2);
+    await p.evaluate(() => { window.__pm.map.zoom = 1; window.__pm.map.open(); }); await p.waitForTimeout(900);
+    const n = () => p.evaluate(() => window.__pm.museum.rooms.map(r => r.photos.length));
+    const n0 = await n();
+    let plans = await p.$$('#map .mroom .plan');
+    let ts = await plans[0].$$('.thumb');
+    const c = async el => { const b = await el.boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    const [ax, ay] = await c(ts[0]), [bx, by] = await c(ts[1]);
+    await p.keyboard.down('Control'); await p.mouse.click(ax, ay); await p.keyboard.up('Control'); await p.waitForTimeout(200);
+    await p.mouse.click(bx, by); await p.waitForTimeout(200); // 고르는 중에는 그냥 눌러도 더 골라진다
+    assert((await p.$$('#map .thumb.sel')).length === 2, '두 장 고름');
+    assert(/2장/.test(await p.textContent('#map .tip')), '안내 글');
+    const r1 = await plans[1].boundingBox();
+    await p.mouse.move(ax, ay); await p.mouse.down();
+    await p.mouse.move(r1.x + r1.width - 12, r1.y + r1.height / 2, { steps: 20 }); await p.waitForTimeout(200);
+    assert(await p.evaluate(() => document.querySelector('#map .thumb.ghost').dataset.n === '2'), '묶음 2');
+    await p.mouse.up(); await p.waitForTimeout(900);
+    const n1 = await n();
+    assert(n1[0] === n0[0] - 2 && n1[1] === n0[1] + 2, '두 장이 옆방으로: ' + n0 + ' → ' + n1);
+    assert((await p.$$('#map .thumb.sel')).length === 0, '옮긴 뒤 고르기 끝');
+    await p.click('#undo'); await p.waitForTimeout(700);
+    assert(String(await n()) === String(n0), '되돌리기');
+    plans = await p.$$('#map .mroom .plan'); ts = await plans[0].$$('.thumb');
+    const [cx, cy] = await c(ts[0]);
+    await p.keyboard.down('Control'); await p.mouse.click(cx, cy); await p.keyboard.up('Control'); await p.waitForTimeout(200);
+    const cap = await (await p.$('#map .mroom .cap')).boundingBox();
+    await p.mouse.click(cap.x + 4, cap.y + cap.height + 14); await p.waitForTimeout(300);
+    assert((await p.$$('#map .thumb.sel')).length === 0 && (await p.evaluate(() => window.__pm.map.isOpen)), '빈 곳 → 취소, 지도는 그대로');
+    await p.evaluate(() => window.__pm.map.close());
+  },
   '출구: 벽 글 고치기 · 방명록 쓰기 버튼': async (p, h) => {
     await h.enter(0);
     await p.evaluate(() => { const L = window.__pm.museumScene.layout; const c = window.__pm.controls; c.setPose(-0.6, L.exit.zStart - 1.0, 0); c.pitch = c.pitchT = 0.25; });

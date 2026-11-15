@@ -452,3 +452,10 @@ body.map-open #edit-menu { display: none; }
 #style-panel.simple .preset i { width: 56px; height: 38px; border-radius: 9px; }
 #style-panel.simple .preset i u { width: 18px; height: 12px; margin-left: -9px; }
 #style-panel.simple .preset b { font-size: 14px; }
+
+/* 지도: 여러 장 고르기 */
+:root body #map .thumb.sel { box-shadow: 0 0 0 3px var(--accent), 0 4px 12px rgba(0,0,0,.5); }
+:root body #map .thumb.sel::after { content: '✓'; position: absolute; right: -7px; top: -7px; width: 18px; height: 18px; border-radius: 9px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+:root body #map .thumb.ghost[data-n]::after { content: attr(data-n); position: absolute; right: -9px; top: -9px; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 11px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; line-height: 22px; text-align: center; }
+:root body #map .thumb.ghost[data-n] { box-shadow: 5px 5px 0 rgba(255,255,255,.55), 10px 10px 0 rgba(255,255,255,.3), 0 10px 24px rgba(0,0,0,.5); }
+:root body #map.selecting .tip { color: #fff; font-weight: 600; }

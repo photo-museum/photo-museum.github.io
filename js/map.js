@@ -177,15 +177,25 @@ export class MuseumMap {
     this.render();
   }
   close() {
+    if (this.sel) this.sel.clear();
     if (!this.isOpen) return;
     this.isOpen = false;
     this.el.classList.remove('open');
     this.onOpen && this.onOpen(false);
   }
+  // 여러 장 고르기: 사진을 꾹 눌렀다 그대로 떼면 그 사진이 골라진다. 그 뒤로는 사진을 톡 눌러 더 고르거나 뺀다.
+  // 고른 사진 가운데 하나를 꾹 눌러 끌면 모두 함께 옮겨진다 (다른 방으로도). 빈 곳을 누르면 고르기 끝.
+  _syncSel() {
+    if (!this.sel) this.sel = new Set();
+    for (const t of this.row.querySelectorAll('.thumb')) t.classList.toggle('sel', this.sel.has(t.dataset.pid));
+    this.el.classList.toggle('selecting', this.sel.size > 0);
+    this._tip();
+  }
   _tip() {
+    if (this.sel && this.sel.size) { this.el.querySelector('.tip').textContent = `${this.sel.size}장 고름 · 톡 눌러 더 고르고, 꾹 눌러 끌어 옮겨요 · 빈 곳을 누르면 취소`; return; }
     this.el.querySelector('.tip').textContent = this.roomsMode
         ? '방을 꾹 눌러 끌면 다른 방 사이에 넣어요 · 확대하면 사진이 보여요'
-        : '사진을 꾹 눌러 옮겨요 · 방을 누르면 그 방으로 가요';
+        : '사진을 꾹 눌러 옮겨요 · 꾹 눌렀다 떼면 여러 장 고르기';
   }
   get roomsMode() { return this.zoom < 0.7; }
   // 확대·축소: 화면에서 (ax: 목록 안 x) 자리를 그대로 두고 바꾼다
@@ -331,6 +341,7 @@ export class MuseumMap {
     });
     this.row.appendChild(add);
     this.row.appendChild(door('exit'));
+    this._syncSel();
     // 입구·출구 아이콘을 방 카드 가운데 높이에 맞춘다
     const c0 = this.row.querySelector('.mroom');
     if (c0) this.row.style.setProperty('--door-y', (c0.querySelector('.plan').offsetHeight / 2 - c0.offsetHeight / 2) + 'px');
@@ -472,8 +483,16 @@ export class MuseumMap {
         for (const c of this._cards()) c.classList.remove('acts-open'); // 펼친 편집 아이콘만 닫는다
         return;
       }
+      if (dd.moved < 10 && e.type === 'pointerup' && this.sel && this.sel.size) {
+        const pid = dd.thumb && dd.thumb.dataset.pid;
+        if (pid) { if (this.sel.has(pid)) this.sel.delete(pid); else this.sel.add(pid); }
+        else this.sel.clear();
+        this._syncSel();
+        return;
+      }
       if (dd.moved < 10 && e.type === 'pointerup') {
         if (!dd.card) return;
+        if (dd.thumb && (e.ctrlKey || e.metaKey || e.shiftKey)) { this.sel = this.sel || new Set(); this.sel.add(dd.thumb.dataset.pid); this._syncSel(); return; } // 컴퓨터: Ctrl/Shift+클릭으로 고르기
         if (dd.thumb) { this.onPhotoTap(+dd.card.dataset.i, dd.thumb.dataset.pid); return; }
         const ri = +dd.card.dataset.i;
         this.close();
@@ -504,6 +523,12 @@ export class MuseumMap {
     g.style.width = t.offsetWidth + 'px'; g.style.height = t.offsetHeight + 'px';
     this.el.appendChild(g);
     d.ghost = g;
+    d.moved0 = d.moved;
+    if (this.sel && this.sel.size > 1 && this.sel.has(t.dataset.pid)) {
+      d.multi = [...this.row.querySelectorAll('.thumb.sel')];
+      g.dataset.n = d.multi.length;
+      for (const x of d.multi) x.classList.add('lifted');
+    }
     t.classList.add('lifted');
     if (navigator.vibrate) navigator.vibrate(12);
     this._moveGhost(d);
@@ -530,12 +555,12 @@ export class MuseumMap {
     const [cx] = this.toContent(d.x, d.y);
     const px = cx - (card.offsetLeft + plan.offsetLeft - this.row.scrollLeft); // 방 그림 안 x
     const t = el.closest('.thumb');
-    if (t && t !== d.thumb && !t.classList.contains('ins')) {
+    if (!d.multi && t && t !== d.thumb && !t.classList.contains('ins')) {
       const tc = t.offsetLeft + t.offsetWidth / 2;
       if (Math.abs(px - tc) < t.offsetWidth * 0.3) return { kind: 'swap', el: t };
     }
     // 끼워 넣을 자리: 이 방 사진들(끌고 있는 것 빼고)을 왼쪽부터 세어 손가락 앞에 몇 장 있나
-    const thumbs = [...plan.querySelectorAll('.thumb:not(.ghost)')].filter(x => x !== d.thumb)
+    const thumbs = [...plan.querySelectorAll('.thumb:not(.ghost)')].filter(x => x !== d.thumb && !(d.multi && d.multi.includes(x)))
       .map(x => ({ el: x, c: x.offsetLeft + x.offsetWidth / 2 })).sort((a, b) => a.c - b.c);
     let k = 0;
     while (k < thumbs.length && thumbs[k].c < px) k++;
@@ -574,6 +599,22 @@ export class MuseumMap {
     if (this._insLine && this._insLine.parentNode) this._insLine.remove();
     d.ghost.remove();
     d.thumb.classList.remove('lifted');
+    if (d.multi) for (const x of d.multi) x.classList.remove('lifted');
+    // 꾹 눌렀다 움직이지 않고 그대로 뗌 → 그 사진을 고른다 (여러 장 고르기 시작)
+    if (d.moved - (d.moved0 || 0) < 8) {
+      this.sel = this.sel || new Set();
+      this.sel.add(d.thumb.dataset.pid);
+      this._syncSel();
+      return;
+    }
+    if (d.multi) {
+      const pids = d.multi.map(x => x.dataset.pid);
+      this.sel.clear();
+      if (t && t.kind === 'insert') this.onInsertMany && this.onInsertMany(pids, t.ri, t.before);
+      this._syncSel();
+      return;
+    }
+    if (this.sel && this.sel.size) { this.sel.clear(); this._syncSel(); }
     if (!t) return;
     if (t.kind === 'swap') this.onSwap(d.thumb.dataset.pid, t.el.dataset.pid);
     else if (t.before !== d.thumb.dataset.pid) this.onInsert && this.onInsert(d.thumb.dataset.pid, t.ri, t.before);
