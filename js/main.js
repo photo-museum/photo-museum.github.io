@@ -582,7 +582,7 @@ function closeGuestbook() {
 function renderGuestbook() {
   const list = $('#gb-list');
   list.innerHTML = '';
-  const entries = (museum.guestbook || []).slice().reverse();
+  const entries = (museum.guestbook || []).slice(); // 쓴 순서대로 (오래된 글이 위)
   if (!entries.length) list.innerHTML = '<p class="empty">아직 남긴 글이 없어요. 첫 글을 남겨 주세요.</p>';
   for (const e of entries) {
     const d = document.createElement('div');

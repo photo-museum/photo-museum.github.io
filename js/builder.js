@@ -472,7 +472,7 @@ function makeGuestNotes(entries, FONTS, light = false) {
   c.width = Math.round(CW * S); c.height = Math.round(CH * S);
   const g = c.getContext('2d');
   g.scale(S, S);
-  const list = entries.slice(-12).reverse();
+  const list = entries.slice(-12); // 쓴 순서대로: 오래된 글이 앞, 새 글이 뒤 (12개가 넘으면 최근 12개)
   if (!list.length) list.push({ name: '', text: '첫 방명록을 남겨 주세요 ✦', color: 0, placeholder: true });
   const cols = 6, cw = CW / cols, rh = CH / 2;
   if (GB === 'board') {
