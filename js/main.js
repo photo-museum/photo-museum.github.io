@@ -778,21 +778,24 @@ function route(x0, z0, x1, z1) {
 }
 const navPrev = $('#nav-prev'), navNext = $('#nav-next');
 let navTargets = { prev: null, next: null };
+// 지금 자리에서 이전·다음 자리 (누르는 순간 새로 계산 — 막 도착했을 때도 맞게)
+function navFromHere() {
+  const st = museumStops();
+  const px = controls.pos.x, pz = controls.pos.z;
+  let at = -1, best = 0.6, prev = null, next = null;
+  st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz); if (d < best) { best = d; at = i; } });
+  if (at >= 0) { prev = st[at - 1] || null; next = st[at + 1] || null; }
+  else {
+    next = st.find(s => s.spot.z < pz - 0.2) || null;
+    prev = [...st].reverse().find(s => s.spot.z > pz + 0.2) || null;
+  }
+  return { prev, next };
+}
 function updateNav() {
-  const show = museum && !homeOpen && !tour.on && controls.enabled && !map.isOpen && !sheetOpen() && !controls.auto
+  const show = museum && !homeOpen && controls.enabled && !map.isOpen && !sheetOpen() && !controls.auto
     && Math.hypot(controls.vel.x, controls.vel.z) < 0.15;
   let prev = null, next = null;
-  if (show) {
-    const st = museumStops();
-    const px = controls.pos.x, pz = controls.pos.z;
-    let at = -1, best = 0.6;
-    st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz); if (d < best) { best = d; at = i; } });
-    if (at >= 0) { prev = st[at - 1] || null; next = st[at + 1] || null; }
-    else {
-      next = st.find(s => s.spot.z < pz - 0.2) || null;
-      prev = [...st].reverse().find(s => s.spot.z > pz + 0.2) || null;
-    }
-  }
+  if (show) ({ prev, next } = navFromHere());
   navTargets = { prev, next };
   navPrev.classList.toggle('show', !!prev);
   navNext.classList.toggle('show', !!next);
@@ -807,8 +810,8 @@ function goStop(s) {
   navPrev.classList.remove('show'); navNext.classList.remove('show');
   hideHint();
 }
-navPrev.addEventListener('click', () => goStop(navTargets.prev));
-navNext.addEventListener('click', () => goStop(navTargets.next));
+navPrev.addEventListener('click', () => goStop(navFromHere().prev));
+navNext.addEventListener('click', () => goStop(navFromHere().next));
 
 const gotoBtn = $('#goto');
 let gotoTarget = null;
@@ -826,6 +829,26 @@ function updateGoto() {
   gotoTarget = t;
   gotoBtn.classList.toggle('show', !!t);
   if (t) gotoBtn.querySelector('span').textContent = `${t.kind} 앞으로`;
+}
+// 조이스틱(또는 걷기 키)을 놓았을 때 사진 쪽을 보고 가까이 있으면 → 그 사진 정면으로 스르륵 가서 선다.
+// (화면을 끌어 둘러보기만 할 때는 움직이지 않는다)
+const snap = { armed: false, rel: 0 };
+function snapTick() {
+  const input = Math.hypot(controls.joy.x, controls.joy.y) > 0.05 || controls.keys.size > 0;
+  if (input) { snap.armed = true; snap.rel = 0; return; }
+  if (!snap.armed) return;
+  const now = performance.now();
+  if (!snap.rel) { snap.rel = now; return; }
+  if (now - snap.rel < 250) return;
+  snap.armed = false;
+  if (tour.on || controls.auto || !controls.enabled || map.isOpen || sheetOpen() || homeOpen || controls.zoom > 1.05) return;
+  const t = bestSpot();
+  if (!t || t.kind !== '사진' || t.ang > 0.65 || t.d > 2.4) return;
+  let dy = t.spot.yaw - controls.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  if (t.d < 0.15 && Math.abs(dy) < 0.08) return; // 이미 그 자리
+  controls.walkPath(route(controls.pos.x, controls.pos.z, t.spot.x, t.spot.z), t.spot.yaw);
+  controls.pitchT = -0.02;
+  gotoBtn.classList.remove('show');
 }
 gotoBtn.addEventListener('click', () => {
   const t = gotoTarget;
@@ -1194,18 +1217,23 @@ document.addEventListener('pointerdown', e => {
 
 // ---------- 관람 모드 ----------
 // 사진 앞에 차례로 저절로 걸어가 잠시 멈춰 보여 준다. 화면을 만지거나 키를 누르면 멈춘다.
-const DWELL = { '사진': 7000, '안내벽': 5500, '전시 소개': 6000, '방명록': 4000 };
-const tour = { on: false, until: 0, last: -1 };
+// 관람 모드: 저절로 넘어가지 않는다. 화면의 ‹ 이전 / 다음 › (또는 ← → 키)로 한 사진씩. 조이스틱은 숨김.
+const tour = { on: false };
 function startTour() {
   if (!museum || homeOpen) return;
   closeStylePanel(); closeSheet();
   if (map.isOpen) map.close();
-  tour.on = true; tour.until = 0;
+  tour.on = true;
   document.body.classList.add('touring');
   controls.joy.x = controls.joy.y = 0;
+  controls.keys.clear();
   hideHint();
-  toast('관람을 시작해요 · 화면을 누르면 멈춰요', 2600);
-  tourStep(true);
+  toast('관람 모드 · 다 봤으면 다음 › 을 눌러요', 2800);
+  // 사진·안내벽 앞이 아니면 가장 가까운 다음 자리로 먼저 간다
+  const st = museumStops();
+  const px = controls.pos.x, pz = controls.pos.z;
+  const near = st.some(s => Math.hypot(s.spot.x - px, s.spot.z - pz) < 0.6);
+  if (!near) goStop(st.find(s => s.spot.z < pz - 0.2) || st[st.length - 1]);
 }
 function stopTour(msg) {
   if (!tour.on) return;
@@ -1214,33 +1242,19 @@ function stopTour(msg) {
   controls.auto = null;
   if (msg) toast(msg, 2200);
 }
-function tourStep(first) {
-  const st = museumStops();
-  const px = controls.pos.x, pz = controls.pos.z;
-  let at = -1, best = 0.6;
-  st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz); if (d < best) { best = d; at = i; } });
-  let next = at >= 0 ? (first ? null : st[at + 1]) : st.find(s => s.spot.z < pz - 0.2);
-  if (first && at >= 0) { tour.until = performance.now() + 1500; return; } // 이미 서 있는 자리부터
-  if (!next) { stopTour('관람을 마쳤어요. 방명록에 한마디 남겨 보세요'); return; }
-  controls.walkPath(route(px, pz, next.spot.x, next.spot.z), next.spot.yaw);
-  controls.pitchT = -0.02;
-  tour.kind = next.kind;
-  tour.until = 0;
-}
 function tourTick() {
   if (!tour.on) return;
-  if (homeOpen || map.isOpen || editor.classList.contains('open')) { stopTour(); return; }
-  if (controls.auto) return; // 걸어가는 중
-  const now = performance.now();
-  if (!tour.until) { tour.until = now + (DWELL[tour.kind] || 5000); return; }
-  if (now >= tour.until) tourStep(false);
+  if (homeOpen || editor.classList.contains('open')) stopTour();
 }
-// 사람이 직접 움직이면 관람을 멈춘다
-// (멈추려고 누른 그 한 번은 판·벽 누르기로 치지 않는다)
 let tourSwallow = 0;
-for (const ev of ['pointerdown', 'wheel']) renderer.domElement.addEventListener(ev, () => { if (tour.on) { stopTour('관람을 멈췄어요'); tourSwallow = performance.now(); } }, { capture: true });
-
-window.addEventListener('keydown', e => { if (tour.on && !e.metaKey && !e.ctrlKey) stopTour('관람을 멈췄어요'); }, { capture: true });
+// 관람 중 키보드: ← → 로 이전·다음 (걷기 키는 막는다)
+window.addEventListener('keydown', e => {
+  if (!tour.on || e.metaKey || e.ctrlKey) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); if (!controls.auto) goStop(navFromHere().next); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); if (!controls.auto) goStop(navFromHere().prev); }
+  else if (e.key === 'Escape') stopTour('관람을 멈췄어요');
+  else if (/^(Key[WASD]|Arrow(Up|Down)|Shift)/.test(e.code)) { e.preventDefault(); e.stopPropagation(); }
+}, { capture: true });
 $('#tour-stop').addEventListener('click', () => stopTour('관람을 멈췄어요'));
 
 // ---------- 안내 ----------
@@ -1616,7 +1630,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-f'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-h'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -2000,6 +2014,7 @@ function loop(t) {
   applyZoom();
   if ((loop.n = (loop.n || 0) + 1) % 8 === 0) { updateGoto(); updateNav(); }
   tourTick();
+  snapTick();
   if (loop.n % 20 === 0) updateHD();
   map.update();
   renderer.render(scene, camera);

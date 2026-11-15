@@ -759,7 +759,7 @@ body:has(#loading:not(.done)) #hud, body:has(#loading:not(.done)) #hint { visibi
   color: rgba(255,255,255,.85); background: rgba(20,20,24,.35); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); cursor: pointer; opacity: .55; transition: opacity .3s; }
 #tour-stop:hover { opacity: 1; }
 body.touring #tour-stop { display: block; }
-body.touring #tools, body.touring #minimap, body.touring .nav, body.touring #goto, body.touring #joy, body.touring #hint { opacity: 0 !important; pointer-events: none !important; }
+body.touring #tools, body.touring #minimap, body.touring #goto, body.touring #joy, body.touring #hint { opacity: 0 !important; pointer-events: none !important; }
 #tools button.tour { font-weight: 600; }
 
 /* 홈 위 버튼: 줄바꿈 없이 한 줄, 좁은 화면은 짧은 이름 */

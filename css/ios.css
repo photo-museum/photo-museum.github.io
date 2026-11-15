@@ -386,3 +386,11 @@ body.rotated.cap-tight #nav-next { bottom: 20px !important; right: 200px !import
 /* 방 사이 간격은 카드(사진 판) 기준으로만 — 아래 버튼 줄이 없어져서 촘촘하게 */
 :root body #map .mroom { align-items: center; }
 :root body #map .rooms .door.exit::before { content: ''; position: absolute; right: 100%; top: 19px; width: 23px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.5); }
+/* 관람 모드: ‹ 이전 / 다음 › 만 또렷하게 (자동으로 넘어가지 않음) */
+body.touring .nav.show { opacity: .85; }
+body.touring .nav small { opacity: 1; }
+/* 작은 지도: 왼쪽 위 홈·제목 알약과 같은 높이 (위 끝을 맞추고 높이도 비슷하게) */
+:root body #minimap { top: max(12px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); padding: 4px 6px; border-radius: 19px; }
+:root body.rotated #minimap { top: 12px; right: 14px; }
+:root body #minimap canvas { border-radius: 14px; }
+@media (pointer: coarse) { :root body #hint { top: 62px; } }
