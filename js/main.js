@@ -14,7 +14,7 @@ import { tutorialSteps, guestSteps } from './tutorial.js';
 import { initHome } from './home.js';
 import { initStylePanel } from './stylepanel.js';
 import { initBackup } from './backupui.js';
-import { buildExample, buildShowcase, SHOWCASE, buildDemoLibrary, addBigTestExhibition } from './seed.js';
+import { buildExample, buildShowcase, SHOWCASE, buildDemoLibrary, addBigTestExhibition, TESTING } from './seed.js';
 import { loadFonts, ensureFont, ensureGlyphs, isFontReady, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
 import {
   loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid, sweepImages, getImage, setRemoteImages,
@@ -1360,7 +1360,7 @@ async function start() {
     try { await buildDemoLibrary(library, t => { $('#loading').textContent = t; }); }
     catch (e) { console.error(e); $('#loading').textContent = '예시 사진을 불러오지 못했어요. 새로 고침해 주세요'; return; }
   }
-  if (!library.bigTest) {
+  if (TESTING && !library.bigTest) { // 사진 많은 시험용 전시실은 자동 시험에서만
     try { await addBigTestExhibition(library, t => { $('#loading').textContent = t; }); } catch (e) { console.warn('시험용 전시실을 만들지 못함', e); }
   }
   persist();

@@ -1,7 +1,12 @@
 // 처음 채워 넣는 전시실들: 사용법 예시(제주), 방 스타일 둘러보기, 예시 전시실 5개(js/demo.js), 사진 많은 시험용.
 // 화면을 건드리지 않고 데이터만 만든다 (진행 글은 say 로 알려 준다).
 import { EXAMPLE } from './example.js';
-import { DEMO, DEMO_VERSION } from './demo.js';
+import { DEMO as DEMO_ALL, DEMO_VERSION } from './demo.js';
+// 처음 온 사람에게는 예시 전시실 두 개만 보여 준다 (다섯 개 + 시험용은 너무 많다는 사용자 결정).
+// 자동 시험(주소가 pm.test)에서는 예전처럼 다섯 개와 시험용 전시실을 모두 만든다: 시험이 그 전시실들에 기대고 있다.
+export const TESTING = /pm\.test$/.test(location.hostname);
+const FIRST = ['제주, 바람이 머문 자리', '교토, 단풍이 지는 소리'];
+const DEMO = TESTING ? DEMO_ALL : FIRST.map(t => DEMO_ALL.find(d => d.title === t)).filter(Boolean);
 import { WALL_BY, CEIL_BY, FLOOR_BY } from './styles.js';
 import { putImage, clearImages, prepareImage, uid, newPhoto, newRoom, newExhibition, HD } from './store.js';
 
