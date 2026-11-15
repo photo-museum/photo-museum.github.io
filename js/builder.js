@@ -462,7 +462,10 @@ function makeExitText(museum, FONTS, light = false) {
 
 // 방명록에 남긴 글: 왼쪽 벽에 색색의 쪽지로 붙인다 (최근 12장)
 const NOTE_COLORS = ['#f6e7c8', '#f3d3d0', '#d6e6d2', '#d5e1ef', '#efe2f2', '#fff1a8'];
-function makeGuestNotes(entries, FONTS) {
+// 방명록 쪽지: 한 가지 색, 반듯하게 줄 맞춰 붙인다.
+// 모양(GB): card = 흰 카드 / cream = 크림 카드 / text = 종이 없이 벽에 글씨만 / board = 큰 판 한 장
+function makeGuestNotes(entries, FONTS, light = false) {
+  const GB = globalThis.__GB || 'old';
   const W = 5.2, H = 2.0, ppm = 260, S = 1.5;
   const CW = Math.round(W * ppm), CH = Math.round(H * ppm);
   const c = document.createElement('canvas');
@@ -472,25 +475,47 @@ function makeGuestNotes(entries, FONTS) {
   const list = entries.slice(-12).reverse();
   if (!list.length) list.push({ name: '', text: '첫 방명록을 남겨 주세요 ✦', color: 0, placeholder: true });
   const cols = 6, cw = CW / cols, rh = CH / 2;
+  if (GB === 'board') {
+    g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowBlur = 18; g.shadowOffsetY = 8;
+    g.fillStyle = '#f7f4ee'; g.fillRect(24, 24, CW - 48, CH - 48);
+    g.shadowColor = 'transparent';
+    g.strokeStyle = 'rgba(40,34,28,0.13)'; g.lineWidth = 1.5;
+    for (let k = 1; k < cols; k++) { g.beginPath(); g.moveTo(24 + (CW - 48) * k / cols, 52); g.lineTo(24 + (CW - 48) * k / cols, CH - 52); g.stroke(); }
+    g.beginPath(); g.moveTo(52, CH / 2); g.lineTo(CW - 52, CH / 2); g.stroke();
+  }
   list.forEach((e, i) => {
     const col = i % cols, row = Math.floor(i / cols);
     const x = col * cw + cw / 2, y = row * rh + rh / 2;
     let seed = 0; for (const ch of (e.id || String(i))) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
     g.save();
     g.translate(x, y);
-    g.rotate(((seed % 9) - 4) * 0.012);
     const w = cw * 0.8, h = rh * 0.8;
-    g.shadowColor = 'rgba(0,0,0,0.45)'; g.shadowBlur = 14; g.shadowOffsetY = 6;
-    g.fillStyle = e.placeholder ? 'rgba(246,231,200,0.5)' : NOTE_COLORS[(e.color || 0) % NOTE_COLORS.length];
-    g.fillRect(-w / 2, -h / 2, w, h);
-    g.shadowColor = 'transparent';
-    g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(-w * 0.18, -h / 2 - 8, w * 0.36, 16); // 마스킹 테이프
-    g.fillStyle = 'rgba(40,34,28,0.9)';
+    let ink = 'rgba(40,34,28,0.9)', ink2 = 'rgba(40,34,28,0.6)';
+    if (GB === 'old') {
+      g.rotate(((seed % 9) - 4) * 0.012);
+      g.shadowColor = 'rgba(0,0,0,0.45)'; g.shadowBlur = 14; g.shadowOffsetY = 6;
+      g.fillStyle = e.placeholder ? 'rgba(246,231,200,0.5)' : NOTE_COLORS[(e.color || 0) % NOTE_COLORS.length];
+      g.fillRect(-w / 2, -h / 2, w, h);
+      g.shadowColor = 'transparent';
+      g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(-w * 0.18, -h / 2 - 8, w * 0.36, 16); // 마스킹 테이프
+    } else if (GB === 'card' || GB === 'cream') {
+      g.shadowColor = 'rgba(0,0,0,0.35)'; g.shadowBlur = 12; g.shadowOffsetY = 5;
+      g.globalAlpha = e.placeholder ? 0.6 : 1;
+      g.fillStyle = GB === 'card' ? '#fbfaf7' : '#efe6d4';
+      g.fillRect(-w / 2, -h / 2, w, h);
+      g.globalAlpha = 1;
+      g.shadowColor = 'transparent';
+    } else if (GB === 'text') {
+      ink = light ? 'rgba(34,30,26,0.9)' : 'rgba(238,231,219,0.94)';
+      ink2 = light ? 'rgba(60,54,48,0.6)' : 'rgba(214,206,193,0.65)';
+      g.fillStyle = ink2; g.fillRect(-w / 2 + 14, -h / 2 + 4, 26, 2); // 글 위 짧은 줄
+    }
+    g.fillStyle = ink;
     g.textBaseline = 'top';
     g.font = FONTS.text(19);
     const lines = wrapLines(g, e.text || '', w - 28).slice(0, 6);
     lines.forEach((l, k) => g.fillText(l, -w / 2 + 14, -h / 2 + 18 + k * 26));
-    if (e.name) { g.font = FONTS.strong(17); g.fillStyle = 'rgba(40,34,28,0.7)'; g.textAlign = 'right'; g.fillText('— ' + e.name, w / 2 - 12, h / 2 - 28); g.textAlign = 'left'; }
+    if (e.name) { g.font = FONTS.strong(17); g.fillStyle = ink2; g.textAlign = 'right'; g.fillText('— ' + e.name, w / 2 - 12, h / 2 - 28); g.textAlign = 'left'; }
     g.restore();
   });
   const tex = new THREE.CanvasTexture(c);
@@ -624,7 +649,7 @@ export class MuseumScene {
     const x0 = -GB_DESK.w / 2, x1 = GB_DESK.w / 2, z0 = dz - GB_DESK.d / 2, z1 = dz + GB_DESK.d / 2;
     this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
     // 방명록 쪽지 (왼쪽 벽)
-    const notes = makeGuestNotes(this.museum.guestbook || [], F);
+    const notes = makeGuestNotes(this.museum.guestbook || [], F, !!themeOf(room).light);
     keep(notes.geometry, notes.material, notes.material.map);
     notes.rotation.y = Math.PI / 2;
     notes.position.set(-ROOM_W / 2 + 0.01, 1.75, (zStart + zEnd) / 2);
