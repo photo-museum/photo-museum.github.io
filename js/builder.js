@@ -1021,7 +1021,7 @@ export class MuseumScene {
     // 천장 조명 하나: 사진을 향해 기울어진 검은 통
     const sx = p.wall === 'L' ? -1 : 1;
     const fx = sx * (ROOM_W / 2 - TRACK_INSET);
-    const fy = 4.2 - 0.2;
+    const fy = ROOM_H - 0.2;
     const fixture = new THREE.Group();
     const body = new THREE.Mesh(R.fixtureGeo, R.fixtureMat);
     const stem = new THREE.Mesh(R.stemGeo, R.fixtureMat);

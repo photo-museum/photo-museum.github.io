@@ -3,7 +3,7 @@
 import { EYE_H } from './layout.js';
 
 const WALK = 1.9;       // m/s  미술관에서 걷는 속도
-const FAST = 3.4;       // 달리기: Shift, 또는 조이스틱을 끝까지 밀 때
+const FAST = 5.2;       // 달리기: Shift, 또는 조이스틱을 끝까지 밀 때 (3.4 → 5.2)
 const RUN_FROM = 0.8;   // 조이스틱을 이만큼 넘게 밀면 달리기 시작
 const ACCEL = 5.0;      // 속도가 목표에 다가가는 빠르기
 const LOOK_DAMP = 18;   // 시선이 따라가는 빠르기

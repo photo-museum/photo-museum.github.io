@@ -3,7 +3,7 @@
 // 방마다 문 들어서 정면에 안내벽(이름과 설명)이 홀로 서 있다.
 
 export const ROOM_W = 7.0;      // 방 폭 (m)
-export const ROOM_H = 4.2;      // 천장 높이
+export const ROOM_H = 5.2;      // 천장 높이 (4.2 → 5.2: 덜 답답하게)
 export const WALL_T = 0.3;      // 방 사이 벽 두께
 export const DOOR_W = 1.6;      // 문 폭
 export const DOOR_H = 2.75;     // 문 높이
