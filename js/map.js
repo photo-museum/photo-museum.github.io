@@ -1,7 +1,7 @@
 // 지도: 오른쪽 위 작은 지도 + 누르면 열리는 큰 평면도.
 // 평면도 방향: 방이 이어지는 쪽(-Z)이 오른쪽, 왼쪽 벽(x<0)이 위쪽. (앞을 보고 걸으면 오른쪽으로 간다)
 // 큰 지도에서 방을 누르면 그 방으로 이동, '편집'을 누르면 방을 끌어서 순서를 바꾼다.
-import { ROOM_W, DOOR_W, INTRO_S, INTRO_W } from './layout.js';
+import { ROOM_W, DOOR_W } from './layout.js';
 import { getImage } from './store.js';
 import { themeOf } from './builder.js';
 
@@ -38,9 +38,6 @@ function drawRoom(g, r, s, ox, oy, { current = false } = {}) {
   if (r.lobby) {
     const xe = x1 - g.lineWidth;
     g.moveTo(xe, oy - 3.2 * s); g.lineTo(xe, oy + 0.7 * s);
-  } else if (r.introX !== undefined) {
-    const xi = ox - (r.zStart - INTRO_S) * s;
-    g.moveTo(xi, oy + (r.introX - INTRO_W / 2) * s); g.lineTo(xi, oy + (r.introX + INTRO_W / 2) * s);
   }
   g.stroke();
 

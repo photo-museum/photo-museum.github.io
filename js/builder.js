@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import {
   ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, PANEL_GAP, layoutMuseum,
-  INTRO_S, INTRO_W, INTRO_H, INTRO_D,
+  INTRO_S, INTRO_W, INTRO_H, INTRO_CY,
 } from './layout.js';
 import { fontsFor } from './fonts.js';
 import {
@@ -322,30 +322,22 @@ function makeLobbyText(museum, FONTS, light = false) {
   );
 }
 
-// 방 안내벽 앞면: 벽 색 바탕 + 위에서 비추는 빛 + 글
+// 방 소개 글 (왼쪽 옆벽에 바로 적는다: 바탕은 투명)
 function introCanvas(room, light, FONTS, bg) {
   const ppm = 400;
   const c = document.createElement('canvas');
   const S = 1.6; // 글씨를 더 촘촘하게 그려 선명하게
-  const CW = Math.round(INTRO_W * ppm), CH = Math.round(INTRO_H * ppm);
+  // 글 크기는 예전 안내벽(4.4m 폭) 기준으로 짜여 있어, 그 비율로 그린 뒤 벽에는 INTRO_W 폭으로 붙인다
+  const CW = Math.round(4.4 * ppm), CH = Math.round(4.4 * INTRO_H / INTRO_W * ppm);
   c.width = Math.round(CW * S); c.height = Math.round(CH * S);
   const g = c.getContext('2d');
   g.scale(S, S);
-  g.fillStyle = bg || (light ? '#d6cfc3' : '#232220');
-  g.fillRect(0, 0, CW, CH);
-  const grd = g.createRadialGradient(CW / 2, -CH * 0.15, 0, CW / 2, -CH * 0.15, CH * 1.25);
-  grd.addColorStop(0, light ? 'rgba(255,246,230,0.5)' : 'rgba(255,226,180,0.22)');
-  grd.addColorStop(1, 'rgba(255,226,180,0)');
-  g.fillStyle = grd; g.fillRect(0, 0, CW, CH);
-  const sh = g.createLinearGradient(0, CH * 0.8, 0, CH);
-  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, light ? 'rgba(60,45,30,0.16)' : 'rgba(0,0,0,0.35)');
-  g.fillStyle = sh; g.fillRect(0, 0, CW, CH);
   g.textBaseline = 'top';
   const ink = light ? 'rgba(36,33,30,0.94)' : 'rgba(236,229,217,0.94)';
   const sub = light ? 'rgba(62,58,52,0.85)' : 'rgba(208,200,187,0.82)';
   const faint = light ? 'rgba(62,58,52,0.42)' : 'rgba(208,200,187,0.4)';
   // 글은 가운데로 모아 컴팩트하게 (폭의 60% 안에서 가운데 정렬, 위아래도 가운데)
-  const W = CW * 0.6, cx = CW / 2;
+  const W = CW * 0.82, cx = CW / 2;
   const no = `ROOM ${String(room.index + 1).padStart(2, '0')}`;
   const blocks = [{ text: no, font: FONTS.mark(34), color: sub, lh: 54, track: 10 }];
   if (room.name) blocks.push({ text: room.name, font: FONTS.title(96), color: ink, lh: 120, gap: 14, max: 2 });
@@ -367,12 +359,6 @@ function introCanvas(room, light, FONTS, bg) {
     y += 58;
   } else if (body.length) y += 30;
   if (body.length) drawTextBlock(g, cx, y, W, body);
-  // 관람 방향: 첫 사진이 걸린 쪽으로 작은 화살표 (아래 가운데)
-  const left = room.introOpen !== 1;
-  g.font = FONTS.text(32);
-  g.fillStyle = sub;
-  g.textBaseline = 'alphabetic';
-  g.fillText(left ? '←  관람 방향' : '관람 방향  →', cx, CH - CH * 0.07);
   g.textAlign = 'left';
   return c;
 }
@@ -876,28 +862,18 @@ export class MuseumScene {
       }
     }
 
-    // ----- 방 안내벽 (문 들어서 정면, 홀로 선 벽) -----
+    // ----- 방 소개 글: 들어서자마자 왼쪽 옆벽 (입구 가까운 쪽) -----
     if (!room.lobby && !room.exit) {
-      const light = !!T.light;
-      const tex = keep(new THREE.CanvasTexture(introCanvas(room, light, fontsFor(room.font), T.introBg)));
+      const tex = keep(new THREE.CanvasTexture(introCanvas(room, !!T.light, fontsFor(room.font))));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = MAX_ANISO;
-      const front = keep(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
-      // 뒷면·옆면은 그 방 벽과 같은 색·질감 (뒤에서 봐도 이질감 없게)
-      const back = keep(surfaceMaterial({ map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lightMap: R.black, ambient: T.wallAmb, lmIntensity: 0 }));
-      const side = back;
-      const geo = keep(new THREE.BoxGeometry(INTRO_W, INTRO_H, INTRO_D));
-      // 면 순서: +x, -x, +y, -y, +z(앞: 문 쪽), -z
-      const wall = new THREE.Mesh(geo, [side, side, side, side, front, back]);
-      const iz = zStart - INTRO_S;
-      wall.position.set(room.introX, INTRO_H / 2, iz);
-      wall.userData = { wallText: 'room', roomIndex: room.index };
-      both(wall);
-      this.pickables.push(wall);
-      // 안내벽은 홀로 선 벽 (양옆 모두 지나갈 수 있다). 나아갈 땐 관람 방향(왼쪽), 되돌아갈 땐 반대쪽(오른쪽)으로 다닌다.
-      const x0 = room.introX - INTRO_W / 2, x1 = room.introX + INTRO_W / 2;
-      const z0 = iz - INTRO_D / 2, z1 = iz + INTRO_D / 2;
-      this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
+      const mat = keep(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }));
+      const txt = new THREE.Mesh(keep(new THREE.PlaneGeometry(INTRO_W, INTRO_H)), mat);
+      txt.rotation.y = Math.PI / 2;
+      txt.position.set(-ROOM_W / 2 + 0.006, INTRO_CY, zStart - INTRO_S);
+      txt.userData = { wallText: 'room', roomIndex: room.index };
+      group.add(txt);
+      this.pickables.push(txt);
     }
 
     // ----- 사진 판 -----
@@ -1045,7 +1021,7 @@ export class MuseumScene {
   // 사진 원본은 지금 방 ±LOAD_NEAR 만 그래픽 메모리에 올리고, ±KEEP_FAR 보다 먼 방의 것은 내린다.
   // (사진이 많은 전시실도 휴대폰 메모리가 넘치지 않게)
   syncPhotos(i) {
-    const LOAD_NEAR = 2, KEEP_FAR = 4;
+    const LOAD_NEAR = 3, KEEP_FAR = 4; // 안내벽이 없어 문 너머 먼 방까지 보인다
     const need = new Set();
     for (const j of this.photoJobs) {
       const d = Math.abs(j.roomIndex - i);

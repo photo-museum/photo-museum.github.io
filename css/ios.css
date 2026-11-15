@@ -412,3 +412,11 @@ body.rotated #gb-cta { bottom: 24px; }
   :root body #editor textarea { height: 3.2em; min-height: 0; }
   :root body #editor .head { font-size: 15px; }
 }
+
+/* 편집 모드: 켜져 있는 동안 메뉴가 떠 있으니 작게 (화면을 덜 가리게) */
+body.editing #edit-menu button { height: 42px; min-width: 0; padding: 0 16px 0 8px; border-radius: 21px; gap: 8px; }
+body.editing #edit-menu button small { display: none; }
+body.editing #edit-menu button svg { width: 28px; height: 28px; }
+body.editing #edit-menu button b { font-size: 14px; }
+body.editing #edit-menu { gap: 6px; }
+body.touring #edit-menu, body.map-open #edit-menu { display: none; }

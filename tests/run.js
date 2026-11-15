@@ -81,8 +81,8 @@ const desktop = {
     const b = await h.pos();
     assert(Math.hypot(b.x - a.x, b.z - a.z) > 0.8, '바닥 클릭으로 이동');
     await h.pose(0, -1); await p.waitForTimeout(900);
-    for (let k = 0; k < 3; k++) { await p.click('#nav-next'); await p.waitForTimeout(300); await h.idle(); await p.waitForTimeout(500); }
-    assert(/ROOM 01/.test((await h.pos()).room), '다음 › 세 번이면 첫 방: ' + (await h.pos()).room);
+    for (let k = 0; k < 2; k++) { await p.click('#nav-next'); await p.waitForTimeout(300); await h.idle(); await p.waitForTimeout(500); }
+    assert(/ROOM 01/.test((await h.pos()).room), '다음 › 두 번이면 첫 방: ' + (await h.pos()).room);
     // 사진 감상 자리 1.6m 뒤에서 앞으로 밀다 놓기
     const sp = await p.evaluate(() => { const st = window.__pm.museumStops().find(s => s.kind === '사진').spot; const c = window.__pm.controls;
       c.setPose(st.x + Math.sin(st.yaw) * 1.6 + 0.3, st.z + Math.cos(st.yaw) * 1.6, st.yaw + 0.2); return st; });
@@ -91,11 +91,33 @@ const desktop = {
     const c = await h.pos();
     assert(Math.hypot(c.x - sp.x, c.z - sp.z) < 0.2, '놓으면 사진 앞에 섬');
   },
-  '안내벽: 나아갈 땐 왼쪽, 되돌아갈 땐 오른쪽 길': async (p, h) => {
+  '관람 중엔 눌러도 안 고쳐짐 · 편집을 켜면 사진 메뉴 (그 터치로 눌리지 않음)': async (p, h) => {
     await h.enter(0);
-    const r = await p.evaluate(() => { const L = window.__pm.museumScene.layout[0]; const a = L.zStart - 1, b = L.zStart - 9;
-      return [window.__pm.route(0, a, 0, b)[0].x, window.__pm.route(0, b, 0, a)[0].x]; });
-    assert(r[0] < 0 && r[1] > 0, '길 x ' + r);
+    await p.evaluate(() => { const s = window.__pm.museumStops().find(s => s.kind === '사진'); const c = window.__pm.controls; c.setPose(s.spot.x, s.spot.z, s.spot.yaw); c.pitch = c.pitchT = -0.02; });
+    await p.waitForTimeout(800);
+    const open = sel => p.evaluate(sel => document.querySelector(sel).classList.contains('open'), sel);
+    await p.mouse.click(550, 250); await p.waitForTimeout(500);
+    assert(!(await open('#sheet')) && !(await open('#editor')), '관람 중엔 메뉴가 안 떠야');
+    await p.click('#tools [data-act=edit]'); await p.waitForTimeout(400);
+    assert((await p.evaluate(() => window.__pm.editMode)) && (await open('#edit-menu')), '편집 모드');
+    const n = await p.evaluate(() => window.__pm.museum.rooms[0].photos.filter(x => x.imageId).length);
+    await p.mouse.click(550, 250); await p.waitForTimeout(150);
+    assert(await open('#sheet'), '편집 중엔 사진 메뉴');
+    await p.waitForTimeout(700);
+    assert(await open('#sheet'), '메뉴가 그 터치로 닫히지 않아야');
+    assert((await p.evaluate(() => window.__pm.museum.rooms[0].photos.filter(x => x.imageId).length)) === n, '사진 그대로');
+    await p.mouse.click(40, 300); await p.waitForTimeout(300);
+    await p.click('#tools [data-act=edit]'); await p.waitForTimeout(300);
+    assert(!(await p.evaluate(() => window.__pm.editMode)), '편집 끝');
+  },
+  '방 소개 글: 왼쪽 벽 · 안내벽 없음': async (p, h) => {
+    await h.enter(0);
+    const r = await p.evaluate(() => { const L = window.__pm.museumScene.layout[0]; const st = window.__pm.museumStops(); return { spot: L.introSpot, kinds: st.slice(0, 3).map(s => s.kind), z0: L.zStart, route: window.__pm.route(0, L.zStart - 1, 0, L.zStart - 9).length }; });
+    assert(r.spot.x < 0 && r.kinds[1] === '방 소개', JSON.stringify(r.kinds));
+    assert(r.route === 1, '방 안에서는 곧장: ' + r.route);
+    await h.pose(0, r.z0 - 1); await p.evaluate(() => { window.__pm.controls.joy.y = -1; }); await p.waitForTimeout(2000);
+    await p.evaluate(() => { window.__pm.controls.joy.y = 0; });
+    assert((await h.pos()).z < r.z0 - 6, '가운데로 곧장 지나감');
   },
   '관람 모드: 저절로 안 넘어가고 다음 › 로만': async (p, h) => {
     await h.enter(0);
@@ -194,8 +216,10 @@ const desktop = {
     assert(await p.evaluate(() => document.querySelector('#gb-cta').classList.contains('show')), '방명록 쓰기 버튼');
     const pt = await p.evaluate(() => { let v = null; window.__pm.museumScene.pickables.forEach(o => { if (o.userData.wallText === 'exit') { v = o.getWorldPosition(o.position.clone()); v.project(window.__pm.camera); } });
       return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; });
+    await p.evaluate(() => window.__pm.setEditMode(true, true));
     await p.mouse.click(pt.x, pt.y); await p.waitForTimeout(500);
     assert((await p.textContent('#ed-head')) === '출구 벽 글', '출구 글 창');
+    await p.evaluate(() => window.__pm.setEditMode(false));
     await p.fill('#ed-title', '와 주셔서 고마워요'); await p.click('#editor-save'); await p.waitForTimeout(700);
     assert((await p.evaluate(() => window.__pm.museum.exitTitle)) === '와 주셔서 고마워요', '저장');
     await p.click('#gb-cta'); await p.waitForTimeout(400);

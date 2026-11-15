@@ -1,6 +1,6 @@
 // 전시 데이터 → 공간 배치 계산 (순수 함수, three.js 몰라도 됨)
 // 맨 앞(z=0)에 입구 로비, 그 뒤로 방들이 -Z 방향으로 일렬로 이어진다. 방 사이에는 두께 WALL_T 인 벽과 문.
-// 방마다 문 들어서 정면에 안내벽(이름과 설명)이 홀로 서 있다.
+// 방마다 들어서자마자 왼쪽 옆벽(입구 가까운 쪽)에 방 이름과 설명이 적혀 있다. (홀로 선 안내벽은 없앰: 다음 방이 훤히 보이게)
 
 export const ROOM_W = 7.0;      // 방 폭 (m)
 export const ROOM_H = 5.2;      // 천장 높이 (4.2 → 5.2: 덜 답답하게)
@@ -18,9 +18,10 @@ export const MIN_LEN = 14;      // 최소 방 길이
 export const LOBBY_L = 6.5;     // 입구 로비 길이
 export const LOBBY_DOOR_X = 1.9; // 로비 정면 벽의 문 위치 (오른쪽). 왼쪽엔 전시 설명.
 export const EXIT_L = 7.0;      // 출구 방 길이
-export const INTRO_S = 3.7;     // 방 시작에서 안내벽까지 (문에서 3.4m 앞에서 읽는다)
-export const INTRO_W = 4.4, INTRO_H = 3.1, INTRO_D = 0.18; // 방 안내벽 크기 (넓게: 들어설 때 사진이 먼저 보이지 않게)
-const START_MARGIN = 6.4;       // 방 시작에서 첫 사진까지 (안내벽 뒤)
+export const INTRO_S = 2.3;     // 방 시작에서 방 소개 글 가운데까지 (왼쪽 옆벽을 따라)
+export const INTRO_W = 3.5, INTRO_H = 2.45, INTRO_CY = 1.8; // 방 소개 글 크기와 가운데 높이
+const START_MARGIN = 4.5;       // 방 시작에서 왼쪽 벽 첫 사진까지 (방 소개 글 다음)
+const START_R = 2.6;            // 오른쪽 벽은 글이 없으니 일찍 시작
 
 const PANEL_AREA = 1.92;
 const MAX_W = 2.6, MAX_H = 1.75;
@@ -57,7 +58,7 @@ export function layoutMuseum(museum) {
       return list.length ? s - EDGE_GAP : start;
     };
     const endL = place(walls.L, START_MARGIN);
-    const endR = place(walls.R, START_MARGIN + STAGGER);
+    const endR = place(walls.R, START_R);
     const content = Math.max(endL, walls.R.length ? endR : 0) + END_MARGIN;
     const length = Math.max(MIN_LEN, content);
     const shift = (length - content) / 2; // 방이 남으면 가운데로
@@ -86,9 +87,8 @@ export function layoutMuseum(museum) {
       doorIn: true,
       doorOut: true, // 마지막 방 뒤에는 출구 방
       doorInX: ri === 0 ? LOBBY_DOOR_X : 0, doorOutX: 0,
-      introX: 0, // 방 가운데
-      // 안내벽은 관람 방향(첫 사진이 걸린 쪽)으로만 지나가게, 반대쪽은 옆벽까지 막는다. -1 = 왼쪽(-x)으로 지나감
-      introOpen: (room.photos.length && panels.length && (panels.find(p => p.index === 0) || panels[0]).wall === 'R') ? 1 : -1,
+      // 방 소개 글: 왼쪽 옆벽, 감상 자리는 그 앞 2.7m
+      introSpot: { x: -ROOM_W / 2 + 2.7, z: zStart - INTRO_S, yaw: Math.PI / 2 },
     });
     z = zEnd - WALL_T;
   });

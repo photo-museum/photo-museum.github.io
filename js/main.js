@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MuseumScene, themeOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
 import { WALL_BY, CEIL_BY, FLOOR_BY } from './styles.js';
 import { WalkControls } from './controls.js';
-import { viewingSpot, INTRO_S, INTRO_W, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
+import { viewingSpot, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
 import { MuseumMap } from './map.js';
 import { Guide } from './guide.js';
 import { Music } from './music.js';
@@ -162,6 +162,7 @@ function rebuild(fallbackRi = 0, fresh = false) {
       controls.setPose(0, r.zStart - 1.4, 0);
     }
   }
+  wake(2000);
   // 지금 서 있는 방 근처 사진을 바로 붙인다 (이미 올라간 사진은 같은 프레임에)
   museumScene.setActiveRoom(museumScene.roomIndexAt(controls.pos.z));
   map.invalidate();
@@ -434,9 +435,9 @@ function editRoomText(ri) {
   const room = museum.rooms[ri];
   if (!room) return;
   openText({
-    head: `ROOM ${String(ri + 1).padStart(2, '0')} 안내벽`,
+    head: `ROOM ${String(ri + 1).padStart(2, '0')} 이름·소개`,
     title: { label: '방 이름', value: room.name, placeholder: '예) 바다, 아침 7시' },
-    body: { label: '방 설명 (문 들어서 정면 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
+    body: { label: '방 설명 (들어서자마자 왼쪽 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
     font: { value: room.font, inherit: museum.font || DEFAULT_FONT },
     onSave: (name, intro, font) => {
       pushUndo('방 이름·설명');
@@ -445,7 +446,7 @@ function editRoomText(ri) {
       if (font) room.font = font; else delete room.font;
       persist();
       rebuild();
-      toast('안내벽을 고쳤어요');
+      toast('방 소개 글을 고쳤어요');
     },
   });
 }
@@ -498,7 +499,7 @@ function addRoom(theme) {
   persist();
   rebuild();
   const n = museum.rooms.length;
-  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 그 방에서 편집 → 방 꾸미기로 벽·천장·바닥·조명을 고를 수 있어요`, 3800);
+  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 편집을 켜고 방 꾸미기에서 벽·천장·바닥·조명을 고를 수 있어요`, 3800);
 }
 
 // ---------- 방 꾸미기 창 (js/stylepanel.js) ----------
@@ -524,8 +525,7 @@ function bestSpot() {
   for (const r of L) {
     if (Math.abs(r.index - ri) > 1) continue;
     for (const p of r.panels) cands.push({ kind: p.photo.imageId ? '사진' : '빈 판', photoId: p.photo.id, cx: p.x, cz: p.z, spot: viewingSpot(p) });
-    const iz = r.zStart - INTRO_S;
-    cands.push({ kind: '안내벽', cx: r.introX, cz: iz, spot: { x: r.introX, z: iz + 3.4, yaw: 0 } });
+    cands.push({ kind: '방 소개', cx: -ROOM_W / 2, cz: r.introSpot.z, spot: r.introSpot });
   }
   if (ri < 0) cands.push({ kind: '전시 소개', cx: -1.25, cz: -LOBBY_L, spot: { x: -1.25, z: -LOBBY_L + 4.9, yaw: 0 } });
   if (L.exit && ri >= L.length) cands.push(...exitSpots(L.exit));
@@ -606,14 +606,13 @@ $('#gb-save').addEventListener('click', () => {
 gb.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') closeGuestbook(); });
 
 // ---------- 이전 / 다음 사진 (터치 한 번으로) ----------
-// 관람 순서: 전시 소개 → (방마다) 안내벽 → 걷는 순서대로 사진 → … → 방명록
+// 관람 순서: 전시 소개 → (방마다) 방 소개 글 → 걷는 순서대로 사진 → … → 방명록
 function museumStops() {
   const L = museumScene.layout;
   if (!L) return [];
   const out = [{ kind: '전시 소개', spot: { x: -1.25, z: -LOBBY_L + 4.9, yaw: 0 } }];
   for (const r of L) {
-    const iz = r.zStart - INTRO_S;
-    out.push({ kind: '안내벽', spot: { x: r.introX, z: iz + 3.4, yaw: 0 } });
+    out.push({ kind: '방 소개', spot: r.introSpot });
     for (const p of [...r.panels].sort((a, b) => a.sAlong - b.sAlong)) {
       if (p.photo.imageId) out.push({ kind: '사진', photoId: p.photo.id, spot: viewingSpot(p) });
     }
@@ -621,7 +620,7 @@ function museumStops() {
   if (L.exit) out.push({ kind: '방명록', spot: { x: 0, z: L.exit.zStart - 3.4 + 1.5, yaw: 0 } });
   return out;
 }
-// 지금 자리에서 목표까지: 안내벽은 옆으로 돌아가고, 방 사이는 문을 지나간다
+// 지금 자리에서 목표까지: 방 사이는 문을 지나간다
 function route(x0, z0, x1, z1) {
   const L = museumScene.layout;
   const fwd = z1 < z0;
@@ -633,16 +632,6 @@ function route(x0, z0, x1, z1) {
     if (!cross((d.zA + zB) / 2)) continue;
     const a = { x: d.x, z: d.zA + 0.5 }, b = { x: d.x, z: zB - 0.5 };
     ev.push({ z: (d.zA + zB) / 2, pts: fwd ? [a, b] : [b, a] });
-  }
-  const gx = INTRO_W / 2 + (ROOM_W / 2 - INTRO_W / 2) / 2; // 안내벽 옆 통로 가운데
-  for (const r of L) {
-    const iz = r.zStart - INTRO_S;
-    if (!cross(iz)) continue;
-    // 사람이 여럿이어도 엉키지 않게: 나아갈 땐 관람 방향 쪽(왼쪽), 되돌아갈 땐 반대쪽(오른쪽)으로 돈다
-    const along = r.introOpen === 1 ? 1 : -1;
-    const side = fwd ? along : -along;
-    const a = { x: side * gx, z: iz + 0.7 }, b = { x: side * gx, z: iz - 0.7 };
-    ev.push({ z: iz, pts: fwd ? [a, b] : [b, a] });
   }
   ev.sort((a, b) => (fwd ? b.z - a.z : a.z - b.z));
   return [...ev.flatMap(e => e.pts), { x: x1, z: z1 }];
@@ -933,7 +922,8 @@ controls.longPressTarget = (sx, sy) => {
   const z = Math.min(0.55 / Math.max(0.01, wN), 0.8 / Math.max(0.01, hN));
   return { x: (c.x + 1) / 2, y: (1 - c.y) / 2, zoom: Math.max(2, z) };
 };
-controls.onTap = (sx, sy) => {
+controls.onTap = (sx, sy) => { tapping = true; try { onSceneTap(sx, sy); } finally { tapping = false; } };
+function onSceneTap(sx, sy) {
   if (performance.now() - tourSwallow < 1500) { tourSwallow = 0; return; } // 관람을 멈추려고 누른 것
   if (sheetOpen()) { closeSheet(); return; }
   const [cx, cy] = toContent(sx, sy);
@@ -944,10 +934,11 @@ controls.onTap = (sx, sy) => {
   const hit = hits[0];
   if (!hit) return;
   const ud = hit.object.userData;
+  if (ud.guestbook) { openGuestbook(); return; }
+  if (!editMode) { tapToWalk(ud, hit); return; } // 관람 중: 고치지 않고 그쪽으로 걸어간다
   if (ud.wallText === 'room') { editRoomText(ud.roomIndex); return; }
   if (ud.wallText === 'exhibition') { editExhibitionText(museum); return; }
   if (ud.wallText === 'exit') { editExitText(); return; }
-  if (ud.guestbook) { openGuestbook(); return; }
   if (ud.exitDoor) {
     openSheet([
       { title: true, label: '전시실을 나가 홈으로 갈까요?' },
@@ -957,14 +948,39 @@ controls.onTap = (sx, sy) => {
     return;
   }
   if (ud.floor) { walkToFloor(hit.point); return; }
-  if (!ud.photoId) return;
+  if (!ud.photoId) { walkToFloor(hit.point); return; } // 그냥 벽
   const t = { roomIndex: ud.roomIndex, photoId: ud.photoId, panel: ud.panel };
   if (ud.label) { openEditor(t); return; }
   openPanelSheet(t);
-};
+}
+
+// 관람 중 누르기: 사진 → 그 사진 앞, 벽 글 → 글 앞, 그 밖(바닥·벽) → 그 자리
+let emptyHintAt = 0;
+function tapToWalk(ud, hit) {
+  const go = sp => { controls.joy.x = controls.joy.y = 0; controls.walkPath(route(controls.pos.x, controls.pos.z, sp.x, sp.z), sp.yaw); controls.pitchT = -0.02; hideHint(); };
+  if (ud.exitDoor) {
+    openSheet([
+      { title: true, label: '전시실을 나가 홈으로 갈까요?' },
+      { label: '홈으로 나가기', fn: () => openHome() },
+      { label: '더 둘러보기', quiet: true },
+    ]);
+    return;
+  }
+  const L = museumScene.layout;
+  if (ud.photoId) {
+    const panel = panelFor(ud.photoId) || ud.panel;
+    if (panel) go(viewingSpot(panel));
+    if (ud.empty && performance.now() - emptyHintAt > 6000) { emptyHintAt = performance.now(); toast('사진을 걸려면 오른쪽 아래 편집을 눌러요', 2600); }
+    return;
+  }
+  if (ud.wallText === 'room' && L[ud.roomIndex]) { go(L[ud.roomIndex].introSpot); return; }
+  if (ud.wallText === 'exhibition') { go({ x: -1.25, z: -LOBBY_L + 4.9, yaw: 0 }); return; }
+  if (ud.wallText === 'exit' && L.exit) { go({ x: -0.6, z: L.exit.zStart - 2.2, yaw: 0 }); return; }
+  walkToFloor(hit.point);
+}
 
 // ---------- 바닥을 톡 누르면 그리로 걸어가기 ----------
-// 길은 ‹ › 와 같아서 안내벽·문은 알아서 돌아간다. 누른 자리에 작은 원이 잠깐 뜬다.
+// 길은 ‹ › 와 같아서 문은 알아서 지나간다. 누른 자리에 작은 원이 잠깐 뜬다.
 const tapRing = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.22, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
 tapRing.rotation.x = -Math.PI / 2;
 tapRing.renderOrder = 20;
@@ -1040,7 +1056,9 @@ function rotatePhoto(t) {
 const sheet = $('#sheet');
 let sheetItems = [];
 function sheetOpen() { return sheet.classList.contains('open'); }
+let sheetAt = 0, tapping = false;
 function openSheet(items, kind = '') {
+  sheetAt = tapping ? performance.now() : 0;
   sheetItems = items;
   sheet.innerHTML = '';
   sheet.className = kind;
@@ -1076,6 +1094,8 @@ document.addEventListener('pointerdown', e => {
 }, true);
 function closeSheet() { sheet.classList.remove('open'); document.body.classList.remove('sheet-open'); }
 sheet.addEventListener('click', e => {
+  // 메뉴가 손가락 바로 밑에 뜨기 때문에, 메뉴를 띄운 그 터치가 메뉴 버튼까지 누르는 일이 있었다 → 뜬 직후의 누르기는 무시
+  if (performance.now() - sheetAt < 450) return;
   const b = e.target.closest('button');
   if (!b) return;
   const it = sheetItems[+b.dataset.i];
@@ -1087,33 +1107,34 @@ sheet.addEventListener('click', e => {
 // 오른쪽 아래: [관람] [편집]. 편집을 누르면 할 일들이 위로 차르륵 올라온다.
 const editMenu = $('#edit-menu');
 const editBtn = $('#tools [data-act=edit]');
-function setEditMenu(open) {
-  editMenu.classList.toggle('open', open);
-  editBtn.classList.toggle('on', open);
-  editBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+// 편집 모드: 켜져 있을 때만 사진·벽 글을 눌러 고칠 수 있다 (평소엔 누르면 그쪽으로 걸어갈 뿐).
+// 켜져 있는 동안 '사진 넣기 · 방 꾸미기 · 방 만들기'가 버튼 위에 떠 있다. 편집을 다시 누르면 꺼진다.
+let editMode = false;
+function setEditMode(on, quiet) {
+  if (on === editMode) return;
+  editMode = on;
+  document.body.classList.toggle('editing', on);
+  editMenu.classList.toggle('open', on);
+  editBtn.classList.toggle('on', on);
+  editBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  editBtn.querySelector('span').textContent = on ? '편집 끝' : '편집';
+  if (on && !quiet) toast('편집 모드 · 사진이나 벽의 글을 누르면 고칠 수 있어요', 2800);
 }
 $('#tools').addEventListener('click', e => {
   const act = e.target.closest('button')?.dataset.act;
   if (!act) return;
   hideHint();
-  if (act === 'tour') { setEditMenu(false); startTour(); }
-  if (act === 'edit') setEditMenu(!editMenu.classList.contains('open'));
+  if (act === 'tour') { setEditMode(false); startTour(); }
+  if (act === 'edit') setEditMode(!editMode);
 });
 editMenu.addEventListener('click', e => {
   const act = e.target.closest('button')?.dataset.act;
   if (!act) return;
-  setEditMenu(false);
   const ri = currentRoomIndex();
   if (act === 'photos') pickPhotos({ roomIndex: ri });
   if (act === 'room') addRoom('white');
   if (act === 'theme') openStylePanel(Math.max(-1, Math.min(museum.rooms.length, museumScene.roomIndexAt(controls.pos.z))));
-  if (act === 'map') { map.open(); map.setZoom(0.5); toast('방을 꾹 눌러 끌면 순서가 바뀌어요 · 벌리면 사진이 보여요', 3200); }
-  if (act === 'text') editRoomText(ri);
 });
-// 메뉴 밖을 누르면 닫힌다
-document.addEventListener('pointerdown', e => {
-  if (editMenu.classList.contains('open') && !e.target.closest('#edit-menu, #tools')) setEditMenu(false);
-}, true);
 
 // ---------- 관람 모드 ----------
 // 사진 앞에 차례로 저절로 걸어가 잠시 멈춰 보여 준다. 화면을 만지거나 키를 누르면 멈춘다.
@@ -1129,7 +1150,7 @@ function startTour() {
   controls.keys.clear();
   hideHint();
   toast('관람 모드 · 다 봤으면 다음 › 을 눌러요', 2800);
-  // 사진·안내벽 앞이 아니면 가장 가까운 다음 자리로 먼저 간다
+  // 사진·방 소개 글 앞이 아니면 가장 가까운 다음 자리로 먼저 간다
   const st = museumStops();
   const px = controls.pos.x, pz = controls.pos.z;
   const near = st.some(s => Math.hypot(s.spot.x - px, s.spot.z - pz) < 0.6);
@@ -1168,8 +1189,8 @@ function toast(msg, ms = 1800) {
 }
 
 $('#hint').innerHTML = isTouch
-  ? '<b>바닥을 톡</b> 누르면 그리로 걸어가요. 조이스틱으로 걸어도 되고, 화면을 끌어 둘러보세요.<br>꾹 누르거나 두 손가락을 벌리면 잠깐 확대돼요. 판을 누르면 사진을 걸 수 있어요.'
-  : '<b>바닥을 클릭</b>하면 그리로 걸어가요. <b>W A S D</b>·방향키로도 걷고, 마우스를 끌어 둘러보세요. <b>Shift</b> 빠르게.<br><b>휠</b>이나 <b>오른쪽 버튼</b>으로 잠깐 확대. 판을 누르면 사진을 걸 수 있어요.';
+  ? '<b>바닥을 톡</b> 누르면 그리로 걸어가요. 조이스틱으로 걸어도 되고, 화면을 끌어 둘러보세요.<br>꾹 누르거나 두 손가락을 벌리면 잠깐 확대돼요. 사진을 걸거나 고치려면 <b>편집</b>을 켜요.'
+  : '<b>바닥을 클릭</b>하면 그리로 걸어가요. <b>W A S D</b>·방향키로도 걷고, 마우스를 끌어 둘러보세요. <b>Shift</b> 빠르게.<br><b>휠</b>이나 <b>오른쪽 버튼</b>으로 잠깐 확대. 사진을 걸거나 고치려면 <b>편집</b>을 켜요.';
 let hintHidden = false;
 function hideHint() {
   if (hintHidden) return;
@@ -1222,6 +1243,7 @@ function openHome() {
   if (map.isOpen) map.close();
   closeSheet();
   homeOpen = true;
+  setEditMode(false);
   music.stop();
   controls.enabled = false;
   controls.joy.x = controls.joy.y = 0;
@@ -1375,7 +1397,7 @@ async function startTutorial() {
 }
 
 // 가만히 보고 있을 때는 휴대폰 화면 원래 해상도(최대 3배)로 또렷하게, 움직이는 동안은 2배로 부드럽게
-const DPR_MOVE = Math.min(window.devicePixelRatio || 1, 2), DPR_STILL = Math.min(window.devicePixelRatio || 1, 3);
+const DPR_MOVE = Math.min(window.devicePixelRatio || 1, isTouch ? 1.5 : 2), DPR_STILL = Math.min(window.devicePixelRatio || 1, isTouch ? 2.5 : 3);
 const sharp = { key: '', since: 0, on: false };
 function sharpTick() {
   if (DPR_STILL <= DPR_MOVE) return;
@@ -1400,6 +1422,7 @@ function loop(t) {
   const ri = museumScene.roomIndexAt(controls.pos.z);
   if (ri !== currentRoom) {
     currentRoom = ri;
+    wake(1500);
     museumScene.setActiveRoom(ri);
     const nm = museum.rooms[ri]?.name;
     $('#room').textContent = ri < 0 ? '입구' : ri >= museum.rooms.length ? '출구'
@@ -1416,9 +1439,17 @@ function loop(t) {
   map.update();
   tapRingTick();
   sharpTick();
-  renderer.render(scene, camera);
+  // 바뀐 것이 있을 때만 다시 그린다 (가만히 사진을 보는 동안 휴대폰이 뜨거워지지 않게).
+  // 사진이 뒤늦게 올라오는 것 등은 0.3초마다 한 번 그려 따라잡는다.
+  const rk = `${controls.pos.x.toFixed(3)},${controls.pos.z.toFixed(3)},${controls.yaw.toFixed(4)},${controls.pitch.toFixed(4)},${controls.zoom.toFixed(3)},${controls.zoomAt.x.toFixed(3)},${controls.zoomAt.y.toFixed(3)},${sharp.on},${viewW},${viewH}`;
+  if (rk !== loop.rk || t < renderUntil || tapRingT || t - loop.rt > 300) {
+    loop.rk = rk; loop.rt = t;
+    renderer.render(scene, camera);
+  }
   requestAnimationFrame(loop);
 }
+let renderUntil = 0;
+function wake(ms = 1200) { renderUntil = Math.max(renderUntil, performance.now() + ms); }
 
 resize();
 start().catch(e => {
@@ -1427,4 +1458,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { music, get tour() { return tour; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { music, setEditMode, get editMode() { return editMode; }, get tour() { return tour; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
