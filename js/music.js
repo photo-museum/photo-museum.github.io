@@ -52,7 +52,7 @@ export class Music {
     } else this.audio.volume = to;
   }
   _load() {
-    const want = new URL(this.track.file, location.href).href;
+    const want = new URL(this.track.file, document.baseURI).href;
     if (this.audio.src !== want) this.audio.src = want;
   }
   // 전시실에 들어갈 때 (누른 순간 안에서 부른다)

@@ -2,8 +2,7 @@
 import * as THREE from 'three';
 import {
   ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, PANEL_GAP, layoutMuseum,
-  INTRO_S, INTRO_W, INTRO_H, INTRO_CY,
-} from './layout.js';
+  INTRO_S, INTRO_W, INTRO_H, INTRO_CY, panelNormal } from './layout.js';
 import { fontsFor } from './fonts.js';
 import {
   concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture,
@@ -702,6 +701,15 @@ export class MuseumScene {
     for (const p of room.panels) {
       const s = p.sAlong;
       const lit = T.spots || T.wash;
+      if (p.wall === 'F' || p.wall === 'B') {
+        // R2: 문 옆 벽(앞·뒤 벽)에 걸린 사진. 벽 빛은 endLight 에서, 여기서는 바닥 띠만
+        if (!T.spots) continue;
+        const { g, ppm, c } = lmF;
+        const fx = (p.x + ROOM_W / 2) * ppm, fy = p.wall === 'F' ? c.height : c.height - Lr * ppm;
+        glow(g, fx, fy, (p.w / 2 + 1.4) * ppm, 1.9 * ppm, [[0, 0.62], [0.5, 0.32], [1, 0]]);
+        glow(g, fx, fy, (p.w / 2 + 0.7) * ppm, 0.6 * ppm, [[0, 0.5], [1, 0]]);
+        continue;
+      }
       if (p.wall === 'L') paintWallSpot(lmL, s, p, lit);    // 왼벽: u = 방 시작부터 거리
       else paintWallSpot(lmR, Lr - s, p, lit);              // 오른벽: u 가 반대 방향
       if (!T.spots) continue;
@@ -765,10 +773,13 @@ export class MuseumScene {
 
     // ----- 끝벽 (앞/뒤). 문이 있으면 문 주변이 은은히 밝다 -----
     // u0: 빛 가운데 (벽 모양 좌표, 0 ~ ROOM_W)
-    const endLight = (withDoor, u0 = ROOM_W / 2, lobbyText = false) => {
-      const L = lightCanvas(ROOM_W, ROOM_H, 32);
+    const endLight = (withDoor, u0 = ROOM_W / 2, lobbyText = false, side = '') => {
+      const hung = side ? room.panels.filter(p => p.wall === side) : [];
+      const L = lightCanvas(ROOM_W, ROOM_H, hung.length ? 64 : 32);
       const { g, ppm, c } = L;
       if (T.skyGlow) paintSkyGlow(L);
+      // R2: 이 벽에 걸린 사진의 스포트 (F 벽은 돌아 있어 u = W/2 - x, B 벽은 u = W/2 + x)
+      for (const p of hung) paintWallSpot(L, side === 'F' ? ROOM_W / 2 - p.x : ROOM_W / 2 + p.x, p, T.spots || T.wash);
       if (lobbyText === 'exit') {
         // 인사 글과 방명록 쪽을 비추는 빛
         glow(g, ROOM_W / 2 * ppm, c.height - 2.9 * ppm, 3.4 * ppm, 2.4 * ppm, [[0, 0.6], [0.55, 0.28], [1, 0]]);
@@ -784,20 +795,20 @@ export class MuseumScene {
       if (T.ao) paintEdgeAO(L, { l: [0.9, 0.4], r: [0.9, 0.4], b: [0.55, 0.42], t: [0.45, 0.3] });
       return keep(lightTex(c));
     };
-    const endMat = (withDoor, u0, lobbyText) => keep(surfaceMaterial({
-      map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lightMap: endLight(withDoor, u0, lobbyText), lmSize: [ROOM_W, ROOM_H],
+    const endMat = (withDoor, u0, lobbyText, side) => keep(surfaceMaterial({
+      map: texOf(R, T.wallMap), tile: T.wallTile || [3, 3], tint: T.wallTint, lightMap: endLight(withDoor, u0, lobbyText, side), lmSize: [ROOM_W, ROOM_H],
       ambient: T.endAmb, lmIntensity: T.endLm, lightColor: T.lightColor || SPOT_COLOR,
     }));
     // 시작 벽 (방 안쪽을 보며 +z 쪽에 있음 → -z 를 향해야 함)
     // 시작 벽은 180도 돌아 있어서 벽 모양 좌표 u = ROOM_W/2 - x
     const inU = ROOM_W / 2 - (room.doorInX || 0), outU = ROOM_W / 2 + (room.doorOutX || 0);
     const startGeo = keep(endWallGeometry(room.doorIn, inU));
-    const startWall = new THREE.Mesh(startGeo, endMat(room.doorIn, inU));
+    const startWall = new THREE.Mesh(startGeo, endMat(room.doorIn, inU, false, 'F'));
     startWall.rotation.y = Math.PI; startWall.position.set(ROOM_W / 2, 0, zStart);
     both(startWall);
     // 끝 벽 (+z 를 향함)
     const endGeo = keep(endWallGeometry(room.doorOut, outU));
-    const endWall = new THREE.Mesh(endGeo, endMat(room.doorOut, outU, room.exit ? 'exit' : !!room.lobby));
+    const endWall = new THREE.Mesh(endGeo, endMat(room.doorOut, outU, room.exit ? 'exit' : !!room.lobby, 'B'));
     endWall.position.set(-ROOM_W / 2, 0, zEnd);
     both(endWall);
     if (room.exit) this.buildExit(room, group, both, keep);
@@ -894,8 +905,13 @@ export class MuseumScene {
       tex.anisotropy = MAX_ANISO;
       const mat = keep(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }));
       const txt = new THREE.Mesh(keep(new THREE.PlaneGeometry(INTRO_W, INTRO_H)), mat);
-      txt.rotation.y = Math.PI / 2;
-      txt.position.set(-ROOM_W / 2 + 0.006, INTRO_CY, zStart - INTRO_S);
+      if (room.introWall === 'R') { // R2: 문 바로 옆 오른쪽 벽
+        txt.rotation.y = -Math.PI / 2;
+        txt.position.set(ROOM_W / 2 - 0.006, INTRO_CY, room.introSpot.z);
+      } else {
+        txt.rotation.y = Math.PI / 2;
+        txt.position.set(-ROOM_W / 2 + 0.006, INTRO_CY, zStart - INTRO_S);
+      }
       txt.userData = { wallText: 'room', roomIndex: room.index };
       group.add(txt);
       this.pickables.push(txt);
@@ -972,17 +988,18 @@ export class MuseumScene {
 
     if (!T.spots) return;
     // 천장 조명 하나: 사진을 향해 기울어진 검은 통
-    const sx = p.wall === 'L' ? -1 : 1;
-    const fx = sx * (ROOM_W / 2 - TRACK_INSET);
+    // 벽에서 방 안쪽으로 TRACK_INSET 만큼 들어온 자리 (어느 벽이든)
+    const [nx, nz] = panelNormal(p);
+    const fx = p.x + nx * (TRACK_INSET - PANEL_GAP), fz = p.z + nz * (TRACK_INSET - PANEL_GAP);
     const fy = ROOM_H - 0.2;
     const fixture = new THREE.Group();
     const body = new THREE.Mesh(R.fixtureGeo, R.fixtureMat);
     const stem = new THREE.Mesh(R.stemGeo, R.fixtureMat);
-    stem.position.set(fx, fy + 0.12, p.z);
+    stem.position.set(fx, fy + 0.12, fz);
     fixture.add(stem);
-    body.position.set(fx, fy, p.z);
+    body.position.set(fx, fy, fz);
     // 통의 아래(-y) 방향이 사진 중심을 보도록
-    const dir = new THREE.Vector3(p.x - fx, p.y - fy, 0).normalize();
+    const dir = new THREE.Vector3(p.x - fx, p.y - fy, p.z - fz).normalize();
     body.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
     fixture.add(body);
     group.add(fixture);

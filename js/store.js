@@ -12,7 +12,7 @@
 // }
 // imageId 가 가리키는 사진(축소본)은 'images' 저장소에 바이트로 따로 둔다.
 
-const DB_NAME = 'photo-museum';
+const DB_NAME = globalThis.PM_R2 ? 'photo-museum-r2' : 'photo-museum'; // 시험판(R2)은 저장 공간을 따로 쓴다: 본 앱의 전시실을 건드리지 않게
 const DB_VERSION = 1;
 const OLD_KEY = 'museum';     // version 1: 전시실 하나
 const LIB_KEY = 'library';

@@ -48,6 +48,12 @@ function drawRoom(g, r, s, ox, oy, { current = false } = {}) {
     const y = oy + p.x * s + (p.wall === 'L' ? 1 : -1) * g.lineWidth * 0.6;
     g.strokeStyle = p.photo.imageId ? '#ffd9a0' : (C.light ? 'rgba(90,85,78,0.45)' : 'rgba(220,215,205,0.35)');
     g.beginPath();
+    if (p.wall === 'F' || p.wall === 'B') { // R2: 문 옆 벽에 걸린 사진 (지도에서는 세로 줄)
+      const x = ox - p.z * s + (p.wall === 'F' ? 1 : -1) * g.lineWidth * 0.6;
+      g.moveTo(x, oy + (p.x - p.w / 2) * s); g.lineTo(x, oy + (p.x + p.w / 2) * s);
+      g.stroke();
+      continue;
+    }
     g.moveTo(ox - (p.z + p.w / 2) * s, y);
     g.lineTo(ox - (p.z - p.w / 2) * s, y);
     g.stroke();

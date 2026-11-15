@@ -3,7 +3,7 @@ import { MuseumScene, themeOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
 import { WALL_BY, CEIL_BY, FLOOR_BY, PRESETS, simplifyStyles, presetOf, styleOf } from './styles.js';
 import { initCaptions } from './captions.js';
 import { WalkControls } from './controls.js';
-import { viewingSpot, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
+import { viewingSpot, LOBBY_L, ROOM_W, WALL_T, R2 } from './layout.js';
 import { MuseumMap } from './map.js';
 import { Guide } from './guide.js';
 import { Music } from './music.js';
@@ -540,7 +540,7 @@ function bestSpot() {
   for (const r of L) {
     if (Math.abs(r.index - ri) > 1) continue;
     for (const p of r.panels) cands.push({ kind: p.photo.imageId ? '사진' : '빈 판', photoId: p.photo.id, cx: p.x, cz: p.z, spot: viewingSpot(p) });
-    cands.push({ kind: '방 소개', cx: -ROOM_W / 2, cz: r.introSpot.z, spot: r.introSpot });
+    cands.push({ kind: '방 소개', cx: r.introWall === 'R' ? ROOM_W / 2 : -ROOM_W / 2, cz: r.introSpot.z, spot: r.introSpot });
   }
   if (ri < 0) cands.push({ kind: '전시 소개', cx: -1.25, cz: -LOBBY_L, spot: { x: -1.25, z: -LOBBY_L + 4.9, yaw: 0 } });
   if (L.exit && ri >= L.length) cands.push(...exitSpots(L.exit));
@@ -628,7 +628,7 @@ function museumStops() {
   const out = [{ kind: '전시 소개', spot: { x: -1.25, z: -LOBBY_L + 4.9, yaw: 0 } }];
   for (const r of L) {
     out.push({ kind: '방 소개', spot: r.introSpot });
-    for (const p of [...r.panels].sort((a, b) => a.sAlong - b.sAlong)) {
+    for (const p of [...r.panels].sort((a, b) => (R2 ? a.index - b.index : a.sAlong - b.sAlong))) {
       if (p.photo.imageId) out.push({ kind: '사진', photoId: p.photo.id, spot: viewingSpot(p) });
     }
   }
@@ -848,7 +848,7 @@ function goToRoom(ri) {
   const r = museumScene.layout[ri];
   if (!r) return;
   controls.auto = null;
-  controls.setPose(0, r.zStart - 1.4, 0);
+  controls.setPose(r.doorInX || 0, r.zStart - 1.4, 0);
   toast(`ROOM ${String(ri + 1).padStart(2, '0')}`);
 }
 
