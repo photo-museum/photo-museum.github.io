@@ -285,8 +285,9 @@ export function initHome(a) {
     const hb = btn.getBoundingClientRect(), home = $('#home');
     // 돌린 화면에서도 맞게: 버튼 위치를 무대 좌표로
     const [cx, cy] = toContent(hb.left + hb.width / 2, hb.top + hb.height / 2);
-    const [bx, by] = toContent(hb.right, hb.bottom);
-    homePop.style.top = (Math.max(cy, by) + 10) + 'px';
+    // 버튼의 아래 끝: 화면을 돌려 쓰는 휴대폰에서는 어느 모서리가 '아래'인지 달라서, 네 모서리 가운데 가장 아래를 쓴다
+    const by = Math.max(...[[hb.left, hb.top], [hb.right, hb.top], [hb.left, hb.bottom], [hb.right, hb.bottom]].map(([x, y]) => toContent(x, y)[1]));
+    homePop.style.top = (by + 16) + 'px'; // 꼬리(8px)가 버튼에 닿지 않게 띄운다
     homePop.style.right = Math.max(12, (a.viewW - cx) - 34) + 'px'; // 꼬리 가운데(오른쪽에서 34px)가 버튼 가운데에 오게
     homePop.classList.add('show');
     clearTimeout(homePopTimer);
