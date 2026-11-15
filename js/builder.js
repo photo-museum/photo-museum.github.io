@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import {
   ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, PANEL_GAP, layoutMuseum,
-  INTRO_S, INTRO_W, INTRO_H, INTRO_CY, panelNormal } from './layout.js';
+  INTRO_S, INTRO_W, INTRO_H, INTRO_CY, panelNormal, R2 } from './layout.js';
 import { fontsFor } from './fonts.js';
 import {
   concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture,
@@ -761,7 +761,9 @@ export class MuseumScene {
       // 빛나는 천장도 벽 쪽으로 갈수록 조금 어둡게
       const lmC = lightCanvas(ROOM_W, Lr, 16);
       paintEdgeAO(lmC, { l: [1.8, 0.55], r: [1.8, 0.55], t: [1.4, 0.4], b: [1.4, 0.4] });
-      const C = T.ceilSpec || { map: 'wallWhite', tile: [3, 3], tint: 0xf2ece2, amb: 0.82 };
+      let C = T.ceilSpec || { map: 'wallWhite', tile: [3, 3], tint: 0xf2ece2, amb: 0.82 };
+      // R2: 천장 무늬의 레일 선은 조명 줄과 어긋난다 → 무늬는 민무늬로 하고, 레일은 조명 바로 위에 진짜로 단다 (아래 '조명 레일')
+      if (R2 && C.map === 'track') C = { ...C, map: 'wallWhite', tile: [3, 3] };
       ceilMat = keep(surfaceMaterial({ map: texOf(R, C.map), tile: C.tile, tint: C.tint, lightMap: keep(lightTex(lmC.c)), lmSize: [ROOM_W, Lr], ambient: C.amb, lmIntensity: 0 }));
     }
     const ceil = new THREE.Mesh(ceilGeo, ceilMat);
@@ -889,8 +891,25 @@ export class MuseumScene {
 
     // ----- 조명 레일 (스포트라이트 방만) -----
     if (T.spots && T.rails !== false && !room.lobby && !room.exit) {
+      if (R2) {
+        // 조명이 달린 줄마다 그 바로 위로 레일 한 줄: 문 옆 두 벽은 가로(x)로, 안쪽 벽은 세로(z)로
+        const inset = TRACK_INSET + PANEL_D / 2;
+        const has = w => room.panels.some(p => p.wall === w);
+        const railX = keep(new THREE.BoxGeometry(ROOM_W - 0.6, 0.035, 0.035));
+        for (const [w, z] of [['F', zStart - inset], ['B', zEnd + inset]]) {
+          if (!has(w)) continue;
+          const rail = new THREE.Mesh(railX, R.fixtureMat);
+          rail.position.set(0, ROOM_H - 0.03, z);
+          group.add(rail);
+        }
+        if (has('L')) {
+          const rail = new THREE.Mesh(keep(new THREE.BoxGeometry(0.035, 0.035, Lr - 0.6)), R.fixtureMat);
+          rail.position.set(-ROOM_W / 2 + inset, ROOM_H - 0.03, zMid);
+          group.add(rail);
+        }
+      }
       const railGeo = keep(new THREE.BoxGeometry(0.035, 0.035, Lr - 0.6));
-      for (const sx of [-1, 1]) {
+      for (const sx of R2 ? [] : [-1, 1]) {
         const rail = new THREE.Mesh(railGeo, R.fixtureMat);
         rail.position.set(sx * (ROOM_W / 2 - TRACK_INSET), ROOM_H - 0.03, zMid);
         group.add(rail);
