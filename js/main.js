@@ -1211,6 +1211,10 @@ function openSheet(items, kind = '') {
   sheet.classList.add('open');
   document.body.classList.add('sheet-open');
 }
+// 홈에서 메뉴(보관·⋯ 등)가 떠 있을 때 메뉴 밖을 누르면 닫힌다 (다른 아이콘을 누르면 닫히고 그 아이콘이 바로 동작)
+document.addEventListener('pointerdown', e => {
+  if (homeOpen && sheetOpen() && !e.target.closest('#sheet')) closeSheet();
+}, true);
 function closeSheet() { sheet.classList.remove('open'); document.body.classList.remove('sheet-open'); }
 sheet.addEventListener('click', e => {
   const b = e.target.closest('button');
@@ -1675,7 +1679,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-m'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-n'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }

@@ -418,3 +418,7 @@ body.cap-tight #nav-next, body.rotated.cap-tight #nav-next { right: 150px !impor
 #gb-cta.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 body.home-open #gb-cta, body.map-open #gb-cta { display: none; }
 body.rotated #gb-cta { bottom: 24px; }
+/* 홈 버튼 줄 작게: [이어보기] [처음부터 보기] [⋯] */
+:root body #home .fcap .acts { gap: 6px; margin-top: 10px; }
+:root body #home .fcap .go, :root body #home .fcap .go2 { height: 36px; padding: 0 16px; border-radius: 18px; font-size: 13.5px; }
+:root body #home .fcap .more { width: 36px; height: 36px; border-radius: 18px; font-size: 15px; }
