@@ -49,11 +49,12 @@ export class WalkControls {
 
   // 여러 점을 차례로 지나 마지막 점에서 yaw 를 바라본다 (벽을 돌아가거나 문을 지날 때).
   // 길이 길면 조금 빨리 걷는다.
-  walkPath(points, yaw) {
+  // strafe: 가는 쪽으로 고개를 돌리지 않는다. 바라볼 쪽(yaw)으로만 천천히 돌며 몸만 옮긴다 (옆 사진으로 넘어갈 때 어지럽지 않게)
+  walkPath(points, yaw, strafe = false) {
     let len = 0, px = this.pos.x, pz = this.pos.z;
     for (const p of points) { len += Math.hypot(p.x - px, p.z - pz); px = p.x; pz = p.z; }
     const last = points[points.length - 1];
-    this.auto = { path: points.slice(), x: last.x, z: last.z, yawEnd: yaw, speed: Math.min(7, Math.max(3.4, len / 1.8)) }; // 눌러서 갈 때는 성큼성큼 (걷기 1.9 → 3.4~7)
+    this.auto = { path: points.slice(), x: last.x, z: last.z, yawEnd: yaw, strafe, speed: Math.min(7, Math.max(3.4, len / 1.8)) }; // 눌러서 갈 때는 성큼성큼 (걷기 1.9 → 3.4~7)
   }
 
   _bind() {
@@ -301,7 +302,7 @@ export class WalkControls {
       // 가는 동안은 가는 쪽을, 마지막 구간에서는 바라볼 쪽을 본다
       let want = a.yawEnd;
       const remain = lastLeg ? d : 99;
-      if (remain > 1.2 && d > 0.3) want = Math.atan2(-dx, -dz);
+      if (!a.strafe && remain > 1.2 && d > 0.3) want = Math.atan2(-dx, -dz);
       let dy = want - this.yawT; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       this.yawT += dy * Math.min(1, dt * 3.2);
       this.pitchT += (-0.02 - this.pitchT) * Math.min(1, dt * 3);

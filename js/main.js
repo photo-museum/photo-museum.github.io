@@ -694,7 +694,9 @@ function goStop(s) {
   hideHint();
   if (R2) { // 시험판 R2: 벽을 따라 한 방향으로만 도니 어지럽지 않다 → 깜빡이지 않고 걸어간다 (걷는 중에 또 누르면 그다음 자리로)
     navPending = null;
-    controls.walkPath(route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z), s.spot.yaw);
+    // 같은 방 안에서는 고개를 돌리지 않고 몸만 옆으로 옮긴다. 문을 지나 다른 방으로 갈 때만 가는 쪽을 본다
+    const path = route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z);
+    controls.walkPath(path, s.spot.yaw, path.length === 1);
     controls.pitchT = -0.02;
     return;
   }
