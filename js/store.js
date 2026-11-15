@@ -94,7 +94,16 @@ export async function putImage(id, blob) {
   return tx('images', 'readwrite', s => s.put({ buf, type: blob.type || 'image/jpeg' }, id));
 }
 
+// 초대받은 손님: 사진은 이 기기에 없고, 공유 서버의 공개 주소(base + 사진 id)에서 받는다. 더 선명한 원본(@hd)은 올리지 않는다.
+let remoteBase = null;
+const remoteCache = new Map();
+export function setRemoteImages(base) { remoteBase = base; }
 export async function getImage(id) {
+  if (remoteBase) {
+    if (id.endsWith('@hd')) return null;
+    if (!remoteCache.has(id)) remoteCache.set(id, fetch(remoteBase + encodeURIComponent(id)).then(r => (r.ok ? r.blob() : null)).catch(() => { remoteCache.delete(id); return null; }));
+    return remoteCache.get(id);
+  }
   const rec = await tx('images', 'readonly', s => s.get(id));
   if (!rec) return null;
   if (rec.buf) return new Blob([rec.buf], { type: rec.type || 'image/jpeg' });

@@ -74,7 +74,7 @@ export class Music {
       if (err && err.name === 'NotAllowedError') { this.playing = false; this.onChange(); }
       else if ((this._skips = (this._skips || 0) + 1) < TRACKS.length) this.next();
     });
-    if (p && p.then) p.then(() => { this._skips = 0; });
+    if (p && p.then) p.then(() => { this._skips = 0; }, () => {}); // 실패는 위에서 다룬다 (여기서 또 터지지 않게)
   }
   // 홈으로 나올 때·다른 앱으로 갈 때
   stop() {

@@ -537,3 +537,9 @@ body.map-open #edit-menu { display: none; }
 /* 지도: 고른 사진 지우기 */
 :root body #map .bar .seldel { display: none; }
 :root body #map.selecting .bar .seldel { display: block; font-size: 13px; padding: 0 14px; background: var(--accent); border-color: transparent; color: #fff; }
+
+/* 초대받은 손님: 홈·되돌리기·방명록 지우기는 없다. 지도와 편집은 눌리지 않는다 (편집은 눌렀을 때 안내만) */
+body.guest #home, body.guest #undo, body.guest #guestbook .del { display: none !important; }
+body.guest #minimap { pointer-events: none; }
+body.guest #tools [data-act=edit] { opacity: .45; }
+:root body #sheet .title { overflow-wrap: anywhere; }

@@ -181,6 +181,7 @@ export function initHome(a) {
       ...(hasResume(ex) ? [{ label: '이어보기', fn: () => enterExhibition(ex) }] : []),
       { label: '처음부터 보기', fn: () => enterExhibition(ex, true) },
       { label: '대표 사진 바꾸기', fn: () => openCoverPicker(ex) },
+      ...(ex.showcase || ex.tutorial ? [] : [{ label: a.isShared(ex) ? '초대 링크 · 공유 관리' : '공유하기 (초대 링크 만들기)', fn: () => a.shareMenu(ex) }]),
       { label: '이 전시실 보내기 (파일)', fn: () => exportExhibitions([ex], `${(ex.title || '전시').replace(/[\\/:*?"<>|]/g, '')}.pmbk`, false) },
       { label: '이름·설명 고치기', fn: () => editExhibitionText(ex) },
       { label: '전시실 지우기', danger: true, fn: () => confirmDeleteExhibition(ex) },

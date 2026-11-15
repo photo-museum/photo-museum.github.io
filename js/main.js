@@ -3,20 +3,21 @@ import { MuseumScene, themeOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
 import { WALL_BY, CEIL_BY, FLOOR_BY, PRESETS, simplifyStyles, presetOf, styleOf } from './styles.js';
 import { initCaptions } from './captions.js';
 import { MuseumMap2 } from './map2.js';
+import { initShare, fetchShared, postGuest, GUEST_ID } from './share.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, LOBBY_L, ROOM_W, WALL_T, R2, guestDesk } from './layout.js';
 import { MuseumMap } from './map.js';
 import { Guide } from './guide.js';
 import { Music } from './music.js';
 import { DEMO_VERSION } from './demo.js';
-import { tutorialSteps } from './tutorial.js';
+import { tutorialSteps, guestSteps } from './tutorial.js';
 import { initHome } from './home.js';
 import { initStylePanel } from './stylepanel.js';
 import { initBackup } from './backupui.js';
 import { buildExample, buildShowcase, SHOWCASE, buildDemoLibrary, addBigTestExhibition } from './seed.js';
 import { loadFonts, ensureFont, ensureGlyphs, isFontReady, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
 import {
-  loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid, sweepImages,
+  loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid, sweepImages, getImage, setRemoteImages,
   newPhoto, newRoom, EMPTY_ASPECT, HD,
 } from './store.js';
 
@@ -173,7 +174,9 @@ function rebuild(fallbackRi = 0, fresh = false) {
   return layout;
 }
 
-function persist() { return saveLibrary(library); }
+// 저장. 공유 중인 전시실은 조금 뒤 저절로 서버에 올라간다. 초대받은 손님은 이 기기에 아무것도 저장하지 않는다.
+function persist() { if (GUEST_ID) return Promise.resolve(); const p = saveLibrary(library); share.syncSoon(); return p; }
+const share = initShare({ get library() { return library; }, getImage, saveLibrary: () => saveLibrary(library) });
 
 // ---------- 되돌리기 ----------
 // 바꾸기 직전의 전체 목록을 기억해 두었다가 되돌린다 (최근 30번).
@@ -591,7 +594,12 @@ function renderGuestbook() {
     const m = document.createElement('span');
     m.textContent = (e.name ? e.name + ' · ' : '') + new Date(e.at).toLocaleDateString('ko-KR');
     const x = document.createElement('button'); x.className = 'del'; x.textContent = '지우기'; x.setAttribute('aria-label', '이 글 지우기');
-    x.addEventListener('click', () => {
+    x.addEventListener('click', async () => {
+      if (share.isShared(museum)) { // 공유 중: 서버의 글을 지운다 (되돌리기 없음)
+        try { await share.deleteGuest(museum, e.id); } catch (err) { toast('지우지 못했어요\n인터넷 연결을 확인해 주세요', 3000); return; }
+        saveLibrary(library); rebuild(); renderGuestbook();
+        return;
+      }
       pushUndo('방명록 글 지우기');
       museum.guestbook = museum.guestbook.filter(g => g.id !== e.id);
       persist(); rebuild(); renderGuestbook();
@@ -610,9 +618,23 @@ function renderGuestbook() {
   });
 }
 $('#gb-close').addEventListener('click', closeGuestbook);
-$('#gb-save').addEventListener('click', () => {
+$('#gb-save').addEventListener('click', async () => {
   const text = $('#gb-text').value.trim();
   if (!text) { $('#gb-text').focus(); return; }
+  if (GUEST_ID || share.isShared(museum)) { // 공유 중: 서버에 남긴다 → 모든 방문자가 본다
+    const btn = $('#gb-save');
+    btn.disabled = true;
+    try {
+      const name = $('#gb-name').value.trim();
+      if (GUEST_ID) museum.guestbook = await postGuest(GUEST_ID, name, text); else await share.addGuest(museum, name, text);
+      $('#gb-text').value = '';
+      if (!GUEST_ID) saveLibrary(library);
+      rebuild(); renderGuestbook();
+      toast('방명록에 남겼어요 ✦');
+    } catch (err) { toast('남기지 못했어요\n인터넷 연결을 확인해 주세요', 3200); }
+    finally { btn.disabled = false; }
+    return;
+  }
   museum.guestbook = museum.guestbook || [];
   museum.guestbook.push({ id: uid('g_'), name: $('#gb-name').value.trim(), text, at: Date.now(), color: gbColor });
   $('#gb-text').value = '';
@@ -745,6 +767,15 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 // 출구 문 앞까지 걸어가면 (누르지 않아도) 홈으로 갈지 묻는다. 물러났다 다시 와야 또 묻는다.
 function askLeave() {
+  if (GUEST_ID) { // 손님: 돌아갈 홈이 없다
+    openSheet([
+      { title: true, label: '관람해 주셔서 고맙습니다' },
+      { label: '처음부터 다시 보기', fn: () => { controls.auto = null; controls.setPose(0, -1.0, 0); exitAsked = false; } },
+      { label: '나도 전시실 만들기', fn: () => { location.href = location.pathname; } },
+      { label: '더 둘러보기', quiet: true },
+    ]);
+    return;
+  }
   openSheet([
     { title: true, label: '전시실을 나가 홈으로 갈까요?' },
     { label: '홈으로 나가기', fn: () => openHome() },
@@ -1256,6 +1287,7 @@ const editBtn = $('#tools [data-act=edit]');
 let editMode = false;
 const tourBtn = $('#tools [data-act=tour]');
 function setEditMode(on, quiet) {
+  if (GUEST_ID && on) { toast('초대받은 분은 고칠 수 없어요\n방명록은 출구에서 쓸 수 있어요', 2800); return; }
   const changed = on !== editMode;
   editMode = on;
   document.body.classList.toggle('editing', on);
@@ -1318,6 +1350,7 @@ function hintTick() {
 
 // ---------- 시작 ----------
 async function start() {
+  if (GUEST_ID) return startGuest();
   requestPersistence();
   // 홈 화면 앱·오프라인용 (http(s) 에서만)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !/pm\.test$/.test(location.hostname)) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
@@ -1345,6 +1378,7 @@ let homeOpen = false;
 const home = $('#home');
 
 function openHome() {
+  if (GUEST_ID) { askLeave(); return; }
   if (guide.active) guide.stop();
   savePose();
   if (map.isOpen) map.close();
@@ -1400,6 +1434,72 @@ function enterExhibition(ex, fresh = false) {
   else { controls.setPose(0, -1.0, 0); controls.pitchT = controls.pitch = 0.04; }
   museumScene.setActiveRoom(museumScene.roomIndexAt(controls.pos.z));
   $('#ex-title').textContent = ex.title;
+  // 공유 중인 내 전시실: 손님들이 남긴 방명록을 받아 온다
+  if (!GUEST_ID && share.isShared(ex)) share.pullGuestbook(ex).then(changed => { if (changed && museum === ex && !homeOpen) { saveLibrary(library); rebuild(); } });
+}
+
+// ---------- 공유 (js/share.js) ----------
+function shareMenu(ex) {
+  const title = ex.title || '이름 없는 전시';
+  if (!share.isShared(ex)) {
+    const n = exhibitionStats(ex).photos;
+    openSheet([
+      { title: true, label: `'${title}' 전시실을 공유할까요?\n사진 ${n}장을 인터넷에 올려요. 링크를 아는 사람은 누구나 볼 수 있고, 고칠 수는 없어요.` },
+      { label: '공유하고 초대 링크 만들기', fn: async () => {
+        toast('공유 준비 중…', 8000);
+        try { await share.share(ex, t => toast(t, 8000)); toast('공유했어요', 1500); renderHome(); shareMenu(ex); }
+        catch (e) { console.error(e); toast('공유하지 못했어요\n인터넷 연결을 확인해 주세요', 4000); }
+      } },
+      { label: '취소', quiet: true },
+    ]);
+    return;
+  }
+  const link = share.linkOf(ex);
+  openSheet([
+    { title: true, label: `초대 링크 · 고치면 저절로 반영돼요\n${link}` },
+    { label: '링크 복사', fn: () => navigator.clipboard.writeText(link).then(() => toast('초대 링크를 복사했어요')).catch(() => { toast('복사하지 못했어요\n위의 링크를 길게 눌러 복사해 주세요', 3500); shareMenu(ex); }) },
+    ...(navigator.share ? [{ label: '링크 보내기', fn: () => navigator.share({ title, text: `'${title}' 전시에 초대합니다`, url: link }).catch(() => {}) }] : []),
+    { label: '공유 끊기', danger: true, fn: () => openSheet([
+      { title: true, label: '공유를 끊을까요?\n초대 링크가 더는 열리지 않고, 올린 사진과 손님 방명록이 서버에서 지워져요. 이 기기의 전시실은 그대로예요.' },
+      { label: '공유 끊기', danger: true, fn: async () => {
+        const keep = (ex.guestbook || []).slice(); // 방명록은 이 기기에 남긴다
+        try { await share.unshare(ex); ex.guestbook = keep; saveLibrary(library); toast('공유를 끊었어요'); renderHome(); }
+        catch (e) { console.error(e); toast('끊지 못했어요\n인터넷 연결을 확인해 주세요', 4000); }
+      } },
+      { label: '취소', quiet: true },
+    ]) },
+    { label: '닫기', quiet: true },
+  ]);
+}
+
+// 초대 링크로 들어온 손님: 이 기기의 전시실은 건드리지 않고, 서버에서 받은 전시실 하나만 보여 준다
+async function startGuest() {
+  document.body.classList.add('guest');
+  const say = t => { $('#loading').textContent = t; };
+  await loadFonts();
+  let r = null;
+  try { r = await fetchShared(GUEST_ID); }
+  catch (e) { say('전시를 불러오지 못했어요. 인터넷 연결을 확인하고 새로 고침해 주세요'); return; }
+  if (!r || !r.data || !Array.isArray(r.data.rooms)) { say('전시를 찾을 수 없어요. 공유가 끝났을 수 있어요'); return; }
+  setRemoteImages(r.photos);
+  const ex = r.data;
+  ex.guestbook = r.guestbook || [];
+  delete ex.showcase; delete ex.tutorial; delete ex.share;
+  library = { version: 2, exhibitions: [ex], guest: true };
+  document.title = `${ex.title || '전시'} · My Museum`;
+  enterExhibition(ex, true);
+  $('#loading').classList.add('done');
+  setTimeout(() => $('#loading').remove(), 1200);
+  requestAnimationFrame(loop);
+  // 처음 온 손님에게는 사용법을 따라 할지 묻는다 (같은 전시에 다시 오면 묻지 않는다)
+  let seen = false;
+  try { seen = !!localStorage.getItem('pm-guest-seen-' + GUEST_ID); localStorage.setItem('pm-guest-seen-' + GUEST_ID, '1'); } catch (e) {}
+  if (seen) return;
+  openSheet([
+    { title: true, label: `'${ex.title || '전시'}' 전시에 오신 것을 환영해요\n처음이라면 둘러보는 법을 잠깐 따라 해 보세요` },
+    { label: '사용법 따라 하기', fn: () => { music.start(); guide.start(guestSteps({ isTouch, controls, museumScene, map, editor, stylePanel, gb, stats, sheetOpen, get editMode() { return editMode; } }, ex.title || '이')); } },
+    { label: '건너뛰고 바로 보기', quiet: true, fn: () => music.start() },
+  ]);
 }
 
 // ---------- 보관 · 백업 (js/backupui.js) ----------
@@ -1412,6 +1512,7 @@ const { renderHome, makeSwipe, exhibitionStats } = initHome({
   get library() { return library; }, get homeOpen() { return homeOpen; }, get viewW() { return viewW; },
   controls, editor, toast, persist, openSheet, sheetOpen, toContent, hasResume, enterExhibition, editExhibitionText,
   exportExhibitions, confirmDeleteExhibition, openBackupMenu, startTutorial, startShowcase,
+  shareMenu, isShared: ex => share.isShared(ex),
 });
 makeSwipe($('#style-panel .items'));
 
@@ -1422,6 +1523,7 @@ function confirmDeleteExhibition(ex) {
     { label: '전시실 지우기', danger: true, fn: () => {
       for (const r of ex.rooms) forgetPhotos(r.photos);
       pushUndo('전시실 지우기');
+      if (share.isShared(ex)) share.unshare(ex).catch(e => console.warn('공유 끊기 실패', e)); // 지운 전시실은 초대 링크도 닫는다
       library.exhibitions = library.exhibitions.filter(x => x !== ex);
       if (museum === ex) museum = null;
       try { localStorage.removeItem('pm-pose-' + ex.id); } catch (e) {}
@@ -1434,6 +1536,7 @@ function confirmDeleteExhibition(ex) {
 }
 
 $('#home-btn').addEventListener('click', () => openHome());
+if (GUEST_ID) map.open = () => {}; // 손님은 전시장 지도를 열 수 없다
 
 // ---------- 튜토리얼: 제주 여행 예시 전시실 + 따라 하기 안내 ----------
 const guide = new Guide({
@@ -1569,4 +1672,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { music, openCaptions, applyPreset, setEditMode, get editMode() { return editMode; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { music, openCaptions, share, shareMenu, persist, applyPreset, setEditMode, get editMode() { return editMode; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };

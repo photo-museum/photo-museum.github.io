@@ -24,29 +24,29 @@ export function tutorialSteps(a) {
     // 인사
     { title: '어서 오세요', text: '<b>제주 여행 예시 전시실</b>에서 사용법을 익혀요.<br>정면 벽에 전시 이름과 설명이 적혀 있어요.' },
     // 걷기 ①: 톡 눌러서
-    { title: '톡 눌러 걷기', text: '<b>바닥을 톡</b> 누르면 그 자리로 걸어가요.',
+    { guest: true, title: '톡 눌러 걷기', text: '<b>바닥을 톡</b> 누르면 그 자리로 걸어가요.',
       task: '<b>바닥을 톡</b> 눌러 걸어가 보세요',
       done: () => { if (a.controls.auto) seen.tap = true; return seen.tap && !a.controls.auto; }, onEnter: () => { seen.tap = false; } },
     // 걷기 ②: 조이스틱(키보드)으로
-    { title: a.isTouch ? '조이스틱으로 걷기' : '키보드로 걷기', text: `${walk}로도 걸을 수 있어요.<br>${look} 주위를 둘러봐요.`,
+    { guest: true, title: a.isTouch ? '조이스틱으로 걷기' : '키보드로 걷기', text: `${walk}로도 걸을 수 있어요.<br>${look} 주위를 둘러봐요.`,
       task: `${walk}으로 오른쪽 문을 지나 <b>ROOM 01</b>로 들어가 보세요`,
       done: () => {
         if (Math.hypot(a.controls.joy.x, a.controls.joy.y) > 0.2 || a.controls.keys.size) seen.joy = (seen.joy || 0) + 1;
         return seen.joy > 30 && a.museumScene.roomIndexAt(a.controls.pos.z) >= 0;
       }, onEnter: () => { seen.joy = 0; } },
     // 사진 보기
-    { title: '방 소개와 사진', text: R2 ? '문 바로 옆 <b>오른쪽 벽</b>에 방 이름과 소개가 있어요.<br>사진은 벽을 따라 <b>한 바퀴</b> 도는 순서로 걸려 있어요.<br><b>사진을 톡</b> 누르면 그 앞으로 걸어가요.'
+    { guest: true, title: '방 소개와 사진', text: R2 ? '문 바로 옆 <b>오른쪽 벽</b>에 방 이름과 소개가 있어요.<br>사진은 벽을 따라 <b>한 바퀴</b> 도는 순서로 걸려 있어요.<br><b>사진을 톡</b> 누르면 그 앞으로 걸어가요.'
         : '들어서면 <b>왼쪽 벽</b>에 방 이름과 소개가 있어요.<br><b>사진을 톡</b> 누르면 그 앞으로 걸어가요.',
       task: '아무 사진이나 <b>톡</b> 눌러 그 앞에 서 보세요', done: () => atViewingSpot(a) },
     // 이전 · 다음 버튼
-    { title: '이전 · 다음', text: '화면 양옆의 <b>‹ 이전</b> / <b>다음 ›</b>을 누르면 다음 사진 앞으로 가요.<br>연달아 눌러 빨리 넘길 수 있어요.',
+    { guest: true, title: '이전 · 다음', text: '화면 양옆의 <b>‹ 이전</b> / <b>다음 ›</b>을 누르면 다음 사진 앞으로 가요.<br>연달아 눌러 빨리 넘길 수 있어요.',
       task: '<b>다음 ›</b>을 두 번 눌러 보세요', done: () => (a.stats.navs || 0) >= seen.nav0 + 2, onEnter: () => { seen.nav0 = a.stats.navs || 0; } },
     // 확대 ①: 꾹 누르기 (컴퓨터: 오른쪽 버튼). 어느 방법으로 확대했는지는 controls.zoomBy
-    { title: '확대 ① 꾹 누르기', text: a.isTouch ? '화면을 <b>꾹 누르면</b> 그곳이 커져요.<br>손을 떼면 원래대로 돌아와요.' : '<b>오른쪽 버튼</b>을 누르고 있으면 그곳이 커져요.<br>놓으면 원래대로 돌아와요.',
+    { guest: true, title: '확대 ① 꾹 누르기', text: a.isTouch ? '화면을 <b>꾹 누르면</b> 그곳이 커져요.<br>손을 떼면 원래대로 돌아와요.' : '<b>오른쪽 버튼</b>을 누르고 있으면 그곳이 커져요.<br>놓으면 원래대로 돌아와요.',
       task: a.isTouch ? '화면을 <b>꾹 눌러</b> 확대했다가 놓아 보세요' : '<b>오른쪽 버튼</b>을 눌러 확대했다가 놓아 보세요',
       done: () => { if (a.controls.zoom > 1.6 && a.controls.zoomBy === 'hold') seen.hold = true; return seen.hold && a.controls.zoom < 1.05; }, onEnter: () => { seen.hold = false; } },
     // 확대 ②: 벌리기 (컴퓨터: 휠)
-    { title: a.isTouch ? '확대 ② 두 손가락 벌리기' : '확대 ② 휠', text: a.isTouch ? '두 손가락을 <b>벌려도</b> 확대돼요.' : '<b>휠</b>을 굴려도 확대돼요.',
+    { guest: true, title: a.isTouch ? '확대 ② 두 손가락 벌리기' : '확대 ② 휠', text: a.isTouch ? '두 손가락을 <b>벌려도</b> 확대돼요.' : '<b>휠</b>을 굴려도 확대돼요.',
       task: a.isTouch ? '두 손가락을 <b>벌려</b> 확대했다가 놓아 보세요' : '<b>휠</b>로 확대했다가 되돌려 보세요',
       done: () => { if (a.controls.zoom > 1.6 && a.controls.zoomBy === 'pinch') seen.pinch = true; return seen.pinch && a.controls.zoom < 1.05; }, onEnter: () => { seen.pinch = false; } },
     // 편집 ①: 사진 고치기
@@ -86,5 +86,14 @@ export function tutorialSteps(a) {
     // 출구 ②: 문으로 걸어 나가기 (홈이 열리면 main.js 가 안내를 끝낸다)
     { title: '다 됐어요 ✦ 출구로 나가기', text: '<b>출구 문</b>으로 걸어가면 홈으로 나갈 수 있어요.<br>홈에서 내 전시실을 만들어 보세요.<br><b>사용법 둘러보기</b>는 홈에서 언제든 다시 볼 수 있어요.',
       task: '초록 <b>출구 문</b>으로 걸어가 <b>홈으로 나가기</b>를 눌러요', done: () => false },
+  ];
+}
+
+// 초대받은 손님용: 둘러보는 법만 (걷기 · 사진 보기 · 이전/다음 · 확대). 고치는 법은 뺀다.
+export function guestSteps(a, title) {
+  return [
+    { title: '어서 오세요', text: `<b>${title}</b> 전시에 초대받으셨어요.<br>둘러보는 방법을 잠깐 익혀 볼게요.` },
+    ...tutorialSteps(a).filter(s => s.guest),
+    { title: '이제 둘러보세요 ✦', text: '사진은 벽을 따라 순서대로 걸려 있어요.<br>마지막 방을 지나면 <b>출구</b>에 방명록이 있어요.<br>한마디 남겨 주시면 전시를 연 분이 볼 수 있어요.' },
   ];
 }
