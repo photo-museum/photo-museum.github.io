@@ -7,10 +7,10 @@
 // ---------- 간단히: 방 꾸미기는 두 가지만 ----------
 // 지금은 방 꾸미기 창에서 이 둘만 고른다 (벽·천장·바닥·조명 카탈로그는 아래에 그대로 남아 있고, 예전에 꾸민 방은 그대로 보인다).
 export const PRESETS = [
-  { id: 'light', label: '밝은 방', sub: '흰 벽 · 트랙 조명 · 밝은 콘크리트', wallCss: '#f4f3f0', floorCss: '#d5d0c8',
-    style: { wall: 'gallery', ceil: 'track', floor: 'concrete', light: 'spot' } },
-  { id: 'dark', label: '어두운 방', sub: '차콜 벽 · 월넛 마루 · 스포트라이트', wallCss: '#2e2a27', floorCss: '#7a5236',
-    style: { wall: 'charcoal', ceil: 'same', floor: 'walnut', light: 'spot' } },
+  { id: 'light', label: '흰 방', sub: '흰 벽 · 트랙 조명 · 밝은 콘크리트', wallCss: '#f4f3f0', floorCss: '#d5d0c8',
+    style: { wall: 'gallery', ceil: 'track', floor: 'concrete', light: 'spot-white' } },
+  { id: 'dark', label: '어두운 방', sub: '차콜 벽 · 검은 천장 · 짙은 콘크리트', wallCss: '#2e2a27', floorCss: '#3a3836',
+    style: { wall: 'charcoal', ceil: 'darkspots', floor: 'concrete-dark', light: 'theater' } }, // D1 블랙박스
 ];
 export const presetOf = st => PRESETS.find(p => ['wall', 'ceil', 'floor', 'light'].every(k => p.style[k] === st[k])) || null;
 
@@ -111,6 +111,7 @@ export const LIGHTS = [
   { id: 'soft', label: '은은한 빛', wash: true, color: 0xffe9cf, amb: 1, lm: 1, sw: ['#fff4e2', '#d9cbb6'] },
   { id: 'even', label: '고른 흰 빛', color: 0xffffff, amb: 1.12, lm: 0.6, sw: ['#ffffff', '#ecebe8'] },
   { id: 'spot', label: '스포트라이트', spots: true, color: 0xffe9cf, amb: 0.92, lm: 1.15, sw: ['#ffe2b8', '#3a332c'] },
+  { id: 'spot-white', label: '흰 방 스포트', spots: true, color: 0xfff0dc, amb: 0.7, lm: 1.8, sw: ['#fff0dc', '#b9b4ac'] }, // 흰 벽에서도 빛 웅덩이가 보이게: 둘레를 낮추고 스포트를 세게
   { id: 'spot-cool', label: '하얀 스포트', spots: true, color: 0xf3f6ff, tint: 0.08, amb: 0.95, lm: 1.1, sw: ['#f4f7ff', '#40444c'] },
   { id: 'theater', label: '어둠 속 스포트', spots: true, color: 0xffe2c0, amb: 0.36, lm: 2.1, sw: ['#ffd9a8', '#0d0c0b'] },
   { id: 'daylight', label: '천창 자연광', sky: true, wash: true, color: 0xf2f6ff, tint: 0.1, amb: 1.08, lm: 0.85, sw: ['#ffffff', '#c9d6e6'] },
@@ -154,4 +155,21 @@ export function styleOf(room) {
     ceilAuto: !CEIL_BY[s.ceil], floorAuto: !FLOOR_BY[s.floor],
     light: LIGHT_BY[s.light] ? s.light : 'soft', // 예전 방은 지금까지처럼 은은한 빛
   };
+}
+
+// 방은 두 가지뿐: 예전에 다른 색으로 꾸민 방·입구·출구를 흰 방 / 어두운 방으로 바꾼다 (벽이 어두우면 어두운 방). 바꾼 게 있으면 true.
+export function simplifyStyles(ex) {
+  let changed = false;
+  const fix = (room) => {
+    const st = styleOf(room);
+    if (room.style && presetOf(st)) return room.style;
+    const c = WALL_BY[st.wall].color;
+    const lum = (0.299 * (c >> 16 & 255) + 0.587 * (c >> 8 & 255) + 0.114 * (c & 255)) / 255;
+    changed = true;
+    return { ...PRESETS[lum < 0.45 ? 1 : 0].style };
+  };
+  for (const r of ex.rooms) r.style = fix(r);
+  if (ex.lobbyStyle) ex.lobbyStyle = fix({ style: ex.lobbyStyle });
+  if (ex.exitStyle) ex.exitStyle = fix({ style: ex.exitStyle });
+  return changed;
 }

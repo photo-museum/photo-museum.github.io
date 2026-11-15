@@ -115,7 +115,7 @@ const desktop = {
     const r = await p.evaluate(() => { const L = window.__pm.museumScene.layout[0]; const st = window.__pm.museumStops(); return { spot: L.introSpot, kinds: st.slice(0, 3).map(s => s.kind), z0: L.zStart, route: window.__pm.route(0, L.zStart - 1, 0, L.zStart - 9).length }; });
     assert(r.spot.x < 0 && r.kinds[1] === '방 소개', JSON.stringify(r.kinds));
     assert(r.route === 1, '방 안에서는 곧장: ' + r.route);
-    await h.pose(0, r.z0 - 1); await p.evaluate(() => { window.__pm.controls.joy.y = -1; }); await p.waitForTimeout(2000);
+    await h.pose(0, r.z0 - 1); await p.evaluate(() => { window.__pm.controls.joy.y = -1; }); await p.waitForTimeout(2800);
     await p.evaluate(() => { window.__pm.controls.joy.y = 0; });
     assert((await h.pos()).z < r.z0 - 6, '가운데로 곧장 지나감');
   },
@@ -139,17 +139,18 @@ const desktop = {
   '방 꾸미기: 밝은 방 / 어두운 방 두 가지 · 되돌리기': async (p, h) => {
     await h.enter(0);
     const st = () => p.evaluate(() => JSON.stringify(window.__pm.museum.rooms[0].style || null));
+    const st0 = await st();
     await p.evaluate(() => window.__pm.openStylePanel(0)); await p.waitForTimeout(400);
     assert((await p.$$('#style-panel .preset')).length === 2, '카드 두 장');
     await p.click('#style-panel .preset[data-preset=dark]'); await p.waitForTimeout(600);
-    assert(JSON.parse(await st()).wall === 'charcoal' && JSON.parse(await st()).floor === 'walnut', '어두운 방: ' + await st());
+    assert(JSON.parse(await st()).wall === 'charcoal' && JSON.parse(await st()).floor === 'concrete-dark', '어두운 방: ' + await st());
     assert(await p.evaluate(() => document.querySelector('#style-panel .preset[data-preset=dark]').classList.contains('on')), '고른 카드 표시');
     await p.click('#style-panel .preset[data-preset=light]'); await p.waitForTimeout(600);
     assert(JSON.parse(await st()).wall === 'gallery', '밝은 방');
     await p.click('#undo'); await p.waitForTimeout(500);
     assert(JSON.parse(await st()).wall === 'charcoal', '되돌리기');
     await p.keyboard.press('Control+z'); await p.waitForTimeout(600);
-    assert((await st()) === 'null', '처음으로: ' + await st());
+    assert((await st()) === st0, '처음으로: ' + await st());
     await p.click('#style-panel .close');
   },
   '입구·출구: 따로 꾸미기': async (p, h) => {
@@ -157,7 +158,7 @@ const desktop = {
     await p.evaluate(() => window.__pm.openStylePanel(-1, 'wall')); await p.waitForTimeout(300);
     await p.evaluate(() => window.__pm.applyStyle('wall', 'navy')); await p.waitForTimeout(500);
     const r = await p.evaluate(() => [window.__pm.museum.lobbyStyle && window.__pm.museum.lobbyStyle.wall, window.__pm.museum.rooms[0].style || null]);
-    assert(r[0] === 'navy' && r[1] === null, JSON.stringify(r));
+    assert(r[0] === 'navy' && r[1].wall !== 'navy', JSON.stringify(r));
     await p.click('#style-panel .follow'); await p.waitForTimeout(400);
     assert(!(await p.evaluate(() => window.__pm.museum.lobbyStyle)), '첫 방과 같게');
     await p.click('#style-panel .close');

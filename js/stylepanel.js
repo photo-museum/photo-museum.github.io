@@ -89,7 +89,7 @@ export function initStylePanel(a) {
       stylePanel.classList.add('simple');
       const cur = presetOf(st);
       stylePanel.querySelector('.now').textContent = tg.key && tg.follows ? `지금은 ${tg.baseName}과 같아요 · 고르면 ${tg.label}만 따로 바뀌어요`
-        : cur ? cur.sub : `지금: ${W.label} (예전에 꾸민 방) · 고르면 바뀌어요`;
+        : '';
       stylePanel.querySelector('.reset').hidden = true;
       stylePanel.querySelector('.rec').hidden = true;
       const box = stylePanel.querySelector('.items');
@@ -98,9 +98,8 @@ export function initStylePanel(a) {
         const b = document.createElement('button');
         b.className = 'preset' + (cur === P && !(tg.key && tg.follows) ? ' on' : '');
         b.dataset.preset = P.id;
-        b.innerHTML = `<i style="background: linear-gradient(180deg, ${P.wallCss} 0 64%, ${P.floorCss} 64%)"><u></u></i><span><b></b><small></small></span>`;
+        b.innerHTML = `<i style="background: linear-gradient(180deg, ${P.wallCss} 0 64%, ${P.floorCss} 64%)"><u></u></i><span><b></b></span>`;
         b.querySelector('b').textContent = P.label;
-        b.querySelector('small').textContent = P.sub;
         b.addEventListener('click', () => applyPreset(P.id));
         box.appendChild(b);
       }

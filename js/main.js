@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MuseumScene, themeOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
-import { WALL_BY, CEIL_BY, FLOOR_BY, PRESETS } from './styles.js';
+import { WALL_BY, CEIL_BY, FLOOR_BY, PRESETS, simplifyStyles, presetOf, styleOf } from './styles.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
 import { MuseumMap } from './map.js';
@@ -496,12 +496,14 @@ editor.addEventListener('keydown', e => {
 function addRoom(theme) {
   pushUndo('방 만들기');
   const nr = newRoom(4, theme);
-  nr.style = { ...PRESETS[0].style }; // 새 방은 밝은 방
+  // 새 방은 앞 방과 번갈아: 앞이 흰 방이면 어두운 방, 어두운 방이면 흰 방 (첫 방은 흰 방)
+  const prev = museum.rooms[museum.rooms.length - 1];
+  nr.style = { ...PRESETS[prev && presetOf(styleOf(prev)) === PRESETS[0] ? 1 : 0].style };
   museum.rooms.push(nr);
   persist();
   rebuild();
   const n = museum.rooms.length;
-  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 편집을 켜고 방 꾸미기에서 밝은 방·어두운 방을 고를 수 있어요`, 3800);
+  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 편집을 켜고 방 꾸미기에서 흰 방·어두운 방을 고를 수 있어요`, 3800);
 }
 
 // ---------- 방 꾸미기 창 (js/stylepanel.js) ----------
@@ -1240,6 +1242,7 @@ document.addEventListener('visibilitychange', () => {
 function enterExhibition(ex, fresh = false) {
   museum = ex;
   setEditMode(false, true); // 들어갈 때는 늘 관람 모드
+  if (!ex.showcase && simplifyStyles(ex)) persist(); // 예전 색 방은 흰 방 / 어두운 방으로
   music.start(); // 누른 순간 안에서 시작해야 휴대폰에서도 소리가 난다
   if (!ex.showcase && !ex.tutorial) { library.lastId = ex.id; persist(); }
   homeOpen = false;
