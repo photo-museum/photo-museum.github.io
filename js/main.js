@@ -692,6 +692,12 @@ function goStop(s) {
   navPending = s;
   stats.navs = (stats.navs || 0) + 1;
   hideHint();
+  if (R2) { // 시험판 R2: 벽을 따라 한 방향으로만 도니 어지럽지 않다 → 깜빡이지 않고 걸어간다 (걷는 중에 또 누르면 그다음 자리로)
+    navPending = null;
+    controls.walkPath(route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z), s.spot.yaw);
+    controls.pitchT = -0.02;
+    return;
+  }
   blink.classList.add('on');
   wake(700);
   clearTimeout(blinkT);
