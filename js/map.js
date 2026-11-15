@@ -131,6 +131,8 @@ export class MuseumMap {
     this.editBtn = this.el.querySelector('[data-act="edit"]');
     this.isOpen = false;
     this.editing = false;
+    this.zoom = 1;            // 지도 확대 배율 (두 손가락·휠·± 버튼). 많이 줄이면 '방 모드'
+    this.el.querySelectorAll('.zoom button').forEach(b => b.addEventListener('click', () => this.setZoom(this.zoom * (b.dataset.z === '1' ? 1.5 : 1 / 1.5))));
     this._last = '';
     this.mini.addEventListener('click', () => this.open());
     this.el.querySelector('[data-act="close"]').addEventListener('click', () => this.close());
@@ -196,7 +198,21 @@ export class MuseumMap {
   _tip() {
     this.el.querySelector('.tip').textContent = this.editing
       ? '방 그림을 끌면 순서가 바뀌어요 · 아래쪽을 끌면 넘겨 봐요'
-      : '방을 누르면 그 방으로 · 사진을 꾹 눌러 끌면 자리 바꾸기';
+      : this.roomsMode
+        ? '방을 꾹 눌러 끌면 다른 방 사이에 넣어요 · 벌리면 사진이 보여요'
+        : '사진을 꾹 눌러 끌면 자리 바꾸기 · 오므리면 방만 보여요';
+  }
+  get roomsMode() { return this.zoom < 0.7; }
+  // 확대·축소: 화면에서 (ax: 목록 안 x) 자리를 그대로 두고 바꾼다
+  setZoom(z, ax) {
+    z = Math.max(0.12, Math.min(3, z));
+    if (Math.abs(z - this.zoom) < 0.001) return;
+    const row = this.row;
+    if (ax == null) ax = row.clientWidth / 2;
+    const f = (row.scrollLeft + ax) / Math.max(1, row.scrollWidth);
+    this.zoom = z;
+    this.render(true);
+    row.scrollLeft = f * row.scrollWidth - ax;
   }
 
   // keepScroll: 지도를 연 채로 내용만 바뀔 때 (사진 바꾸기 등)
@@ -216,7 +232,10 @@ export class MuseumMap {
     const maxLen = Math.max(...layout.map(r => r.length));
     const sH = (rh - 112 - pad * 2) / ROOM_W;
     const sW = (rw - 60 - pad * 2) / maxLen;
-    const s = Math.max(9, Math.min(36, sH, sW));
+    const s0 = Math.max(9, Math.min(36, sH, sW));
+    const s = s0 * this.zoom;
+    const rooms = this.roomsMode;
+    this.el.classList.toggle('rooms-mode', rooms);
     const wallPx = Math.max(1.5, s * 0.14);
     this._order = museum.rooms.map(r => r.id);
     layout.forEach((r, i) => {
@@ -227,7 +246,8 @@ export class MuseumMap {
       card.dataset.i = i;
       const plan = document.createElement('div');
       plan.className = 'plan';
-      const w = r.length * s + pad * 2, h = ROOM_W * s + pad * 2;
+      // 방 모드에서도 누를 수 있게 너무 작아지지는 않게
+      const w = Math.max(rooms ? 64 : 0, r.length * s + pad * 2), h = Math.max(rooms ? 64 : 0, ROOM_W * s + pad * 2);
       plan.style.width = w + 'px'; plan.style.height = h + 'px';
       card.style.setProperty('--plan-h', h + 'px');
       const ox = pad + r.zStart * s, oy = pad + ROOM_W / 2 * s;
@@ -242,8 +262,8 @@ export class MuseumMap {
         me.style.top = (oy + c.pos.x * s) + 'px';
         plan.appendChild(me);
       }
-      // 액자 자리에 작은 사진
-      for (const p of r.panels) {
+      // 액자 자리에 작은 사진 (방 모드에서는 숨김)
+      for (const p of rooms ? [] : r.panels) {
         const t = document.createElement('div');
         t.className = 'thumb' + (p.photo.imageId ? '' : ' empty');
         t.dataset.pid = p.photo.id;
@@ -270,6 +290,7 @@ export class MuseumMap {
       acts.innerHTML = `<button data-act="rename">이름·설명</button><button data-act="fill">+ 사진 넣기</button>`
         + `<button data-act="clear" class="quiet"${hung ? '' : ' disabled'}>모두 내리기</button>`
         + `<button data-act="delete" class="quiet"${layout.length > 1 ? '' : ' disabled'}>방 지우기</button>`;
+      if (rooms) cap.querySelector('span').textContent = `사진 ${hung}`;
       card.append(plan, cap, acts);
       this.row.appendChild(card);
     });
@@ -300,8 +321,46 @@ export class MuseumMap {
   _bindDrag() {
     let d = null;
     const row = this.row;
+    // 두 손가락 벌리기·오므리기 = 지도 확대·축소
+    const pts = new Map();
+    let pinch = null, pinchRaf = 0;
+    const pinchInfo = () => {
+      const [a, b] = [...pts.values()];
+      const [cx] = this.toContent((a.x + b.x) / 2, (a.y + b.y) / 2);
+      return { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, ax: cx - row.offsetLeft };
+    };
+    row.addEventListener('pointerdown', e => { pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); }, true);
+    row.addEventListener('pointerdown', e => {
+      if (pts.size === 2 && !(d && (d.started || d.mode === 'photo'))) {
+        if (d) { clearTimeout(d.timer); d = null; }
+        const pi = pinchInfo();
+        pinch = { d0: pi.dist, z0: this.zoom };
+        for (const id of pts.keys()) { try { row.setPointerCapture(id); } catch (er) {} }
+        return;
+      }
+      if (pinch) return;
+    }, true);
+    const pmove = e => {
+      const pt = pts.get(e.pointerId);
+      if (pt) { pt.x = e.clientX; pt.y = e.clientY; }
+      if (!pinch || pts.size < 2) return false;
+      cancelAnimationFrame(pinchRaf);
+      pinchRaf = requestAnimationFrame(() => { if (!pinch || pts.size < 2) return; const pi = pinchInfo(); this.setZoom(pinch.z0 * pi.dist / pinch.d0, pi.ax); });
+      return true;
+    };
+    const pend = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
+    row.addEventListener('pointerup', pend, true);
+    row.addEventListener('pointercancel', pend, true);
+    // 컴퓨터: 휠을 위아래로 굴리면 확대·축소 (옆으로 굴리면 넘겨 보기)
+    row.addEventListener('wheel', e => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      const [cx] = this.toContent(e.clientX, e.clientY);
+      this.setZoom(this.zoom * Math.exp(-e.deltaY * 0.0022), cx - row.offsetLeft);
+    }, { passive: false });
     row.addEventListener('pointerdown', e => {
       cancelAnimationFrame(this._glide); // 흘러가던 것을 잡으면 멈춘다
+      if (pinch || pts.size > 1) return;
       if (e.target.closest('button')) return;
       if (this.isBlocked()) { d = null; return; }
       // 카드 밖 빈 곳이나 방 아래 글씨 쪽을 끌면 좌우로 넘겨 보기만 한다.
@@ -317,16 +376,24 @@ export class MuseumMap {
         const dd = d;
         d.timer = setTimeout(() => { if (d === dd && dd.moved < 10) this._lift(dd); }, 380);
       }
+      // 방 모드: 방을 꾹 누르면 들어 올려 다른 방 사이로 옮긴다 (마우스는 끌기 시작하면 바로)
+      if (this.roomsMode && !this.editing && card && onPlan) {
+        const dd = d;
+        d.roomCan = true;
+        if (e.pointerType !== 'mouse') d.timer = setTimeout(() => { if (d === dd && dd.moved < 10) this._liftRoom(dd); }, 380);
+      }
     });
     row.addEventListener('pointermove', e => {
+      if (pmove(e)) return;
       if (!d || e.pointerId !== d.id) return;
       let [mx, my] = this.mapDelta(e.clientX - d.x, e.clientY - d.y);
       d.x = e.clientX; d.y = e.clientY;
       d.moved += Math.abs(mx) + Math.abs(my);
       if (d.mode === 'photo') { this._moveGhost(d); return; }
       if (d.thumb && (e.pointerType === 'mouse' || this.editing) && d.moved > 4) { this._lift(d); return; }
+      if (d.roomCan && e.pointerType === 'mouse' && !d.roomLift && d.moved > 4) this._liftRoom(d);
       if (d.timer && d.moved > 10) { clearTimeout(d.timer); d.timer = null; }
-      if (!this.editing || !d.card || !d.onPlan) { // 넘겨 보기 (손 뗀 뒤 흘러가도록 빠르기를 기억)
+      if (!d.roomLift && (!this.editing || !d.card || !d.onPlan)) { // 넘겨 보기 (손 뗀 뒤 흘러가도록 빠르기를 기억)
         row.scrollLeft -= mx;
         const now = performance.now(), dt = Math.max(1, now - (d.vt || now - 16));
         d.v = (d.v || 0) * 0.5 + (-mx / dt) * 0.5; d.vt = now; d.scrolled = true;
@@ -367,6 +434,7 @@ export class MuseumMap {
       if (dd.started) {
         dd.card.classList.remove('drag');
         dd.card.style.transform = '';
+        if (dd.roomLift && !this.editing) this._commitOrder(); // 방 모드에서 옮긴 것은 바로 저장
         return;
       }
       if (dd.moved < 10 && e.type === 'pointerup') {
@@ -381,6 +449,15 @@ export class MuseumMap {
     row.addEventListener('pointerup', end);
     row.addEventListener('pointercancel', end);
     this._dragState = () => d;
+  }
+
+  // 방 들어 올리기 (방 모드에서 꾹 누름)
+  _liftRoom(d) {
+    clearTimeout(d.timer); d.timer = null;
+    d.roomLift = true; d.started = true;
+    d.card.classList.add('drag');
+    d.f0 = this.toContent(d.sx, d.sy)[0] - this.row.offsetLeft;
+    if (navigator.vibrate) navigator.vibrate(12);
   }
 
   // 사진 들어 올리기: 손가락을 따라다니는 복사본
