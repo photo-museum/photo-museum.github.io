@@ -1,20 +1,21 @@
 import * as THREE from 'three';
-import { MuseumScene, themeOf, texOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
-import { WALLS, WALL_GROUPS, CEILINGS, FLOORS, LIGHTS, WALL_BY, CEIL_BY, FLOOR_BY, LIGHT_BY, styleOf, recOf } from './styles.js';
+import { MuseumScene, themeOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
+import { WALL_BY, CEIL_BY, FLOOR_BY } from './styles.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, INTRO_S, INTRO_W, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
-import { MuseumMap, thumbURL } from './map.js';
+import { MuseumMap } from './map.js';
 import { Guide } from './guide.js';
-import { makeBackup, readBackup, saveFile } from './backup.js';
 import { Music } from './music.js';
 import { DEMO_VERSION } from './demo.js';
 import { tutorialSteps } from './tutorial.js';
 import { initHome } from './home.js';
+import { initStylePanel } from './stylepanel.js';
+import { initBackup } from './backupui.js';
 import { buildExample, buildShowcase, SHOWCASE, buildDemoLibrary, addBigTestExhibition } from './seed.js';
-import { loadFonts, ensureFont, ensureGlyphs, isFontReady, fontFamily, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
+import { loadFonts, ensureFont, ensureGlyphs, isFontReady, fontInfo, FONT_LIST, DEFAULT_FONT } from './fonts.js';
 import {
   loadLibrary, saveLibrary, putImage, deleteImage, prepareImage, requestPersistence, uid, sweepImages,
-  newPhoto, newRoom, newExhibition, EMPTY_ASPECT, HD,
+  newPhoto, newRoom, EMPTY_ASPECT, HD,
 } from './store.js';
 
 const $ = s => document.querySelector(s);
@@ -500,157 +501,10 @@ function addRoom(theme) {
   toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 그 방에서 편집 → 방 꾸미기로 벽·천장·바닥·조명을 고를 수 있어요`, 3800);
 }
 
-// ---------- 방 꾸미기: 벽 · 천장 · 바닥 · 조명 ----------
-// 벽·천장·바닥·조명을 따로 고른다. 벽을 바꾸면 추천만 보여 주고, '추천대로'를 눌러야 맞춰진다.
-const stylePanel = $('#style-panel');
-let styleTab = 'wall', styleRi = 0;
-const swCache = new Map();
-function swatchURL(kind, item, wallColor) {
-  const key = kind + item.id + (kind === 'ceil' && item.tint === 'wall' ? wallColor : '');
-  if (swCache.has(key)) return swCache.get(key);
-  const c = document.createElement('canvas'); c.width = c.height = 96;
-  const g = c.getContext('2d');
-  const hex = n => '#' + n.toString(16).padStart(6, '0');
-  if (kind === 'light') {
-    // 어두운 벽에 떨어지는 빛 모양
-    const [a, b] = item.sw;
-    g.fillStyle = b; g.fillRect(0, 0, 96, 96);
-    const blob = (x, y, rx, ry, al) => { const gr = g.createRadialGradient(x, y, 0, x, y, 1); g.save(); g.translate(x, y); g.scale(rx, ry); const r = g.createRadialGradient(0, 0, 0, 0, 0, 1); r.addColorStop(0, a); r.addColorStop(1, 'rgba(0,0,0,0)'); g.globalAlpha = al; g.fillStyle = r; g.beginPath(); g.arc(0, 0, 1, 0, 7); g.fill(); g.restore(); };
-    if (item.spots) { blob(30, 50, 22, 34, 0.95); blob(70, 50, 22, 34, 0.95); g.fillStyle = '#111'; g.fillRect(26, 4, 8, 8); g.fillRect(66, 4, 8, 8); }
-    else if (item.sky) { const gr = g.createLinearGradient(0, 0, 0, 96); gr.addColorStop(0, a); gr.addColorStop(1, b); g.fillStyle = gr; g.fillRect(0, 0, 96, 96); }
-    else if (item.cove) { const gr = g.createLinearGradient(0, 0, 0, 60); gr.addColorStop(0, a); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 8, 96, 60); g.fillStyle = a; g.fillRect(0, 6, 96, 3); }
-    else if (item.up) { for (const x of [20, 48, 76]) blob(x, 96, 10, 60, 0.95); }
-    else { blob(48, 48, 60, 60, item.wash ? 0.9 : 0.6); }
-    g.fillStyle = 'rgba(245,240,230,.9)'; g.fillRect(36, 38, 24, 18); // 사진 한 장
-  } else if (kind === 'wall') {
-    g.fillStyle = hex(item.color); g.fillRect(0, 0, 96, 96);
-    if (item.map) { const t = texOf(museumScene.res, item.map); if (t && t.image) { g.globalCompositeOperation = 'multiply'; g.drawImage(t.image, 0, 0, 96, item.map === 'brick' ? 48 : 96); if (item.map === 'brick') g.drawImage(t.image, 0, 48, 96, 48); g.globalCompositeOperation = 'source-over'; } }
-    if (item.crown) { g.fillStyle = hex(item.crown); g.fillRect(0, 0, 96, 14); }
-    if (item.wainscot) { g.fillStyle = hex(item.wainscot.c); const h = Math.max(14, item.wainscot.h * 40); g.fillRect(0, 96 - h, 96, h); }
-  } else {
-    const t = texOf(museumScene.res, item.tex);
-    const tint = item.tint === 'wall' ? wallColor : (item.tint ?? 0xffffff);
-    if (t && t.image) {
-      // 한 장 크기에 맞춰 약 1.6m 를 보여 준다
-      const sx = 96 / (item.tile[0] / 1.6), sy = 96 / (item.tile[1] / 1.6);
-      for (let x = 0; x < 96; x += sx) for (let y = 0; y < 96; y += sy) g.drawImage(t.image, x, y, sx + 0.5, sy + 0.5);
-      if (tint !== 0xffffff) { g.globalCompositeOperation = 'multiply'; g.fillStyle = hex(tint); g.fillRect(0, 0, 96, 96); g.globalCompositeOperation = 'source-over'; }
-    } else { g.fillStyle = hex(tint); g.fillRect(0, 0, 96, 96); }
-  }
-  const u = c.toDataURL('image/jpeg', 0.85);
-  swCache.set(key, u);
-  return u;
-}
-function openStylePanel(ri, tab = 'wall') {
-  styleRi = ri; styleTab = tab;
-  closeSheet();
-  stylePanel.classList.add('open');
-  document.body.classList.add('style-open');
-  renderStylePanel();
-}
-function closeStylePanel() { stylePanel.classList.remove('open'); document.body.classList.remove('style-open'); }
-// 꾸밀 곳: 방 (0..n-1), 입구 (-1), 출구 (n). 입구·출구는 따로 정하지 않으면 첫 방·마지막 방을 따른다.
-function styleTarget(ri = styleRi) {
-  const n = museum.rooms.length;
-  if (ri < 0 || ri >= n) {
-    const lobby = ri < 0, key = lobby ? 'lobbyStyle' : 'exitStyle', base = museum.rooms[lobby ? 0 : n - 1];
-    return {
-      label: lobby ? '입구' : '출구', key, follows: !museum[key], baseName: lobby ? '첫 방' : '마지막 방',
-      room: { style: museum[key] || base.style, theme: base.theme },
-      set(st) { museum[key] = st; },
-    };
-  }
-  const room = museum.rooms[ri];
-  return room && { label: `ROOM ${String(ri + 1).padStart(2, '0')}`, room, set(st) { room.style = st; } };
-}
-function renderStylePanel() {
-  const tg = styleTarget();
-  if (!tg) return;
-  const room = tg.room;
-  const st = styleOf(room);
-  const W = WALL_BY[st.wall];
-  const rec = recOf(st.wall);
-  stylePanel.querySelector('.ttl').textContent = `${tg.label} 꾸미기`;
-  const fol = stylePanel.querySelector('.follow');
-  fol.hidden = !tg.key || tg.follows;
-  if (tg.key) fol.textContent = `${tg.baseName}과 같게`;
-  stylePanel.querySelector('.now').textContent = tg.key && tg.follows ? `지금은 ${tg.baseName}과 같아요 · 고르면 ${tg.label}만 따로 바뀌어요` : '';
-  if (!(tg.key && tg.follows)) stylePanel.querySelector('.now').textContent = `${W.label} · ${CEIL_BY[st.ceil].label} · ${FLOOR_BY[st.floor].label} · ${LIGHT_BY[st.light].label}`;
-  for (const b of stylePanel.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === styleTab);
-  // 추천: 바꾸지는 않고 보여 주기만. '추천대로'를 누르면 천장·바닥·조명을 한꺼번에.
-  const same = st.ceil === rec.ceil && st.floor === rec.floor && st.light === rec.light;
-  const reset = stylePanel.querySelector('.reset');
-  reset.hidden = same;
-  const recLine = stylePanel.querySelector('.rec');
-  recLine.hidden = same;
-  recLine.textContent = `${W.label}에 어울리는 추천 · 천장 ${CEIL_BY[rec.ceil].label} · 바닥 ${FLOOR_BY[rec.floor].label} · 조명 ${LIGHT_BY[rec.light].label}`;
-  const box = stylePanel.querySelector('.items');
-  box.innerHTML = '';
-  const add = (kind, item, on, isRec, groupHead) => {
-    if (groupHead) { const h = document.createElement('span'); h.className = 'gh'; h.textContent = groupHead; box.appendChild(h); }
-    const b = document.createElement('button');
-    b.className = 'sw' + (on ? ' on' : '');
-    b.innerHTML = `<i style="background-image:url('${swatchURL(kind, item, W.color)}')"></i><span></span>${isRec ? '<em>추천</em>' : ''}`;
-    b.querySelector('span').textContent = item.label;
-    b.addEventListener('click', () => applyStyle(kind, item.id));
-    box.appendChild(b);
-  };
-  if (styleTab === 'wall') {
-    let g = '';
-    for (const w of WALLS) { add('wall', w, w.id === st.wall, false, w.g !== g ? w.g : ''); g = w.g; }
-  } else if (styleTab === 'ceil') {
-    for (const c of CEILINGS) add('ceil', c, c.id === st.ceil, c.id === rec.ceil);
-  } else if (styleTab === 'floor') {
-    for (const f of FLOORS) add('floor', f, f.id === st.floor, f.id === rec.floor);
-  } else {
-    for (const l of LIGHTS) add('light', l, l.id === st.light, l.id === rec.light);
-  }
-  const on = box.querySelector('.sw.on');
-  if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.clientWidth / 2 + on.offsetWidth / 2);
-}
-function applyStyle(kind, id) {
-  const tg = styleTarget();
-  if (!tg) return;
-  const st = styleOf(tg.room);
-  pushUndo(`${tg.label} 꾸미기`);
-  // 벽을 바꿔도 천장·바닥·조명은 그대로 (추천은 위에 보여 주기만)
-  tg.set({ wall: st.wall, ceil: st.ceil, floor: st.floor, light: st.light, [kind]: id });
-  persist();
-  rebuild();
-  styleRi = Math.max(-1, Math.min(museum.rooms.length, styleRi));
-  renderStylePanel();
-}
-stylePanel.querySelector('.close').addEventListener('click', () => { closeStylePanel(); controls.pitchT = 0.02; });
-stylePanel.querySelector('.reset').addEventListener('click', () => {
-  const tg = styleTarget();
-  const wall = styleOf(tg.room).wall;
-  pushUndo('추천대로');
-  tg.set({ wall, ...recOf(wall) });
-  persist(); rebuild(); renderStylePanel();
-  toast('천장·바닥·조명을 추천대로 맞췄어요');
+// ---------- 방 꾸미기 창 (js/stylepanel.js) ----------
+const { stylePanel, openStylePanel, closeStylePanel, renderStylePanel, applyStyle } = initStylePanel({
+  get museum() { return museum; }, controls, museumScene, toast, persist, rebuild, pushUndo, closeSheet, route,
 });
-stylePanel.querySelector('.follow').addEventListener('click', () => {
-  const tg = styleTarget();
-  if (!tg || !tg.key) return;
-  pushUndo(`${tg.label} 꾸미기`);
-  delete museum[tg.key];
-  persist(); rebuild(); renderStylePanel();
-  toast(`${tg.label}을 ${tg.baseName}과 같게 맞췄어요`);
-});
-// 꾸밀 곳 옮기기: 입구 ‹ ROOM 01 … › 출구 (그곳으로 걸어가 보여 준다)
-for (const b of stylePanel.querySelectorAll('.pick')) b.addEventListener('click', () => {
-  const n = museum.rooms.length;
-  styleRi = Math.max(-1, Math.min(n, styleRi + (b.dataset.d === '1' ? 1 : -1)));
-  const L = museumScene.layout;
-  const r = styleRi < 0 ? L.lobby : styleRi >= n ? L.exit : L[styleRi];
-  controls.joy.x = controls.joy.y = 0;
-  const z = styleRi < 0 ? r.zEnd + 2.2 : r.zStart - (styleRi >= n ? 1.6 : 1.4);
-  controls.walkPath(route(controls.pos.x, controls.pos.z, 0, z), 0);
-  renderStylePanel();
-});
-// 탭에 맞춰 시선을 살짝: 천장은 위로, 바닥은 아래로
-const lookFor = tab => { controls.pitchT = tab === 'ceil' ? 0.6 : tab === 'floor' ? -0.5 : tab === 'light' ? 0.15 : 0.02; };
-for (const b of stylePanel.querySelectorAll('.tabs button')) b.addEventListener('click', () => { styleTab = b.dataset.tab; lookFor(styleTab); renderStylePanel(); });
 
 // 사진·방 버튼이 쓸 방 (로비면 첫 방, 출구면 마지막 방)
 function currentRoomIndex() { return Math.max(0, Math.min(museum.rooms.length - 1, museumScene.roomIndexAt(controls.pos.z))); }
@@ -1415,86 +1269,18 @@ function enterExhibition(ex, fresh = false) {
   $('#ex-title').textContent = ex.title;
 }
 
+// ---------- 보관 · 백업 (js/backupui.js) ----------
+const { openBackupMenu, exportExhibitions, nudgeBackup } = initBackup({
+  get library() { return library; }, get homeOpen() { return homeOpen; },
+  toast, persist, pushUndo, openSheet, renderHome: () => renderHome(),
+});
+
 const { renderHome, makeSwipe, exhibitionStats } = initHome({
   get library() { return library; }, get homeOpen() { return homeOpen; }, get viewW() { return viewW; },
   controls, editor, toast, persist, openSheet, sheetOpen, toContent, hasResume, enterExhibition, editExhibitionText,
   exportExhibitions, confirmDeleteExhibition, openBackupMenu, startTutorial, startShowcase,
 });
 makeSwipe($('#style-panel .items'));
-
-// ---------- 백업 · 불러오기 · 공유 ----------
-// 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
-// (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-z'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
-const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
-function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
-function backupAge() {
-  if (!library.lastBackup) return '아직 백업한 적이 없어요';
-  const days = Math.floor((Date.now() - library.lastBackup) / 86400000);
-  return days < 1 ? '오늘 백업했어요' : `마지막 백업 ${days}일 전`;
-}
-function openBackupMenu() {
-  openSheet([
-    { title: true, label: `보관 · ${backupAge()} · 버전 ${APP_VERSION}` },
-    { label: '⤓ 모든 전시실을 백업 파일로 저장', fn: () => exportExhibitions(ownExhibitions(), `PhotoMuseum-백업-${dateTag()}.pmbk`, true) },
-    { label: '⤒ 백업 파일에서 불러오기', fn: () => importPick() },
-    { label: isStandalone() ? '✓ 홈 화면 앱으로 쓰고 있어요' : '홈 화면에 앱으로 추가하는 법', fn: () => installHelp() },
-    { label: '닫기', quiet: true },
-  ]);
-}
-async function exportExhibitions(list, name, full) {
-  if (!list.length) { toast('저장할 전시실이 없어요'); return; }
-  try {
-    const blob = await makeBackup(JSON.parse(JSON.stringify(list)), (i, n) => toast(`사진 묶는 중… ${i} / ${n}`, 4000));
-    const r = await saveFile(blob, name);
-    if (r === 'cancel') { toast('저장을 취소했어요'); return; }
-    if (full) { library.lastBackup = Date.now(); persist(); }
-    toast(r === 'shared' ? '파일을 보냈어요. "파일에 저장"을 고르면 아이폰에 남아요' : `백업 파일을 저장했어요 (${(blob.size / 1048576).toFixed(1)}MB)`, 4200);
-  } catch (e) { console.error(e); toast('백업 파일을 만들지 못했어요: ' + e.message, 4000); }
-}
-const importInput = document.createElement('input');
-importInput.type = 'file'; importInput.hidden = true;
-document.body.appendChild(importInput);
-function importPick() { importInput.value = ''; importInput.click(); }
-importInput.addEventListener('change', async () => {
-  const f = importInput.files && importInput.files[0];
-  if (!f) return;
-  try {
-    const head = await readBackup(f, (i, n) => toast(`사진 넣는 중… ${i} / ${n}`, 4000));
-    pushUndo('백업 불러오기');
-    let added = 0, replaced = 0;
-    for (const ex of head.exhibitions) {
-      const i = library.exhibitions.findIndex(e => e.id === ex.id);
-      if (i >= 0) { library.exhibitions[i] = ex; replaced++; } else { library.exhibitions.push(ex); added++; }
-    }
-    await persist();
-    if (homeOpen) renderHome();
-    toast(`전시실 ${added}개를 불러왔어요${replaced ? ` · ${replaced}개는 백업 내용으로 바꿨어요` : ''}`, 4000);
-  } catch (e) { console.error(e); toast(e.message || '불러오지 못했어요', 4000); }
-});
-function installHelp() {
-  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  openSheet([
-    { title: true, label: ios
-      ? 'Safari 아래쪽 공유 버튼(□↑) → "홈 화면에 추가". 홈 화면 앱은 사진을 지우지 않고 오래 보관해요. 앱은 Safari 와 저장 공간이 따로라서, 먼저 여기서 백업 파일을 저장한 뒤 앱에서 불러오세요.'
-      : '브라우저 메뉴에서 "앱 설치" 또는 "홈 화면에 추가"를 고르세요. 설치한 앱은 사진을 더 오래 안전하게 보관해요.' },
-    ...(deferredInstall ? [{ label: '지금 설치하기', fn: () => { deferredInstall.prompt(); deferredInstall = null; } }] : []),
-    { label: '먼저 백업 파일 저장', fn: () => exportExhibitions(ownExhibitions(), `PhotoMuseum-백업-${dateTag()}.pmbk`, true) },
-    { label: '닫기', quiet: true },
-  ]);
-}
-let deferredInstall = null;
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
-// 바꾼 것이 있는데 일주일 넘게 백업하지 않았으면 홈에서 한 번 알려 준다
-let backupNudged = false;
-function nudgeBackup() {
-  if (backupNudged || !library.changedAt) return;
-  if (library.lastBackup && library.lastBackup > library.changedAt) return;
-  if (library.lastBackup && Date.now() - library.lastBackup < 7 * 86400000) return;
-  backupNudged = true;
-  setTimeout(() => toast('소중한 사진을 지키려면 오른쪽 위 "보관"에서 백업 파일을 저장해 두세요', 4500), 1200);
-}
 
 function confirmDeleteExhibition(ex) {
   const st = exhibitionStats(ex);

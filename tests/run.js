@@ -253,7 +253,8 @@ const phone = {
     const t = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
     await t('touchStart', [{ x: 200, y: 400 }]); await p.waitForTimeout(1200);
     assert((await h.pos()).zoom > 2, '확대');
-    await t('touchEnd', []); await p.waitForTimeout(1500);
+    await t('touchEnd', []);
+    await p.waitForFunction(() => window.__pm.controls.zoom < 1.1, null, { timeout: 6000 }).catch(() => {});
     assert((await h.pos()).zoom < 1.1, '돌아옴');
   },
   '휴대폰: 걸으면서 둘러보기는 확대가 아님': async (p, h, ctx) => {
