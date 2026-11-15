@@ -941,18 +941,8 @@ export class MuseumScene {
       wall.userData = { wallText: 'room', roomIndex: room.index };
       both(wall);
       this.pickables.push(wall);
-      // 관람 방향 반대쪽은 옆벽까지 이어 붙여 막는다 (관람 방향으로만 지나가게)
-      const open = room.introOpen === 1 ? 1 : -1;
-      const ext0 = open === 1 ? -ROOM_W / 2 : room.introX + INTRO_W / 2;   // 막는 조각의 x 범위
-      const ext1 = open === 1 ? room.introX - INTRO_W / 2 : ROOM_W / 2;
-      if (ext1 - ext0 > 0.01) {
-        const extFront = keep(new THREE.MeshBasicMaterial({ color: new THREE.Color(T.introBg), toneMapped: false }));
-        const ext = new THREE.Mesh(keep(new THREE.BoxGeometry(ext1 - ext0, INTRO_H, INTRO_D)), [side, side, side, side, extFront, back]);
-        ext.position.set((ext0 + ext1) / 2, INTRO_H / 2, iz);
-        both(ext);
-      }
-      const x0 = open === 1 ? -ROOM_W / 2 : room.introX - INTRO_W / 2;
-      const x1 = open === 1 ? room.introX + INTRO_W / 2 : ROOM_W / 2;
+      // 안내벽은 홀로 선 벽 (양옆 모두 지나갈 수 있다). 나아갈 땐 관람 방향(왼쪽), 되돌아갈 땐 반대쪽(오른쪽)으로 다닌다.
+      const x0 = room.introX - INTRO_W / 2, x1 = room.introX + INTRO_W / 2;
       const z0 = iz - INTRO_D / 2, z1 = iz + INTRO_D / 2;
       this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
     }
