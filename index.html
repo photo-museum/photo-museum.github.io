@@ -28,6 +28,7 @@
   <div id="stage">
   <div id="app"></div>
   <div class="vignette"></div>
+  <div id="blink" aria-hidden="true"></div>
 
   <header id="hud">
     <button id="home-btn" aria-label="홈으로"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
@@ -71,6 +72,7 @@
     <button role="menuitem" data-act="photos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg><span><b>사진 넣기</b><small>이 방의 빈 판에 걸어요</small></span></button>
     <button role="menuitem" data-act="theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-1.5-1.2-2-2.4-2H16a2 2 0 0 1-2-2V6.5C14 4.6 13.3 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/></svg><span><b>방 꾸미기</b><small>흰 방 · 어두운 방</small></span></button>
     <button role="menuitem" data-act="room"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg><span><b>방 만들기</b><small>끝에 새 방을 붙여요</small></span></button>
+    <button role="menuitem" data-act="captions"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg><span><b>설명 쓰기</b><small>사진 설명을 한꺼번에</small></span></button>
   </div>
 
   <div id="map" role="dialog" aria-label="전시장 지도">
@@ -125,6 +127,17 @@
   <!-- 조이스틱은 돌린 화면 밖에 둔다 (실제 화면 좌표로 동작) -->
   <div id="joy"></div>
   <input id="file" type="file" accept="image/*" multiple hidden>
+
+  <div id="captions" role="dialog" aria-label="사진 설명 한꺼번에 쓰기">
+    <div class="box">
+      <p class="head">사진 설명 쓰기</p>
+      <div class="list"></div>
+      <div class="row">
+        <button class="cancel quiet">취소</button>
+        <button class="save">저장</button>
+      </div>
+    </div>
+  </div>
 
   <div id="editor" role="dialog" aria-label="설명 쓰기">
     <div class="box">

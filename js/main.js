@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MuseumScene, themeOf, EXIT_TITLE, EXIT_NOTE } from './builder.js';
 import { WALL_BY, CEIL_BY, FLOOR_BY, PRESETS, simplifyStyles, presetOf, styleOf } from './styles.js';
+import { initCaptions } from './captions.js';
 import { WalkControls } from './controls.js';
 import { viewingSpot, LOBBY_L, ROOM_W, WALL_T } from './layout.js';
 import { MuseumMap } from './map.js';
@@ -656,7 +657,8 @@ let navTargets = { prev: null, next: null };
 // 걸어가는 중이면 '가고 있는 자리'를 기준으로: 도착을 기다리지 않고 연달아 눌러 빨리 넘길 수 있다
 function navFromHere() {
   const st = museumStops();
-  const px = controls.auto ? controls.auto.x : controls.pos.x, pz = controls.auto ? controls.auto.z : controls.pos.z;
+  const base = navPending ? navPending.spot : controls.auto || controls.pos;
+  const px = base.x, pz = base.z;
   let at = -1, best = 0.6, prev = null, next = null;
   st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz); if (d < best) { best = d; at = i; } });
   if (at >= 0) { prev = st[at - 1] || null; next = st[at + 1] || null; }
@@ -678,13 +680,28 @@ function updateNav() {
   if (prev) navPrev.setAttribute('aria-label', `이전 ${prev.kind}으로`);
   if (next) navNext.setAttribute('aria-label', `다음 ${next.kind}으로`);
 }
+// 이전·다음: 걸어가며 왼쪽 벽·오른쪽 벽으로 번갈아 돌면 어지럽다 → 화면이 잠깐 어두워졌다가 그 자리에 바로 서 있다 (깜빡 넘기기).
+// 어두운 동안 또 누르면 그다음 자리로 바뀐다.
+const blink = $('#blink');
+let navPending = null, blinkT = 0;
 function goStop(s) {
   if (!s) return;
   controls.joy.x = controls.joy.y = 0; // 조이스틱이 같이 움직이지 않게
-  controls.walkPath(route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z), s.spot.yaw);
-  controls.pitchT = -0.02;
+  controls.auto = null;
+  navPending = s;
   stats.navs = (stats.navs || 0) + 1;
   hideHint();
+  blink.classList.add('on');
+  wake(700);
+  clearTimeout(blinkT);
+  blinkT = setTimeout(() => {
+    const sp = navPending.spot;
+    navPending = null;
+    controls.setPose(sp.x, sp.z, sp.yaw);
+    controls.pitch = controls.pitchT = -0.02;
+    wake(900);
+    requestAnimationFrame(() => requestAnimationFrame(() => blink.classList.remove('on')));
+  }, 150);
 }
 navPrev.addEventListener('click', () => goStop(navFromHere().prev));
 navNext.addEventListener('click', () => goStop(navFromHere().next));
@@ -910,6 +927,11 @@ function insertPhotos(pids, ri, beforePid) {
   toast(`${moved.length}장을 ROOM ${String(ri + 1).padStart(2, '0')}로 옮겼어요`);
 }
 
+// 사진 설명 한꺼번에 쓰기 (js/captions.js)
+const { openCaptions } = initCaptions({
+  get museum() { return museum; }, get homeOpen() { return homeOpen; }, controls, map, pushUndo, persist, rebuild, toast,
+});
+
 // 지도의 방 아래 버튼들
 function roomAction(act, ri) {
   const room = museum.rooms[ri];
@@ -918,6 +940,7 @@ function roomAction(act, ri) {
   const hung = room.photos.filter(p => p.imageId).length;
   if (act === 'fill') pickPhotos({ roomIndex: ri });
   if (act === 'rename') editRoomText(ri);
+  if (act === 'captions') openCaptions(ri);
   if (act === 'style') {
     const set = k => { pushUndo(`${name} 꾸미기`); room.style = { ...PRESETS[k].style }; persist(); rebuild(); };
     const cur = presetOf(styleOf(room));
@@ -1207,6 +1230,7 @@ editMenu.addEventListener('click', e => {
   const ri = currentRoomIndex();
   if (act === 'photos') pickPhotos({ roomIndex: ri });
   if (act === 'room') addRoom('white');
+  if (act === 'captions') openCaptions(Math.max(0, ri));
   if (act === 'theme') openStylePanel(Math.max(-1, Math.min(museum.rooms.length, museumScene.roomIndexAt(controls.pos.z))));
 });
 
@@ -1494,4 +1518,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { music, applyPreset, setEditMode, get editMode() { return editMode; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { music, openCaptions, applyPreset, setEditMode, get editMode() { return editMode; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };

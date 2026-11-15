@@ -320,10 +320,11 @@ export class MuseumMap {
         fill: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M12 9v6M9 12h6"/>',
         clear: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9 12h6"/>',
         delete: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+        captions: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
         style: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor" stroke="none"/>',
       };
       const act = (k, t, dis) => `<button data-act="${k}"${dis ? ' disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic[k]}</svg><small>${t}</small></button>`;
-      acts.innerHTML = act('rename', '이름·설명') + act('style', '방 꾸미기') + act('fill', '사진 넣기') + act('clear', '모두 내리기', !hung) + act('delete', '방 지우기', layout.length <= 1);
+      acts.innerHTML = act('rename', '이름·설명') + act('style', '방 꾸미기') + act('fill', '사진 넣기') + act('captions', '사진 설명', !hung) + act('clear', '모두 내리기', !hung) + act('delete', '방 지우기', layout.length <= 1);
       plan.append(eb, acts);
       if (rooms) cap.querySelector('span').textContent = `사진 ${hung}`;
       card.append(plan, cap);

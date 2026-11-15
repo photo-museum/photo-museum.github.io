@@ -38,7 +38,7 @@ export function tutorialSteps(a) {
     { title: '방 소개와 사진', text: '들어서면 <b>왼쪽 벽</b>에 방 이름과 소개가 있어요.<br><b>사진을 톡</b> 누르면 그 앞으로 걸어가요.',
       task: '아무 사진이나 <b>톡</b> 눌러 그 앞에 서 보세요', done: () => atViewingSpot(a) },
     // 이전 · 다음 버튼
-    { title: '이전 · 다음', text: '화면 양옆의 <b>‹ 이전</b> / <b>다음 ›</b>을 누르면 사진을 차례로 볼 수 있어요.<br>걸어가는 중에 또 눌러도 돼요.',
+    { title: '이전 · 다음', text: '화면 양옆의 <b>‹ 이전</b> / <b>다음 ›</b>을 누르면 다음 사진 앞으로 바로 넘어가요.<br>연달아 눌러 빨리 넘길 수 있어요.',
       task: '<b>다음 ›</b>을 두 번 눌러 보세요', done: () => (a.stats.navs || 0) >= seen.nav0 + 2, onEnter: () => { seen.nav0 = a.stats.navs || 0; } },
     // 확대 ①: 꾹 누르기 (컴퓨터: 오른쪽 버튼). 어느 방법으로 확대했는지는 controls.zoomBy
     { title: '확대 ① 꾹 누르기', text: a.isTouch ? '화면을 <b>꾹 누르면</b> 그곳이 커져요.<br>손을 떼면 원래대로 돌아와요.' : '<b>오른쪽 버튼</b>을 누르고 있으면 그곳이 커져요.<br>놓으면 원래대로 돌아와요.',
@@ -53,7 +53,7 @@ export function tutorialSteps(a) {
       task: '<b>편집</b>을 켜고 사진을 눌러 메뉴를 훑어본 뒤 <b>닫기</b>를 눌러요',
       done: () => { if (a.sheetOpen()) seen.sheet = true; return seen.sheet && !a.sheetOpen(); }, onEnter: () => { seen.sheet = false; } },
     // 편집 ②: 위에 뜨는 세 버튼
-    { title: '사진 넣기 · 방 꾸미기 · 방 만들기', text: '편집 중에는 버튼 세 개가 위에 떠 있어요.<br>· <b>사진 넣기</b>: 지금 방에 사진 걸기<br>· <b>방 꾸미기</b>: 흰 방 / 어두운 방<br>· <b>방 만들기</b>: 끝에 새 방',
+    { title: '편집 버튼 네 개', text: '편집 중에는 버튼 네 개가 위에 떠 있어요.<br>· <b>사진 넣기</b>: 지금 방에 사진 걸기<br>· <b>방 꾸미기</b>: 흰 방 / 어두운 방<br>· <b>방 만들기</b>: 끝에 새 방<br>· <b>설명 쓰기</b>: 사진 설명을 한꺼번에',
       task: '<b>방 꾸미기</b>를 열어 보고 <b>✕</b>로 닫은 뒤, <b>관람</b>을 눌러 돌아가요',
       done: () => { if (styleOpen()) seen.style = true; return seen.style && !styleOpen() && !a.editMode; },
       onEnter: () => { seen.style = false; } },

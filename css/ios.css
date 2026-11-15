@@ -459,3 +459,24 @@ body.map-open #edit-menu { display: none; }
 :root body #map .thumb.ghost[data-n]::after { content: attr(data-n); position: absolute; right: -9px; top: -9px; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 11px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; line-height: 22px; text-align: center; }
 :root body #map .thumb.ghost[data-n] { box-shadow: 5px 5px 0 rgba(255,255,255,.55), 10px 10px 0 rgba(255,255,255,.3), 0 10px 24px rgba(0,0,0,.5); }
 :root body #map.selecting .tip { color: #fff; font-weight: 600; }
+
+/* 이전·다음: 깜빡 넘기기 */
+#blink { position: absolute; inset: 0; z-index: 2; background: #000; opacity: 0; pointer-events: none; transition: opacity .14s ease; }
+#blink.on { opacity: 1; }
+/* 사진 설명 한꺼번에 쓰기 (돌리지 않은 화면: 세로로 들고 편하게 적는다) */
+#captions { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 10px; background: rgba(0,0,0,.55); }
+#captions.open { display: flex; }
+#captions .box { width: min(560px, 100%); max-height: calc(100dvh - 20px); display: flex; flex-direction: column; gap: 10px; padding: 16px 14px 12px; box-sizing: border-box;
+  color: var(--label); background: var(--gl-bg); border: 1px solid var(--gl-border); box-shadow: var(--gl-shadow); border-radius: 26px;
+  -webkit-backdrop-filter: blur(30px) saturate(190%); backdrop-filter: blur(30px) saturate(190%); font-family: var(--ui); }
+#captions .head { margin: 0 4px; font-size: 17px; font-weight: 700; }
+#captions .list { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 8px; padding: 2px; }
+#captions .rh { margin: 8px 4px 0; font-size: 12px; font-weight: 600; color: var(--label2); }
+#captions .rh:first-child { margin-top: 0; }
+#captions .crow { display: flex; gap: 10px; align-items: flex-start; }
+#captions .crow i { flex: none; width: 76px; height: 76px; border-radius: 10px; background: rgba(0,0,0,.12) center / cover no-repeat; }
+#captions .crow textarea { flex: 1; min-width: 0; min-height: 76px; box-sizing: border-box; resize: none; padding: 9px 11px; border: 0; border-radius: 12px; background: rgba(255,255,255,.72); color: var(--label); font: 400 16px/1.4 var(--ui); }
+#captions .crow textarea:focus { outline: 2px solid rgba(229,72,77,.45); }
+#captions .row { display: flex; gap: 8px; justify-content: flex-end; }
+#captions .row button { height: 40px; padding: 0 20px; border-radius: 20px; border: 0; background: var(--accent); color: #fff; font: 600 15px var(--ui); }
+#captions .row button.quiet { background: var(--fill); color: var(--label); }

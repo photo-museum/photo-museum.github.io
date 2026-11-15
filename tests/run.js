@@ -246,6 +246,25 @@ const desktop = {
     assert((await p.$$('#map .thumb.sel')).length === 0 && (await p.evaluate(() => window.__pm.map.isOpen)), '빈 곳 → 취소, 지도는 그대로');
     await p.evaluate(() => window.__pm.map.close());
   },
+  '사진 설명 한꺼번에 쓰기 · 되돌리기 / 다음 › 은 깜빡 넘기기': async (p, h) => {
+    await h.enter(0);
+    await p.evaluate(() => window.__pm.openCaptions(0)); await p.waitForTimeout(500);
+    const tas = await p.$$('#captions textarea');
+    const n = await p.evaluate(() => window.__pm.museum.rooms.reduce((s, r) => s + r.photos.filter(x => x.imageId).length, 0));
+    assert(tas.length === n && n > 1, '사진마다 한 칸: ' + tas.length + ' / ' + n);
+    await tas[0].fill('첫째 설명'); await tas[1].fill('둘째 설명\n둘째 줄');
+    await p.click('#captions .save'); await p.waitForTimeout(700);
+    const caps = () => p.evaluate(() => window.__pm.museum.rooms.flatMap(r => r.photos.filter(x => x.imageId)).slice(0, 2).map(x => x.caption || ''));
+    assert(JSON.stringify(await caps()) === JSON.stringify(['첫째 설명', '둘째 설명\n둘째 줄']), '저장: ' + JSON.stringify(await caps()));
+    assert(!(await p.evaluate(() => document.querySelector('#captions').classList.contains('open'))), '닫힘');
+    await p.click('#undo'); await p.waitForTimeout(700);
+    assert((await caps())[0] !== '첫째 설명', '되돌리기 한 번에');
+    await h.pose(0, -1); await p.waitForTimeout(900);
+    await p.click('#nav-next');
+    assert(await p.evaluate(() => document.querySelector('#blink').classList.contains('on')), '깜빡');
+    await p.waitForTimeout(700);
+    assert(!(await p.evaluate(() => document.querySelector('#blink').classList.contains('on') || !!window.__pm.controls.auto)), '걷지 않고 바로 도착');
+  },
   '출구: 벽 글 고치기 · 방명록 쓰기 버튼': async (p, h) => {
     await h.enter(0);
     await p.evaluate(() => { const L = window.__pm.museumScene.layout; const c = window.__pm.controls; c.setPose(-0.6, L.exit.zStart - 1.0, 0); c.pitch = c.pitchT = 0.25; });
@@ -388,10 +407,10 @@ const phone = {
     assert((await h.names()) !== before, '순서 바뀜');
     await p.evaluate(() => window.__pm.map.close());
   },
-  '휴대폰: 편집 메뉴 3개 · 방 꾸미기 열림': async (p, h) => {
+  '휴대폰: 편집 메뉴 4개 · 방 꾸미기 열림': async (p, h) => {
     await h.enter(0);
     await p.tap('#tools [data-act=edit]'); await p.waitForTimeout(500);
-    assert((await p.$$('#edit-menu button')).length === 3, '메뉴 3개');
+    assert((await p.$$('#edit-menu button')).length === 4, '메뉴 4개');
     await p.tap('#edit-menu [data-act=theme]'); await p.waitForTimeout(500);
     assert(await p.evaluate(() => document.querySelector('#style-panel').classList.contains('open')), '방 꾸미기');
     await p.tap('#style-panel .close');
