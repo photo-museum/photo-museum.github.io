@@ -86,7 +86,9 @@ export function layoutMuseum(museum) {
       doorIn: true,
       doorOut: true, // 마지막 방 뒤에는 출구 방
       doorInX: ri === 0 ? LOBBY_DOOR_X : 0, doorOutX: 0,
-      introX: 0, // 방 가운데 (양옆 1.3m 로 돌아 들어간다)
+      introX: 0, // 방 가운데
+      // 안내벽은 관람 방향(첫 사진이 걸린 쪽)으로만 지나가게, 반대쪽은 옆벽까지 막는다. -1 = 왼쪽(-x)으로 지나감
+      introOpen: (room.photos.length && panels.length && (panels.find(p => p.index === 0) || panels[0]).wall === 'R') ? 1 : -1,
     });
     z = zEnd - WALL_T;
   });
