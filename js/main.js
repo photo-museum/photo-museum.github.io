@@ -1355,6 +1355,13 @@ function homeList() { return library.exhibitions.filter(ex => !ex.showcase); }
 // 홈 (시안 H3): 고른 전시실의 대표 사진이 화면 가득, 왼쪽에 큰 제목과 '들어가기',
 // 오른쪽 아래 유리 띠에 전시실 표지들. 화면을 옆으로 밀거나 띠의 표지를 누르면 넘어간다.
 const hstrip = $('#home .hstrip');
+makeSwipe(hstrip); // 띠는 손가락으로 옆으로 넘긴다 (끌고 난 뒤엔 표지가 눌리지 않음)
+// 양 끝에 더 있으면 그쪽 가장자리를 흐리게
+function stripEdges() {
+  hstrip.classList.toggle('more-l', hstrip.scrollLeft > 2);
+  hstrip.classList.toggle('more-r', hstrip.scrollLeft < hstrip.scrollWidth - hstrip.clientWidth - 2);
+}
+hstrip.addEventListener('scroll', stripEdges, { passive: true });
 const hbgs = [...document.querySelectorAll('#home .hbg3 .ph')];
 let hbgOn = 0, hbgKey = '';
 function renderHome() {
@@ -1405,7 +1412,13 @@ function layoutFlow(animate = true) {
   flowItems.forEach((it, k) => { it.el.classList.toggle('on', k === i); it.el.setAttribute('aria-selected', k === i ? 'true' : 'false'); });
   if (!sel) return;
   setHomeBg(sel);
-  if (sel.el && sel.el.scrollIntoView && animate) sel.el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  // 띠에는 4개만 보이니, 고른 표지가 보이도록 띠를 옆으로 민다 (돌린 화면이라 scrollIntoView 대신 직접)
+  if (sel.el) {
+    const L = sel.el.offsetLeft - hstrip.clientWidth / 2 + sel.el.offsetWidth / 2;
+    const to = Math.max(0, Math.min(hstrip.scrollWidth - hstrip.clientWidth, L));
+    if (animate && hstrip.scrollTo) hstrip.scrollTo({ left: to, behavior: 'smooth' }); else hstrip.scrollLeft = to;
+    stripEdges();
+  }
   homeSel = sel.add ? 'new' : sel.ex.id;
   const exs = flowItems.length - 1;
   if (sel.add) {
@@ -1536,8 +1549,29 @@ function openCoverPicker(ex) {
 $('#cover-pick .close').addEventListener('click', () => $('#cover-pick').classList.remove('open'));
 $('#cover-pick').addEventListener('click', e => { if (e.target.id === 'cover-pick') e.currentTarget.classList.remove('open'); });
 
-$('#h-tour').addEventListener('click', () => startTutorial());
-$('#h-styles').addEventListener('click', () => startShowcase());
+// 홈 위 동그란 아이콘: 처음 누르면 아래에 이름표가 살짝 뜨고, 이름표를 누르면 들어간다
+// (아이콘만으로는 무엇인지 알기 어려워서)
+const homePop = $('#home-pop');
+let homePopFor = null, homePopTimer = 0;
+function showHomePop(btn, label, go) {
+  if (homePopFor === btn && homePop.classList.contains('show')) { hideHomePop(); return; }
+  homePopFor = btn;
+  homePop.querySelector('span').textContent = label;
+  homePop.onclick = () => { hideHomePop(); go(); };
+  const hb = btn.getBoundingClientRect(), home = $('#home');
+  // 돌린 화면에서도 맞게: 버튼 위치를 무대 좌표로
+  const [cx, cy] = toContent(hb.left + hb.width / 2, hb.top + hb.height / 2);
+  const [bx, by] = toContent(hb.right, hb.bottom);
+  homePop.style.top = (Math.max(cy, by) + 10) + 'px';
+  homePop.style.right = Math.max(12, (viewW - cx) - 22) + 'px';
+  homePop.classList.add('show');
+  clearTimeout(homePopTimer);
+  homePopTimer = setTimeout(hideHomePop, 4500);
+}
+function hideHomePop() { homePop.classList.remove('show'); homePopFor = null; }
+$('#h-tour').addEventListener('click', e => showHomePop(e.currentTarget, '사용법 둘러보기', startTutorial));
+$('#h-styles').addEventListener('click', e => showHomePop(e.currentTarget, '방 스타일 둘러보기', startShowcase));
+document.addEventListener('pointerdown', e => { if (homePopFor && !e.target.closest('#home-pop, #h-tour, #h-styles')) hideHomePop(); }, true);
 $('#h-backup').addEventListener('click', () => openBackupMenu());
 
 // ---------- 백업 · 불러오기 · 공유 ----------
