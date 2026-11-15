@@ -185,7 +185,6 @@ body.rotated #map { padding: 14px 16px; }
   font: inherit; font-size: 13px; padding: 7px 14px; border-radius: 999px; cursor: pointer;
 }
 #map .bar button.quiet { border-color: transparent; color: var(--dim); font-size: 16px; padding: 5px 10px; }
-#map.editing .bar button[data-act="edit"] { background: var(--ink); color: #111; }
 #map .rooms {
   flex: 1; min-height: 0; display: flex; align-items: center; gap: 14px; padding: 0 16px;
   overflow-x: auto; overflow-y: hidden; touch-action: none; scrollbar-width: thin;
@@ -221,7 +220,6 @@ body.rotated #map { padding: 14px 16px; }
 #map .acts button.quiet { color: var(--dim); }
 #map .acts button[data-act="delete"] { color: #e8a596; }
 #map .acts button:disabled { opacity: 0.35; cursor: default; }
-#map.editing .acts { visibility: hidden; }
 #map .mroom .cap { display: flex; flex-direction: column; gap: 2px; padding-left: 4px; }
 #map .mroom .cap b { font-weight: 500; font-size: 12px; letter-spacing: 0.18em; }
 #map .mroom .cap i { font-style: normal; font-family: var(--display); font-size: 15px; color: var(--ink); }
@@ -232,10 +230,6 @@ body.rotated #map { padding: 14px 16px; }
   content: ''; position: absolute; right: -14px; width: 14px; height: 2px; top: calc((100% - 78px) / 2);
   background: rgba(233,227,216,0.25);
 }
-#map.editing .mroom .plan { cursor: grab; }
-#map.editing .mroom { cursor: default; animation: wiggle .32s ease-in-out infinite alternate; }
-#map.editing .mroom:nth-child(2n) { animation-delay: -.16s; }
-#map.editing .mroom::after { display: none; }
 #map .mroom.drag { animation: none !important; transition: none; z-index: 2; cursor: grabbing; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.6)); }
 @keyframes wiggle { from { transform: rotate(-0.6deg); } to { transform: rotate(0.6deg); } }
 body.map-open #joy { visibility: hidden; }

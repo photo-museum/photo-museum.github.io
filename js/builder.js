@@ -487,15 +487,20 @@ function makeExitText(museum, FONTS, light = false) {
   const sub = light ? 'rgba(60,54,48,0.75)' : 'rgba(214,206,193,0.75)';
   const line = (t, font, color, y) => { g.font = font; g.fillStyle = color; g.fillText(t, CW / 2, y); };
   // 출구 벽 글은 고칠 수 있다 (museum.exitTitle / exitNote, 없으면 기본 글)
-  const fit = (t, font, max) => { g.font = font; let tt = t; while (tt.length > 1 && g.measureText(tt).width > max) tt = tt.slice(0, -2) + '…'; return tt; };
+  // 길어도 자르지 않는다: 글씨 크기를 줄여 한 줄에 다 넣는다
+  const fitLine = (t, mk, size, min, y) => {
+    let sz = size;
+    g.font = mk(sz);
+    while (sz > min && g.measureText(t).width > CW - 70) { sz -= 2; g.font = mk(sz); }
+    return [mk(sz), y + (size - sz) * 0.45];
+  };
   const head = (museum.exitTitle || '').trim() || EXIT_TITLE;
   const note = (museum.exitNote ?? EXIT_NOTE).trim();
-  line(fit(head, FONTS.title(96), CW - 60), FONTS.title(96), ink, 40);
-  line(fit((museum.title || '').trim(), FONTS.text(44), CW - 80), FONTS.text(44), sub, 190);
+  { const [f, y] = fitLine(head, FONTS.title, 96, 36, 40); line(head, f, ink, y); }
+  { const t = (museum.title || '').trim(); const [f, y] = fitLine(t, FONTS.text, 44, 22, 190); line(t, f, sub, y); }
   g.fillStyle = 'rgba(255,217,160,0.65)'; g.fillRect(CW / 2 - 50, 270, 100, 3);
   if (note) {
-    const ls = note.split('\n').slice(0, 2);
-    ls.forEach((l, k) => line(fit(l, FONTS.text(38), CW - 80), FONTS.text(38), sub, 300 + k * 56));
+    note.split('\n').slice(0, 2).forEach((l, k) => { const [f, y] = fitLine(l, FONTS.text, 38, 20, 300 + k * 56); line(l, f, sub, y); });
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = MAX_ANISO;

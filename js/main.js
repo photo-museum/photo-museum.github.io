@@ -58,18 +58,9 @@ controls.toNorm = (sx, sy) => { const [cx, cy] = toContent(sx, sy); return [cx /
 
 // 잠깐 확대: 카메라가 보는 화면의 일부만 크게 그린다 (시선은 그대로)
 let lastZoomKey = '';
-// 사진 옆 설명이 떠 있을 때는 화면을 살짝 왼쪽으로 밀어(그림만) 사진과 설명이 나란히 보이게
-let capShift = 0, capShiftGoal = 0;
 function applyZoom() {
   const z = controls.zoom;
-  capShift += (capShiftGoal - capShift) * 0.12;
-  if (Math.abs(capShift - capShiftGoal) < 0.5) capShift = capShiftGoal;
   if (z <= 1.001) {
-    if (capShift > 0.5) {
-      const key = `s${capShift.toFixed(1)},${viewW},${viewH}`;
-      if (key !== lastZoomKey) { lastZoomKey = key; camera.setViewOffset(viewW, viewH, capShift, 0, viewW, viewH); }
-      return;
-    }
     if (lastZoomKey) { camera.clearViewOffset(); lastZoomKey = ''; }
     return;
   }
@@ -906,62 +897,8 @@ function updateHD() {
     if (hit && hit.object.userData.photoId && !hit.object.userData.empty && !hit.object.userData.label) id = hit.object.userData.photoId;
   }
   museumScene.setHD(id);
-  updateCapSide(t);
 }
 
-// 사진이 화면에 그려진 오른쪽 끝을 계산해서 그 오른쪽 빈자리에 설명을 둔다
-const _v3 = new THREE.Vector3();
-function placeCapSide(photoId) {
-  let panel = null;
-  for (const r of museumScene.layout || []) { panel = r.panels.find(p => p.photo.id === photoId); if (panel) break; }
-  let right = viewW * 0.72;
-  if (panel) {
-    camera.updateMatrixWorld();
-    let mx = -Infinity;
-    for (const dz of [-panel.w / 2, panel.w / 2]) for (const dy of [-panel.h / 2, panel.h / 2]) {
-      _v3.set(panel.x, panel.y + dy, panel.z + dz).project(camera);
-      mx = Math.max(mx, (_v3.x + 1) / 2 * viewW);
-    }
-    if (isFinite(mx)) right = mx;
-  }
-  // 자리가 좁으면(휴대폰) '다음' 버튼을 아래로 내리고 그 자리까지 쓴다
-  const tight = viewW - 70 - (right + 14) < 170;
-  document.body.classList.toggle('cap-tight', tight);
-  const navW = tight ? 14 : 70;
-  const left = Math.min(viewW - navW - 130, right + 14);
-  capSide.style.left = left + 'px';
-  capSide.style.right = 'auto';
-  capSide.style.width = Math.max(130, Math.min(280, viewW - navW - left)) + 'px';
-}
-
-// 사진 앞에 서면 오른쪽에 그 사진 설명을 조금 크게, 연하게 띄운다 (벽의 작은 설명판을 읽기 쉽게)
-const capSide = $('#cap-side');
-const CAP_SIDE_OFF = true;
-let capSideId = null;
-function updateCapSide(t) {
-  // 사용자 요청으로 끔: 사진 앞에 서도 설명이 저절로 뜨지 않는다 (대신 꾹 눌러 확대해서 벽 글씨를 읽는다)
-  if (CAP_SIDE_OFF) { if (capSideId !== null) { capSideId = null; capSide.classList.remove('show'); document.body.classList.remove('cap-tight'); } return; }
-  const moving = Math.hypot(controls.vel.x, controls.vel.z) > 0.25 || !!controls.auto;
-  let photo = null, room = null;
-  if (!moving && !homeOpen && !map.isOpen && !sheetOpen() && controls.zoom < 1.1 && t && t.photoId && t.kind === '사진' && t.d < 0.9 && t.ang < 0.45) {
-    const f = findPhoto(t.photoId);
-    if (f) { room = f.room; photo = room.photos[f.i]; }
-  }
-  const text = photo && (photo.caption || '').trim();
-  const id = text ? photo.id + '|' + text : null;
-  if (id === capSideId) return;
-  capSideId = id;
-  if (!text) { capSide.classList.remove('show'); document.body.classList.remove('cap-tight'); capShiftGoal = 0; return; }
-  // 사진은 늘 가운데 그대로. 설명은 사진 오른쪽 끝과 화면 오른쪽('다음' 버튼) 사이 빈자리에만.
-  placeCapSide(photo.id);
-  const [title, ...rest] = text.split('\n');
-  capSide.querySelector('b').textContent = title;
-  capSide.querySelector('b').style.fontFamily = fontFamily(room.font || museum.font);
-  capSide.querySelector('p').textContent = rest.join('\n');
-  capSide.classList.remove('show');
-  void capSide.offsetWidth;
-  capSide.classList.add('show');
-}
 
 // ---------- 지도 ----------
 const map = new MuseumMap({
@@ -1767,7 +1704,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-x'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-z'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
