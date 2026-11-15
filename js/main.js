@@ -1071,6 +1071,27 @@ function visibleChain(o) {
   return true;
 }
 
+// 꾹 누른 곳이 사진 설명판(글씨)이면 → 그 판의 화면 위치와, 판이 화면 폭의 절반쯤 되는 확대 배율
+const _lp = new THREE.Vector3();
+controls.longPressTarget = (sx, sy) => {
+  const [nx, ny] = controls.toNorm(sx, sy);
+  ndc.set(nx * 2 - 1, -(ny * 2 - 1));
+  raycaster.setFromCamera(ndc, camera);
+  raycaster.far = 30;
+  const hit = raycaster.intersectObjects(museumScene.pickables, true).find(h => visibleChain(h.object));
+  const o = hit && hit.object;
+  if (!o || !o.userData.label) return null;
+  const g = o.geometry.parameters || { width: 0.4, height: 0.3 };
+  o.updateMatrixWorld();
+  const c = o.getWorldPosition(new THREE.Vector3()).project(camera);
+  // 판의 왼쪽·오른쪽 끝이 화면에서 얼마나 떨어져 있나
+  const L = _lp.set(-g.width / 2, 0, 0).applyMatrix4(o.matrixWorld).project(camera).x;
+  const R = _lp.set(g.width / 2, 0, 0).applyMatrix4(o.matrixWorld).project(camera).x;
+  const wN = Math.abs(R - L) / 2; // 화면 폭 대비
+  const hN = wN * (g.height / g.width) * (viewW / viewH);
+  const z = Math.min(0.55 / Math.max(0.01, wN), 0.8 / Math.max(0.01, hN));
+  return { x: (c.x + 1) / 2, y: (1 - c.y) / 2, zoom: Math.max(2, z) };
+};
 controls.onTap = (sx, sy) => {
   if (performance.now() - tourSwallow < 1500) { tourSwallow = 0; return; } // 관람을 멈추려고 누른 것
   if (sheetOpen()) { closeSheet(); return; }
@@ -1643,7 +1664,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-j'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-l'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -2001,6 +2022,17 @@ function tutorialSteps() {
   ];
 }
 
+// 가만히 보고 있을 때는 휴대폰 화면 원래 해상도(최대 3배)로 또렷하게, 움직이는 동안은 2배로 부드럽게
+const DPR_MOVE = Math.min(window.devicePixelRatio || 1, 2), DPR_STILL = Math.min(window.devicePixelRatio || 1, 3);
+const sharp = { key: '', since: 0, on: false };
+function sharpTick() {
+  if (DPR_STILL <= DPR_MOVE) return;
+  const k = `${controls.pos.x.toFixed(3)},${controls.pos.z.toFixed(3)},${controls.yaw.toFixed(4)},${controls.pitch.toFixed(4)},${controls.zoom.toFixed(3)}`;
+  const now = performance.now();
+  if (k !== sharp.key) { sharp.key = k; sharp.since = now; if (sharp.on) { sharp.on = false; renderer.setPixelRatio(DPR_MOVE); renderer.setSize(viewW, viewH); } return; }
+  if (!sharp.on && now - sharp.since > 350) { sharp.on = true; renderer.setPixelRatio(DPR_STILL); renderer.setSize(viewW, viewH); }
+}
+
 let lastT = performance.now();
 function loop(t) {
   const dt = (t - lastT) / 1000;
@@ -2030,6 +2062,7 @@ function loop(t) {
   snapTick();
   if (loop.n % 20 === 0) updateHD();
   map.update();
+  sharpTick();
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }

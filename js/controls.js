@@ -156,7 +156,14 @@ export class WalkControls {
         p.lpTimer = setTimeout(() => {
           if (ptrs.get(id) !== p || p.moved >= 10 || p.pinched || ptrs.size !== 1 || !this.enabled) return;
           const [nx, ny] = this.toNorm(p.x, p.y);
-          this._zoomAround(nx, ny, Math.max(this.zoom, 2.5));
+          // 글씨(설명판)를 꾹 누르면: 손가락 밑이 아니라 화면 가운데로 가져와 크게 (손가락에 가려 못 읽지 않게)
+          const tgt = this.longPressTarget && this.longPressTarget(p.x, p.y);
+          if (tgt) {
+            this.zoomFocus = this._pointAt(tgt.x, tgt.y);
+            this.zoom = this.zoomGoal = Math.max(1, Math.min(ZOOM_MAX, tgt.zoom));
+            this.zoomAt = { x: 0.5, y: 0.5 };
+            p.anchor = { fx: nx, fy: ny };
+          } else this._zoomAround(nx, ny, Math.max(this.zoom, 2.5));
           this.zoomHold = true;
           p.right = true;
           if (navigator.vibrate) navigator.vibrate(10);
@@ -201,7 +208,12 @@ export class WalkControls {
       }
       if (jp) p.pinched = true; // 조이스틱 쪽과 같이 벌리는 중
       if (p.pinched) return; // 확대하던 손가락 하나가 남아 있으면 둘러보기 안 함
-      if (p.right) { const [nx, ny] = this.toNorm(rawX, rawY); this.zoomAt = { x: nx, y: ny }; return; }
+      if (p.right) {
+        const [nx, ny] = this.toNorm(rawX, rawY);
+        // 글씨를 가운데로 가져온 경우: 손가락이 움직인 만큼만 옮긴다
+        this.zoomAt = p.anchor ? { x: 0.5 + (nx - p.anchor.fx), y: 0.5 + (ny - p.anchor.fy) } : { x: nx, y: ny };
+        return;
+      }
       const touch = e.pointerType === 'touch';
       const k = (touch ? LOOK_TOUCH : LOOK_MOUSE) / this.zoom; // 확대 중엔 천천히 둘러보기
       this.yawT += dx * k;

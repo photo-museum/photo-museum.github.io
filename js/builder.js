@@ -230,7 +230,7 @@ function paintWallSpot(L, u, p, spots = true) {
 // ---------- 설명판: 사진 옆 벽에 붙는 작은 글씨 ----------
 const LABEL_W = 0.4;           // m
 const LABEL_PX = 1150;         // 1m 당 픽셀 (작을수록 글씨가 커짐)
-const LABEL_SS = 2.4;          // 실제로는 이만큼 더 촘촘하게 그린다 (선명하게)
+const LABEL_SS = 3.0;          // 실제로는 이만큼 더 촘촘하게 그린다 (꾹 눌러 크게 봐도 선명하게)
 let MAX_ANISO = 8;             // 기기가 허락하는 만큼 (MuseumScene 에서 정함)
 function wrapLines(g, text, maxW) {
   const out = [];
