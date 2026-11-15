@@ -1,7 +1,7 @@
 // 지도: 오른쪽 위 작은 지도 + 누르면 열리는 큰 평면도.
 // 평면도 방향: 방이 이어지는 쪽(-Z)이 오른쪽, 왼쪽 벽(x<0)이 위쪽. (앞을 보고 걸으면 오른쪽으로 간다)
 // 큰 지도에서 방을 누르면 그 방으로 이동, '편집'을 누르면 방을 끌어서 순서를 바꾼다.
-import { ROOM_W, DOOR_W } from './layout.js';
+import { ROOM_W, DOOR_W, R2 } from './layout.js';
 import { getImage } from './store.js';
 import { themeOf } from './builder.js';
 
@@ -166,14 +166,16 @@ export class MuseumMap {
     this._last = key;
     const W = 104, H = 56, s = 4.2;
     const g = fitCanvas(this.miniCanvas, W, H);
-    // R2 는 방이 옆으로 깊어서, 작은 지도가 내 위치를 위아래로도 따라간다
-    const deep = layout.some(r => r.cx);
-    const ox = W / 2 + c.pos.z * s, oy = deep ? H / 2 - c.pos.x * s : H / 2;
+    // R2: 내가 늘 가운데, 반시계로 90도 돌려서 그린다 → 다음 방(가는 쪽)이 위, 방이 깊어지는 쪽이 왼쪽
+    const ox = W / 2 + c.pos.z * s, oy = R2 ? H / 2 - c.pos.x * s : H / 2;
+    g.save();
+    if (R2) { g.translate(W / 2, H / 2); g.rotate(-Math.PI / 2); g.translate(-W / 2, -H / 2); }
     for (const r of [layout.lobby, ...layout, layout.exit]) {
       if (ox - r.zStart * s > W || ox - r.zEnd * s < 0) continue;
       drawRoom(g, r, s, ox, oy);
     }
     drawPlayer(g, W / 2, oy + c.pos.x * s, c.yaw, 4.5);
+    g.restore();
   }
   invalidate() { this._ver = (this._ver || 0) + 1; }
 

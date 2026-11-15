@@ -48,6 +48,20 @@ export class MuseumMap2 extends MuseumMap {
     const here = layout.findIndex(r => c.pos.z <= r.zStart + 0.3 && c.pos.z > r.zEnd - 0.3);
     const TH = Math.round(58 * this.zoom); // 사진 높이
     this._order = museum.rooms.map(r => r.id);
+    // 방마다 사진을 접어 둘 수 있다 (방 이름 줄의 ⌃). 접힌 방에도 사진을 끌어다 놓을 수 있다 (맨 끝에 들어감)
+    if (!this.folded) this.folded = new Set();
+    const allBtn = this.el.querySelector('.bar .foldall') || (() => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'foldall';
+      b.addEventListener('click', () => {
+        const ids = this.getMuseum().rooms.map(r => r.id);
+        if (ids.every(id => this.folded.has(id))) this.folded.clear(); else for (const id of ids) this.folded.add(id);
+        this.render(true);
+      });
+      this.el.querySelector('.bar .zoom').before(b);
+      return b;
+    })();
+    allBtn.textContent = museum.rooms.every(r => this.folded.has(r.id)) ? '모두 펴기' : '모두 접기';
     const place = (kind, text, d) => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'vplace ' + kind;
@@ -60,7 +74,8 @@ export class MuseumMap2 extends MuseumMap {
       const room = museum.rooms[i];
       const hung = room.photos.filter(p => p.imageId).length;
       const card = document.createElement('div');
-      card.className = 'mroom v' + (i === here ? ' here' : '');
+      const folded = this.folded.has(room.id);
+      card.className = 'mroom v' + (i === here ? ' here' : '') + (folded ? ' folded' : '');
       card.dataset.id = room.id; card.dataset.i = i;
       const hd = document.createElement('div');
       hd.className = 'rhd';
@@ -71,8 +86,12 @@ export class MuseumMap2 extends MuseumMap {
       const eb = document.createElement('button');
       eb.type = 'button'; eb.className = 'redit'; eb.setAttribute('aria-label', `${label(i)} 편집`);
       eb.innerHTML = PEN;
-      eb.addEventListener('click', e => { e.stopPropagation(); this._toggleActs(card); });
-      hd.appendChild(eb);
+      eb.addEventListener('click', e => { e.stopPropagation(); if (this.folded.delete(room.id)) { this.render(true); return; } this._toggleActs(card); });
+      const fb = document.createElement('button');
+      fb.type = 'button'; fb.className = 'fold'; fb.setAttribute('aria-label', `${label(i)} 사진 ${folded ? '펴기' : '접기'}`); fb.setAttribute('aria-expanded', folded ? 'false' : 'true');
+      fb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>';
+      fb.addEventListener('click', e => { e.stopPropagation(); if (!this.folded.delete(room.id)) this.folded.add(room.id); this.render(true); });
+      hd.append(fb, eb);
       const plan = document.createElement('div');
       plan.className = 'plan strip';
       const T = themeOf(r);
@@ -117,6 +136,7 @@ export class MuseumMap2 extends MuseumMap {
     const card = el.closest('#map .mroom.v');
     if (!card) return null;
     const plan = card.querySelector('.plan');
+    if (card.classList.contains('folded')) return { kind: 'insert', plan: null, card, ri: +card.dataset.i, before: null }; // 접힌 방: 맨 끝에 넣는다
     const [cx, cy] = this.toContent(d.x, d.y);
     const o = this._at(plan);
     const px = cx - o.x, py = cy - o.y;
@@ -148,7 +168,9 @@ export class MuseumMap2 extends MuseumMap {
     }
     if (!this._insLine) { this._insLine = document.createElement('i'); this._insLine.className = 'ins-line'; }
     const L = this._insLine;
-    if (t && t.kind === 'insert') {
+    const dropCard = t && t.kind === 'insert' && !t.plan ? t.card : null; // 접힌 방 위: 방 줄을 통째로 강조
+    if (dropCard !== d.dropCard) { if (d.dropCard) d.dropCard.classList.remove('drop'); if (dropCard) dropCard.classList.add('drop'); d.dropCard = dropCard; }
+    if (t && t.kind === 'insert' && t.plan) {
       if (L.parentNode !== t.plan) t.plan.appendChild(L);
       L.style.left = t.line.x + 'px'; L.style.top = t.line.y + 'px'; L.style.bottom = 'auto'; L.style.height = t.line.h + 'px';
     } else if (L.parentNode) L.remove();
@@ -259,7 +281,7 @@ export class MuseumMap2 extends MuseumMap {
       this._handled = performance.now();
       clearTimeout(dd.timer);
       cancelAnimationFrame(this._auto);
-      if (dd.mode === 'photo') { this._drop(dd); return; }
+      if (dd.mode === 'photo') { if (dd.dropCard) dd.dropCard.classList.remove('drop'); this._drop(dd); return; }
       if (dd.mode === 'room') { this._roomDrop(dd); return; }
       if (dd.scrolled && dd.v && performance.now() - dd.vt < 150) {
         let v = Math.max(-5, Math.min(5, dd.v)), last = performance.now();
