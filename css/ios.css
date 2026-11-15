@@ -422,3 +422,5 @@ body.rotated #gb-cta { bottom: 24px; }
 :root body #home .fcap .acts { gap: 6px; margin-top: 10px; }
 :root body #home .fcap .go, :root body #home .fcap .go2 { height: 36px; padding: 0 16px; border-radius: 18px; font-size: 13.5px; }
 :root body #home .fcap .more { width: 36px; height: 36px; border-radius: 18px; font-size: 15px; }
+/* 지도: 사진 사이에 끼워 넣을 자리 */
+#map .ins-line { position: absolute; top: 6px; bottom: 6px; width: 4px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 10px rgba(229,72,77,.8); pointer-events: none; z-index: 3; }

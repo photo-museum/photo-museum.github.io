@@ -969,6 +969,7 @@ const map = new MuseumMap({
   toContent: (sx, sy) => toContent(sx, sy),
   isBlocked: () => { if (sheetOpen()) { closeSheet(); return true; } return editor.classList.contains('open') || gb.classList.contains('open'); },
   onSwap: (a, b) => swapPhotos(a, b),
+  onInsert: (pid, ri, beforePid) => insertPhoto(pid, ri, beforePid),
   onPhotoTap: (ri, pid) => openPanelSheet({ roomIndex: ri, photoId: pid, panel: panelFor(pid) }),
   onRoomAction: (act, ri) => roomAction(act, ri),
   onOpen: open => {
@@ -1030,6 +1031,23 @@ function swapPhotos(a, b) {
   persist();
   rebuild();
   toast(pa.imageId && pb.imageId ? '두 사진 자리를 바꿨어요' : '사진을 옮겼어요');
+}
+
+// 사진 하나를 (다른 방이어도) 다른 사진 앞에 끼워 넣기. beforePid 가 없으면 그 방 맨 끝.
+function insertPhoto(pid, ri, beforePid) {
+  const A = findPhoto(pid);
+  const room = museum.rooms[ri];
+  if (!A || !room) return;
+  pushUndo('사진 끼워 넣기');
+  const [ph] = A.room.photos.splice(A.i, 1);
+  let k = beforePid ? room.photos.findIndex(p => p.id === beforePid) : -1;
+  if (k < 0) k = room.photos.length;
+  room.photos.splice(k, 0, ph);
+  if (!A.room.photos.length) A.room.photos.push(newPhoto()); // 방이 텅 비지 않게 빈 판 하나
+  stats.swaps++;
+  persist();
+  rebuild();
+  toast(A.room === room ? '사진 순서를 바꿨어요' : `ROOM ${String(ri + 1).padStart(2, '0')}에 넣었어요`);
 }
 
 // 지도의 방 아래 버튼들
@@ -1696,7 +1714,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-p'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-q'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -2033,7 +2051,7 @@ function tutorialSteps() {
       task: '사진을 눌러 보세요', done: () => sheetOpen() },
     { title: '전시장 지도', text: '메뉴는 바깥을 누르면 닫혀요.<br>오른쪽 위의 <b>작은 지도</b>를 누르면 전시장 전체가 한눈에 보여요.',
       task: '오른쪽 위 <b>작은 지도</b>를 눌러 보세요', done: () => map.isOpen && !sheetOpen() },
-    { title: '사진 자리 바꾸기', text: '지도에서 방을 누르면 그 방으로 바로 가요.<br>사진을 <b>꾹 눌러</b> 다른 사진 위에 놓으면 두 사진의 자리가 바뀌어요. 다른 방 사진과도 돼요.',
+    { title: '사진 자리 바꾸기', text: '지도에서 방을 누르면 그 방으로 바로 가요.<br>사진을 <b>꾹 눌러</b> 다른 사진 위에 놓으면 두 사진의 자리가 바뀌고, 사진과 사진 <b>사이</b>에 놓으면 그 사이에 끼워져요. 다른 방으로도 돼요.',
       task: '사진을 꾹 눌러 다른 사진 위에 놓아 보세요', done: () => stats.swaps > seen.swaps0, onEnter: () => { seen.swaps0 = stats.swaps; } },
     { title: '방 순서 바꾸기', text: '지도를 <b>축소</b>하면 사진은 숨고 방만 보여요. 그때 방을 <b>꾹 눌러 끌면</b> 다른 방 사이에 끼워 넣을 수 있어요. 다시 <b>확대</b>하면 사진이 보여요.',
       task: isTouch ? '지도를 <b>축소</b>해서(두 손가락 오므리기 또는 <b>−</b>) 방만 보이게 한 뒤, 방을 <b>꾹 눌러</b> 다른 자리로 옮겨 보세요' : '<b>−</b>(또는 휠)로 <b>축소</b>해서 방만 보이게 한 뒤, 방을 끌어 다른 자리로 옮겨 보세요',

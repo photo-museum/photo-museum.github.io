@@ -201,7 +201,7 @@ export class MuseumMap {
       ? '방 그림을 끌면 순서가 바뀌어요 · 아래쪽을 끌면 넘겨 봐요'
       : this.roomsMode
         ? '방을 꾹 눌러 끌면 다른 방 사이에 넣어요 · 확대하면 사진이 보여요'
-        : '사진을 꾹 눌러 끌면 자리 바꾸기 · 축소하면 방만 보여요';
+        : '사진을 꾹 눌러 끌어 사진 위에 놓으면 자리 바꾸기, 사이에 놓으면 끼워 넣기 · 축소하면 방만 보여요';
   }
   get roomsMode() { return this.zoom < 0.7; }
   // 확대·축소: 화면에서 (ax: 목록 안 x) 자리를 그대로 두고 바꾼다
@@ -529,10 +529,32 @@ export class MuseumMap {
     };
     this._auto = requestAnimationFrame(step);
   }
+  // 끌고 있는 사진을 어디에 놓을지:
+  //  - 다른 사진의 한가운데 → 자리 바꾸기 (swap)
+  //  - 사진과 사진 사이(빈 곳, 다른 방도) → 그 사이에 끼워 넣기 (insert, 빨간 세로줄로 보여 줌)
   _target(d) {
     const el = document.elementFromPoint(d.x, d.y);
-    const t = el && el.closest && el.closest('#map .rooms .thumb');
-    return t && t !== d.thumb ? t : null;
+    if (!el || !el.closest) return null;
+    const plan = el.closest('#map .rooms .plan');
+    if (!plan) return null;
+    const card = plan.closest('.mroom');
+    const [cx] = this.toContent(d.x, d.y);
+    const px = cx - (card.offsetLeft + plan.offsetLeft - this.row.scrollLeft); // 방 그림 안 x
+    const t = el.closest('.thumb');
+    if (t && t !== d.thumb && !t.classList.contains('ins')) {
+      const tc = t.offsetLeft + t.offsetWidth / 2;
+      if (Math.abs(px - tc) < t.offsetWidth * 0.3) return { kind: 'swap', el: t };
+    }
+    // 끼워 넣을 자리: 이 방 사진들(끌고 있는 것 빼고)을 왼쪽부터 세어 손가락 앞에 몇 장 있나
+    const thumbs = [...plan.querySelectorAll('.thumb:not(.ghost)')].filter(x => x !== d.thumb)
+      .map(x => ({ el: x, c: x.offsetLeft + x.offsetWidth / 2 })).sort((a, b) => a.c - b.c);
+    let k = 0;
+    while (k < thumbs.length && thumbs[k].c < px) k++;
+    const before = thumbs[k] ? thumbs[k].el.dataset.pid : null;
+    const lx = k === 0 ? (thumbs[0] ? thumbs[0].c - thumbs[0].el.offsetWidth / 2 - 6 : px)
+      : k === thumbs.length ? thumbs[k - 1].c + thumbs[k - 1].el.offsetWidth / 2 + 6
+      : (thumbs[k - 1].c + thumbs[k].c) / 2;
+    return { kind: 'insert', plan, ri: +card.dataset.i, before, lx };
   }
   _moveGhost(d) {
     const [cx, cy] = this.toContent(d.x, d.y);
@@ -540,19 +562,32 @@ export class MuseumMap {
     g.style.left = (cx - g.offsetWidth / 2) + 'px';
     g.style.top = (cy - g.offsetHeight / 2) + 'px';
     const t = this._target(d);
-    if (t !== d.over) {
+    // 자리 바꾸기 강조
+    const over = t && t.kind === 'swap' ? t.el : null;
+    if (over !== d.over) {
       if (d.over) d.over.classList.remove('over');
-      if (t) t.classList.add('over');
-      d.over = t;
+      if (over) over.classList.add('over');
+      d.over = over;
     }
+    // 끼워 넣기 줄
+    if (!this._insLine) { this._insLine = document.createElement('i'); this._insLine.className = 'ins-line'; }
+    const L = this._insLine;
+    if (t && t.kind === 'insert') {
+      if (L.parentNode !== t.plan) t.plan.appendChild(L);
+      L.style.left = (t.lx - 2) + 'px';
+    } else if (L.parentNode) L.remove();
+    d.target = t;
   }
-  // 손을 뗀 순간 강조돼 있던 판에 놓는다 (휴대폰은 꾹 누른 뒤 pointercancel 로 끝나기도 해서)
+  // 손을 뗀 순간 보이던 대로 놓는다 (휴대폰은 꾹 누른 뒤 pointercancel 로 끝나기도 해서)
   _drop(d) {
-    const t = d.over;
+    const t = d.target;
     if (d.over) d.over.classList.remove('over');
+    if (this._insLine && this._insLine.parentNode) this._insLine.remove();
     d.ghost.remove();
     d.thumb.classList.remove('lifted');
-    if (t) this.onSwap(d.thumb.dataset.pid, t.dataset.pid);
+    if (!t) return;
+    if (t.kind === 'swap') this.onSwap(d.thumb.dataset.pid, t.el.dataset.pid);
+    else if (t.before !== d.thumb.dataset.pid) this.onInsert && this.onInsert(d.thumb.dataset.pid, t.ri, t.before);
   }
 
   _toggleActs(card) {
