@@ -289,6 +289,11 @@ export function initHome(a) {
     const by = Math.max(...[[hb.left, hb.top], [hb.right, hb.top], [hb.left, hb.bottom], [hb.right, hb.bottom]].map(([x, y]) => toContent(x, y)[1]));
     homePop.style.top = (by + 16) + 'px'; // 꼬리(8px)가 버튼에 닿지 않게 띄운다
     homePop.style.right = Math.max(12, (a.viewW - cx) - 34) + 'px'; // 꼬리 가운데(오른쪽에서 34px)가 버튼 가운데에 오게
+    // 꼬리 끝(말풍선 오른쪽에서 34px)이 버튼 한가운데를 가리키게: 실제로 놓인 자리를 재서 어긋난 만큼 옮긴다
+    let px = 0;
+    for (let e = homePop; e && e.id !== 'stage'; e = e.offsetParent) px += e.offsetLeft;
+    const off = (px + homePop.offsetWidth - 34) - cx;
+    if (Math.abs(off) > 0.5) homePop.style.right = (parseFloat(homePop.style.right) + off) + 'px';
     homePop.classList.add('show');
     clearTimeout(homePopTimer);
     homePopTimer = setTimeout(hideHomePop, 4500);
