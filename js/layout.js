@@ -49,7 +49,8 @@ export function layoutMuseum(museum) {
   museum.rooms.forEach((room, ri) => {
     const walls = { L: [], R: [] };
     room.photos.forEach((photo, pi) => {
-      walls[pi % 2 === 0 ? 'L' : 'R'].push({ photo, index: pi, ...panelSize(displayAspect(photo)) });
+      // 왼쪽 벽 맨 앞은 방 소개 글 자리라, 첫 사진은 맞은편(오른쪽)부터: 글(왼) → 1(오) → 2(왼) → 3(오) …
+      walls[pi % 2 === 0 ? 'R' : 'L'].push({ photo, index: pi, ...panelSize(displayAspect(photo)) });
     });
     // 벽마다 차례로 쌓기
     const place = (list, start) => {
@@ -59,7 +60,7 @@ export function layoutMuseum(museum) {
     };
     const endL = place(walls.L, START_MARGIN);
     const endR = place(walls.R, START_R);
-    const content = Math.max(endL, walls.R.length ? endR : 0) + END_MARGIN;
+    const content = Math.max(walls.L.length ? endL : 0, endR) + END_MARGIN;
     const length = Math.max(MIN_LEN, content);
     const shift = (length - content) / 2; // 방이 남으면 가운데로
 

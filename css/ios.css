@@ -30,7 +30,7 @@ svg .fill { fill: currentColor; stroke: none; }
 
 /* 유리 공통 */
 :root body #home-btn, :root body #hud .pill, :root body .nav, :root body #goto, :root body #minimap,
-:root body #tools, :root body #tour-stop, :root body #toast, :root body #undo, :root body #guide {
+:root body #tools, :root body #toast, :root body #undo, :root body #guide {
   background: var(--gx-bg); border: 1px solid var(--gx-border); box-shadow: var(--gx-shadow); color: #fff;
   -webkit-backdrop-filter: blur(16px) saturate(190%); backdrop-filter: blur(16px) saturate(190%);
 }
@@ -107,7 +107,6 @@ body.home-open #edit-menu, body.style-open #edit-menu { display: none; }
 /* ---------- 알림 · 되돌리기 · 관람 멈추기 ---------- */
 :root body #toast { border-radius: 20px; padding: 9px 16px; font-size: 13px; font-weight: 500; }
 :root body #undo { border-radius: 20px; padding: 9px 16px; font-size: 13px; }
-:root body #tour-stop { border-radius: 20px; padding: 9px 18px; font-size: 13px; font-weight: 600; opacity: .7; }
 :root body #hint { color: rgba(255,255,255,.8); text-shadow: 0 1px 6px rgba(0,0,0,.5); }
 :root body.light-room #hint { color: rgba(30,30,32,.75); text-shadow: none; }
 :root body.light-room #hud { color: #fff; }
@@ -356,8 +355,6 @@ body.rotated #home .hstrip { max-width: calc(4 * 48px + 3 * 6px + 12px + 2px); }
 :root body #map .mroom { align-items: center; }
 :root body #map .rooms .door.exit::before { content: ''; position: absolute; right: 100%; top: 19px; width: 23px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.5); }
 /* 관람 모드: ‹ 이전 / 다음 › 만 또렷하게 (자동으로 넘어가지 않음) */
-body.touring .nav.show { opacity: .85; }
-body.touring .nav small { opacity: 1; }
 /* 작은 지도: 왼쪽 위 홈·제목 알약과 같은 높이 (위 끝을 맞추고 높이도 비슷하게) */
 :root body #minimap { top: max(12px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); padding: 4px 6px; border-radius: 19px; }
 :root body.rotated #minimap { top: 12px; right: 14px; }
@@ -419,4 +416,16 @@ body.editing #edit-menu button small { display: none; }
 body.editing #edit-menu button svg { width: 28px; height: 28px; }
 body.editing #edit-menu button b { font-size: 14px; }
 body.editing #edit-menu { gap: 6px; }
-body.touring #edit-menu, body.map-open #edit-menu { display: none; }
+
+/* 방 꾸미기 (간단히): 밝은 방 / 어두운 방 카드 두 장 */
+:root body #style-panel.simple .tabs { display: none; }
+:root body #style-panel.simple .items { display: flex; gap: 12px; overflow: visible; padding: 4px 2px 2px; }
+#style-panel .preset { flex: 1; display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: 20px; text-align: left; cursor: pointer;
+  background: rgba(255,255,255,.6); border: 2px solid transparent; color: var(--label); }
+#style-panel .preset i { flex: none; position: relative; width: 108px; height: 68px; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1), 0 3px 8px rgba(0,0,0,.14); }
+#style-panel .preset i u { position: absolute; left: 50%; top: 20%; width: 34px; height: 22px; margin-left: -17px; border-radius: 2px; background: linear-gradient(160deg, #9db7d6, #5b7a5a); box-shadow: 0 2px 5px rgba(0,0,0,.35), 0 0 14px rgba(255,236,200,.55); }
+#style-panel .preset span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#style-panel .preset b { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+#style-panel .preset small { font-size: 12px; color: var(--label2); line-height: 1.35; }
+#style-panel .preset.on { border-color: var(--accent); background: rgba(229,72,77,.07); }
+#home .hbtns button[hidden] { display: none !important; }

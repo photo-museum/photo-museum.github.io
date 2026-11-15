@@ -1,6 +1,6 @@
 {
-  "name": "Photo Museum",
-  "short_name": "Photo Museum",
+  "name": "My Museum",
+  "short_name": "My Museum",
   "description": "나만의 사진 전시실",
   "start_url": "./",
   "scope": "./",

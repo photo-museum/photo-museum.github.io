@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#050505">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Photo Museum">
+  <meta name="apple-mobile-web-app-title" content="My Museum">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="icon" href="assets/icons/icon-192.png">
-  <title>Photo Museum</title>
+  <title>My Museum</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- 글씨체: js/fonts.js 와 같이 바꾼다. 기본은 프리텐다드 -->
@@ -61,16 +61,15 @@
     </div>
   </div>
   <div id="toast"></div>
-  <button id="tour-stop" type="button">■ 관람 멈추기</button>
   <button id="undo" type="button" aria-label="되돌리기">↶ 되돌리기 <span></span></button>
 
   <nav id="tools" aria-label="관람과 편집">
-    <button data-act="tour" class="tour" aria-label="관람 모드: 사진을 차례로 보여 줘요"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M8 5.5v13l10.5-6.5z"/></svg><span>관람</span></button>
+    <button data-act="tour" class="tour" aria-label="관람 모드"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M8 5.5v13l10.5-6.5z"/></svg><span>관람</span></button>
     <button data-act="edit" aria-expanded="false" aria-controls="edit-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span>편집</span></button>
   </nav>
   <div id="edit-menu" role="menu" aria-label="편집">
     <button role="menuitem" data-act="photos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg><span><b>사진 넣기</b><small>이 방의 빈 판에 걸어요</small></span></button>
-    <button role="menuitem" data-act="theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-1.5-1.2-2-2.4-2H16a2 2 0 0 1-2-2V6.5C14 4.6 13.3 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/></svg><span><b>방 꾸미기</b><small>벽 · 천장 · 바닥 · 조명</small></span></button>
+    <button role="menuitem" data-act="theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-1.5-1.2-2-2.4-2H16a2 2 0 0 1-2-2V6.5C14 4.6 13.3 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/></svg><span><b>방 꾸미기</b><small>밝은 방 · 어두운 방</small></span></button>
     <button role="menuitem" data-act="room"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg><span><b>방 만들기</b><small>끝에 새 방을 붙여요</small></span></button>
   </div>
 
@@ -101,10 +100,10 @@
     <div class="hbg3" aria-hidden="true"><div class="ph"></div><div class="ph"></div><div class="shade"></div></div>
     <div class="flow" aria-hidden="true"></div>
     <header>
-      <span class="brand">Photo Museum</span>
+      <span class="brand">My Museum</span>
       <div class="hbtns">
         <button id="h-backup" aria-label="보관: 백업과 불러오기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></button>
-        <button id="h-styles" aria-label="방 스타일 둘러보기"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path class="fill" d="M12 3a9 9 0 0 0 0 18z"/></svg></button>
+        <button id="h-styles" aria-label="방 스타일 둘러보기" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path class="fill" d="M12 3a9 9 0 0 0 0 18z"/></svg></button>
         <button id="h-tour" aria-label="사용법 둘러보기"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.5M12 17h.01"/></svg></button>
       </div>
     </header>

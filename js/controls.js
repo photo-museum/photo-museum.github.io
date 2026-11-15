@@ -53,7 +53,7 @@ export class WalkControls {
     let len = 0, px = this.pos.x, pz = this.pos.z;
     for (const p of points) { len += Math.hypot(p.x - px, p.z - pz); px = p.x; pz = p.z; }
     const last = points[points.length - 1];
-    this.auto = { path: points.slice(), x: last.x, z: last.z, yawEnd: yaw, speed: Math.min(5, Math.max(WALK, len / 3.2)) };
+    this.auto = { path: points.slice(), x: last.x, z: last.z, yawEnd: yaw, speed: Math.min(7, Math.max(3.4, len / 1.8)) }; // 눌러서 갈 때는 성큼성큼 (걷기 1.9 → 3.4~7)
   }
 
   _bind() {
@@ -297,7 +297,7 @@ export class WalkControls {
       const d = Math.hypot(dx, dz);
       const lastLeg = a.path.length === 1;
       if (!lastLeg && d < 0.35) a.path.shift(); // 중간 점은 지나가듯
-      const v = lastLeg ? Math.min(a.speed, d * 1.6) : a.speed;
+      const v = lastLeg ? Math.min(a.speed, Math.max(0.25, d * 2.6)) : a.speed;
       if (d > 0.02) { tx = dx / d * v; tz = dz / d * v; }
       // 가는 동안은 가는 쪽을, 마지막 구간에서는 바라볼 쪽을 본다
       let want = a.yawEnd;

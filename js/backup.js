@@ -30,7 +30,7 @@ export async function makeBackup(exhibitions, onProgress = () => {}) {
 export async function readBackup(file, onProgress = () => {}) {
   const buf = await file.arrayBuffer();
   const magic = new TextDecoder().decode(new Uint8Array(buf, 0, MAGIC.length));
-  if (magic !== MAGIC) throw new Error('Photo Museum 백업 파일이 아니에요');
+  if (magic !== MAGIC) throw new Error('My Museum 백업 파일이 아니에요');
   const hl = new DataView(buf, MAGIC.length, 4).getUint32(0);
   const head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, MAGIC.length + 4, hl)));
   if (!head || !Array.isArray(head.exhibitions)) throw new Error('백업 파일이 망가졌어요');

@@ -1,7 +1,9 @@
 // 방 꾸미기 창: 벽 · 천장 · 바닥 · 조명을 따로 고른다 (입구·출구도). 벽을 바꾸면 추천만 보여 주고, '추천대로'를 눌러야 맞춰진다.
 // main.js 가 initStylePanel(a) 로 한 번 부른다. a.museum 은 읽을 때마다 지금 전시실.
 import { texOf } from './builder.js';
-import { WALLS, CEILINGS, FLOORS, LIGHTS, WALL_BY, CEIL_BY, FLOOR_BY, LIGHT_BY, styleOf, recOf } from './styles.js';
+import { WALLS, CEILINGS, FLOORS, LIGHTS, WALL_BY, CEIL_BY, FLOOR_BY, LIGHT_BY, styleOf, recOf, PRESETS, presetOf } from './styles.js';
+
+const SIMPLE = true; // 밝은 방 / 어두운 방 두 가지만 고른다. false 로 하면 예전 벽·천장·바닥·조명 탭
 
 const $ = s => document.querySelector(s);
 
@@ -82,6 +84,28 @@ export function initStylePanel(a) {
     const fol = stylePanel.querySelector('.follow');
     fol.hidden = !tg.key || tg.follows;
     if (tg.key) fol.textContent = `${tg.baseName}과 같게`;
+    if (SIMPLE) {
+      // 카드 두 장: 밝은 방 / 어두운 방
+      stylePanel.classList.add('simple');
+      const cur = presetOf(st);
+      stylePanel.querySelector('.now').textContent = tg.key && tg.follows ? `지금은 ${tg.baseName}과 같아요 · 고르면 ${tg.label}만 따로 바뀌어요`
+        : cur ? cur.sub : `지금: ${W.label} (예전에 꾸민 방) · 고르면 바뀌어요`;
+      stylePanel.querySelector('.reset').hidden = true;
+      stylePanel.querySelector('.rec').hidden = true;
+      const box = stylePanel.querySelector('.items');
+      box.innerHTML = '';
+      for (const P of PRESETS) {
+        const b = document.createElement('button');
+        b.className = 'preset' + (cur === P && !(tg.key && tg.follows) ? ' on' : '');
+        b.dataset.preset = P.id;
+        b.innerHTML = `<i style="background: linear-gradient(180deg, ${P.wallCss} 0 64%, ${P.floorCss} 64%)"><u></u></i><span><b></b><small></small></span>`;
+        b.querySelector('b').textContent = P.label;
+        b.querySelector('small').textContent = P.sub;
+        b.addEventListener('click', () => applyPreset(P.id));
+        box.appendChild(b);
+      }
+      return;
+    }
     stylePanel.querySelector('.now').textContent = tg.key && tg.follows ? `지금은 ${tg.baseName}과 같아요 · 고르면 ${tg.label}만 따로 바뀌어요` : '';
     if (!(tg.key && tg.follows)) stylePanel.querySelector('.now').textContent = `${W.label} · ${CEIL_BY[st.ceil].label} · ${FLOOR_BY[st.floor].label} · ${LIGHT_BY[st.light].label}`;
     for (const b of stylePanel.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === styleTab);
@@ -115,6 +139,17 @@ export function initStylePanel(a) {
     }
     const on = box.querySelector('.sw.on');
     if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.clientWidth / 2 + on.offsetWidth / 2);
+  }
+  function applyPreset(id) {
+    const tg = styleTarget();
+    const P = PRESETS.find(p => p.id === id);
+    if (!tg || !P) return;
+    pushUndo(`${tg.label} 꾸미기`);
+    tg.set({ ...P.style });
+    persist();
+    rebuild();
+    styleRi = Math.max(-1, Math.min(a.museum.rooms.length, styleRi));
+    renderStylePanel();
   }
   function applyStyle(kind, id) {
     const tg = styleTarget();
@@ -160,5 +195,5 @@ export function initStylePanel(a) {
   const lookFor = tab => { controls.pitchT = tab === 'ceil' ? 0.6 : tab === 'floor' ? -0.5 : tab === 'light' ? 0.15 : 0.02; };
   for (const b of stylePanel.querySelectorAll('.tabs button')) b.addEventListener('click', () => { styleTab = b.dataset.tab; lookFor(styleTab); renderStylePanel(); });
 
-  return { stylePanel, openStylePanel, closeStylePanel, renderStylePanel, applyStyle };
+  return { stylePanel, openStylePanel, closeStylePanel, renderStylePanel, applyStyle, applyPreset };
 }

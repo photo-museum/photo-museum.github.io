@@ -139,7 +139,7 @@ export class MuseumMap {
         return;
       }
       if (performance.now() - (this._handled || 0) < 500) return; // 방/사진 누르기에서 이어진 click
-      if (e.target === this.el || e.target === this.row) { if (!this.isBlocked()) this.close(); }
+      // 빈 곳을 눌러도 닫히지 않는다 (아래 빈 곳을 밀다가 자꾸 닫혀서). 닫기는 ✕ · 방 누르기 · Esc 로만.
     });
     window.addEventListener('keydown', e => {
       if (!this.isOpen) return;

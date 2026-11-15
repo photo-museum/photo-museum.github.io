@@ -4,6 +4,16 @@
 // room.style = { wall, ceil?, floor?, light? }  (ceil/floor 가 없으면 벽의 추천, light 가 없으면 은은한 빛)
 // 벽을 바꿔도 천장·바닥·조명은 그대로 두고 추천만 보여 준다. '추천대로'를 누르면 셋 다 추천으로.
 
+// ---------- 간단히: 방 꾸미기는 두 가지만 ----------
+// 지금은 방 꾸미기 창에서 이 둘만 고른다 (벽·천장·바닥·조명 카탈로그는 아래에 그대로 남아 있고, 예전에 꾸민 방은 그대로 보인다).
+export const PRESETS = [
+  { id: 'light', label: '밝은 방', sub: '흰 벽 · 트랙 조명 · 밝은 콘크리트', wallCss: '#f4f3f0', floorCss: '#d5d0c8',
+    style: { wall: 'gallery', ceil: 'track', floor: 'concrete', light: 'spot' } },
+  { id: 'dark', label: '어두운 방', sub: '차콜 벽 · 월넛 마루 · 스포트라이트', wallCss: '#2e2a27', floorCss: '#7a5236',
+    style: { wall: 'charcoal', ceil: 'same', floor: 'walnut', light: 'spot' } },
+];
+export const presetOf = st => PRESETS.find(p => ['wall', 'ceil', 'floor', 'light'].every(k => p.style[k] === st[k])) || null;
+
 // ---------- 벽 ----------
 // color: 벽 색, map: 마감 무늬, wainscot: 아래 징두리판 { c, h }, crown: 위 몰딩 색
 export const WALL_GROUPS = ['하양·회색', '클래식', '부드러운 색', '깊은 색', '마감'];

@@ -8,7 +8,7 @@ export function initBackup(a) {
   // ---------- 백업 · 불러오기 · 공유 ----------
   // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
   // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-  const APP_VERSION = '11.16-c'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+  const APP_VERSION = '11.16-g'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
   const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const ownExhibitions = () => a.library.exhibitions.filter(e => !e.showcase && !e.tutorial);
   function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -20,7 +20,7 @@ export function initBackup(a) {
   function openBackupMenu() {
     openSheet([
       { title: true, label: `보관 · ${backupAge()} · 버전 ${APP_VERSION}` },
-      { label: '⤓ 모든 전시실을 백업 파일로 저장', fn: () => exportExhibitions(ownExhibitions(), `PhotoMuseum-백업-${dateTag()}.pmbk`, true) },
+      { label: '⤓ 모든 전시실을 백업 파일로 저장', fn: () => exportExhibitions(ownExhibitions(), `MyMuseum-백업-${dateTag()}.pmbk`, true) },
       { label: '⤒ 백업 파일에서 불러오기', fn: () => importPick() },
       { label: isStandalone() ? '✓ 홈 화면 앱으로 쓰고 있어요' : '홈 화면에 앱으로 추가하는 법', fn: () => installHelp() },
       { label: '닫기', quiet: true },
@@ -63,7 +63,7 @@ export function initBackup(a) {
         ? 'Safari 아래쪽 공유 버튼(□↑) → "홈 화면에 추가". 홈 화면 앱은 사진을 지우지 않고 오래 보관해요. 앱은 Safari 와 저장 공간이 따로라서, 먼저 여기서 백업 파일을 저장한 뒤 앱에서 불러오세요.'
         : '브라우저 메뉴에서 "앱 설치" 또는 "홈 화면에 추가"를 고르세요. 설치한 앱은 사진을 더 오래 안전하게 보관해요.' },
       ...(deferredInstall ? [{ label: '지금 설치하기', fn: () => { deferredInstall.prompt(); deferredInstall = null; } }] : []),
-      { label: '먼저 백업 파일 저장', fn: () => exportExhibitions(ownExhibitions(), `PhotoMuseum-백업-${dateTag()}.pmbk`, true) },
+      { label: '먼저 백업 파일 저장', fn: () => exportExhibitions(ownExhibitions(), `MyMuseum-백업-${dateTag()}.pmbk`, true) },
       { label: '닫기', quiet: true },
     ]);
   }
