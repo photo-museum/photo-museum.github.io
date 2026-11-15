@@ -819,6 +819,8 @@ navPrev.addEventListener('click', () => goStop(navFromHere().prev));
 navNext.addEventListener('click', () => goStop(navFromHere().next));
 
 const gotoBtn = $('#goto');
+const gbCta = $('#gb-cta');
+gbCta.addEventListener('click', () => { gbCta.classList.remove('show'); openGuestbook(); });
 let gotoTarget = null;
 function updateGoto() {
   const moving = Math.hypot(controls.vel.x, controls.vel.z) > 0.15 || controls.auto;
@@ -831,6 +833,15 @@ function updateGoto() {
       if (t.d < 0.3 && Math.abs(dy) < 0.15) t = null;
     }
   }
+  // 방명록 책상 가까이 오면 '방명록 쓰기' (그래야 눌러서 쓸 생각을 한다)
+  const L = museumScene.layout;
+  let nearDesk = false;
+  if (L && L.exit && controls.enabled && !map.isOpen && !sheetOpen() && !gb.classList.contains('open')) {
+    const dz = L.exit.zStart - 3.4; // 책상 자리 (builder GB_DESK.s)
+    nearDesk = Math.hypot(controls.pos.x, controls.pos.z - dz) < 3.2 && controls.pos.z < L.exit.zStart + 0.5;
+  }
+  gbCta.classList.toggle('show', nearDesk);
+  if (nearDesk && t && t.kind === '방명록') t = null; // 같은 자리를 두 번 말하지 않게
   gotoTarget = t;
   gotoBtn.classList.toggle('show', !!t);
   if (t) gotoBtn.querySelector('span').textContent = `${t.kind} 앞으로`;
@@ -1664,7 +1675,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-l'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-m'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
