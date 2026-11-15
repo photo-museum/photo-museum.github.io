@@ -516,3 +516,16 @@ body.map-open #edit-menu { display: none; }
 :root body #map.v .mroom.v.drop .rhd { background: rgba(229,72,77,.35); box-shadow: 0 0 0 2px var(--accent); }
 :root body #map .bar .foldall { display: none; }
 :root body #map.v .bar .foldall { display: block; font-size: 13px; padding: 0 14px; }
+
+/* 세로 지도: 입구 → 방들 → 출구를 잇는 선 (왼쪽 세로줄 + 방마다 점) */
+:root body #map.v .rooms { padding-left: 34px; }
+:root body #map.v .mroom.v::before, :root body #map.v .vplace::before { content: ''; display: block; position: absolute; left: -19px; top: -6px; bottom: -6px; width: 3px; height: auto; border-radius: 2px; background: rgba(255,255,255,.32); }
+:root body #map.v .mroom.v::after, :root body #map.v .vplace::after { content: ''; display: block; position: absolute; left: -24px; right: auto; top: 9px; width: 13px; height: 13px; box-sizing: border-box; border-radius: 50%; background: #1c1c1e; border: 3px solid rgba(255,255,255,.75); }
+:root body #map.v .vplace { position: relative; overflow: visible; }
+:root body #map.v .vplace::after { top: 50%; margin-top: -6.5px; }
+:root body #map.v .vplace.lobby::before { top: 50%; }
+:root body #map.v .vplace.exit::before { bottom: 50%; }
+:root body #map.v .vplace.add::before { background: repeating-linear-gradient(180deg, rgba(255,255,255,.32) 0 5px, transparent 5px 9px); }
+:root body #map.v .vplace.add::after { border-style: dashed; background: transparent; }
+:root body #map.v .mroom.v.here::after { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 4px rgba(229,72,77,.3); }
+:root body #map.v .mroom.v.drag::before { visibility: hidden; }

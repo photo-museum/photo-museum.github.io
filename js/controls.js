@@ -298,7 +298,12 @@ export class WalkControls {
       const lastLeg = a.path.length === 1;
       if (!lastLeg && d < 0.35) a.path.shift(); // 중간 점은 지나가듯
       const v = lastLeg ? Math.min(a.speed, Math.max(0.25, d * 2.6)) : a.speed;
-      if (d > 0.02) { tx = dx / d * v; tz = dz / d * v; }
+      if (lastLeg && d < 0.12) {
+        // 마지막 한 뼘은 속도를 거치지 않고 곧장 끌어당긴다 (속도가 남아 목표를 지나쳤다 되돌아오며 어긋난 채 멈추지 않게)
+        this.vel.x = this.vel.z = 0;
+        const k = Math.min(1, dt * 10);
+        this.pos.x += dx * k; this.pos.z += dz * k;
+      } else if (d > 0.02) { tx = dx / d * v; tz = dz / d * v; }
       // 가는 동안은 가는 쪽을, 마지막 구간에서는 바라볼 쪽을 본다
       let want = a.yawEnd;
       const remain = lastLeg ? d : 99;

@@ -653,6 +653,8 @@ function route(x0, z0, x1, z1) {
   return [...ev.flatMap(e => e.pts), { x: x1, z: z1 }];
 }
 const navPrev = $('#nav-prev'), navNext = $('#nav-next');
+const stopKey = s => s.photoId || `${s.kind}:${s.spot.x.toFixed(1)},${s.spot.z.toFixed(1)}`;
+let navLast = null; // 이전·다음으로 마지막에 간 자리
 let navTargets = { prev: null, next: null };
 // 지금 자리에서 이전·다음 자리 (누르는 순간 새로 계산 — 막 도착했을 때도 맞게)
 // 걸어가는 중이면 '가고 있는 자리'를 기준으로: 도착을 기다리지 않고 연달아 눌러 빨리 넘길 수 있다
@@ -662,6 +664,19 @@ function navFromHere() {
   const px = base.x, pz = base.z;
   let at = -1, best = 0.6, prev = null, next = null;
   st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz); if (d < best) { best = d; at = i; } });
+  if (at < 0 && R2) {
+    // 사진 앞이 아닌 곳에 서 있을 때 (조이스틱으로 조금 움직였거나 방 한가운데):
+    //  · 방금 보던 자리에서 몇 걸음 안 떨어졌으면 → 그 자리의 이전·다음 (보던 순서를 잇는다)
+    //  · 아니면 → 가장 가까운 자리가 '다음', 그 앞이 '이전' (멀리 건너뛰지 않는다)
+    const li = navLast ? st.findIndex(s => stopKey(s) === navLast) : -1;
+    if (li >= 0 && Math.hypot(st[li].spot.x - px, st[li].spot.z - pz) < 3.5) at = li;
+    else {
+      const ri = museumScene.roomIndexAt(pz);
+      let ni = -1, nd = Infinity;
+      st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz) + (museumScene.roomIndexAt(s.spot.z) === ri ? 0 : 50); if (d < nd) { nd = d; ni = i; } });
+      return { prev: st[ni - 1] || null, next: st[ni] || null };
+    }
+  }
   if (at >= 0) { prev = st[at - 1] || null; next = st[at + 1] || null; }
   else {
     next = st.find(s => s.spot.z < pz - 0.2) || null;
@@ -694,9 +709,9 @@ function goStop(s) {
   hideHint();
   if (R2) { // 벽을 따라 한 방향으로만 도니 어지럽지 않다 → 깜빡이지 않고 걸어간다 (걷는 중에 또 누르면 그다음 자리로). 예전 구조(old/)만 깜빡 넘기기
     navPending = null;
-    // 같은 방 안에서는 고개를 돌리지 않고 몸만 옆으로 옮긴다. 문을 지나 다른 방으로 갈 때만 가는 쪽을 본다
-    const path = route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z);
-    controls.walkPath(path, s.spot.yaw, path.length === 1);
+    navLast = stopKey(s);
+    // 가는 쪽으로 고개를 돌리지 않는다: 몸만 옮기면서, 다음에 볼 쪽으로 꼭 필요한 만큼만 천천히 돈다 (문을 지나 다음 방으로 갈 때도)
+    controls.walkPath(route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z), s.spot.yaw, true);
     controls.pitchT = -0.02;
     return;
   }

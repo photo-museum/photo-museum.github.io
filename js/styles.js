@@ -111,9 +111,9 @@ export const LIGHTS = [
   { id: 'soft', label: '은은한 빛', wash: true, color: 0xffe9cf, amb: 1, lm: 1, sw: ['#fff4e2', '#d9cbb6'] },
   { id: 'even', label: '고른 흰 빛', color: 0xffffff, amb: 1.12, lm: 0.6, sw: ['#ffffff', '#ecebe8'] },
   { id: 'spot', label: '스포트라이트', spots: true, color: 0xffe9cf, amb: 0.92, lm: 1.15, sw: ['#ffe2b8', '#3a332c'] },
-  { id: 'spot-white', label: '흰 방 스포트', spots: true, color: 0xfff0dc, amb: 0.7, lm: 1.8, sw: ['#fff0dc', '#b9b4ac'] }, // 흰 벽에서도 빛 웅덩이가 보이게: 둘레를 낮추고 스포트를 세게
+  { id: 'spot-white', label: '흰 방 스포트', spots: true, color: 0xfff0dc, amb: 0.64, lm: 2.4, sw: ['#fff0dc', '#b9b4ac'] }, // 흰 벽에서도 빛 웅덩이가 보이게: 둘레를 낮추고 스포트를 세게
   { id: 'spot-cool', label: '하얀 스포트', spots: true, color: 0xf3f6ff, tint: 0.08, amb: 0.95, lm: 1.1, sw: ['#f4f7ff', '#40444c'] },
-  { id: 'theater', label: '어둠 속 스포트', spots: true, color: 0xffe2c0, amb: 0.36, lm: 2.1, sw: ['#ffd9a8', '#0d0c0b'] },
+  { id: 'theater', label: '어둠 속 스포트', spots: true, color: 0xffe2c0, amb: 0.36, lm: 4.2, sw: ['#ffd9a8', '#0d0c0b'] },
   { id: 'daylight', label: '천창 자연광', sky: true, wash: true, color: 0xf2f6ff, tint: 0.1, amb: 1.08, lm: 0.85, sw: ['#ffffff', '#c9d6e6'] },
   { id: 'cove', label: '간접 조명 띠', cove: true, color: 0xfff1da, tint: 0.05, amb: 0.78, lm: 1, sw: ['#fff1da', '#6b6156'] },
   { id: 'uplight', label: '바닥 업라이트', up: true, wash: true, color: 0xffd9a6, tint: 0.12, amb: 0.62, lm: 1.7, sw: ['#3b3128', '#ffd9a6'] },
