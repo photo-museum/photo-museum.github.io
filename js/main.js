@@ -1163,11 +1163,39 @@ controls.onTap = (sx, sy) => {
     ]);
     return;
   }
+  if (ud.floor) { walkToFloor(hit.point); return; }
   if (!ud.photoId) return;
   const t = { roomIndex: ud.roomIndex, photoId: ud.photoId, panel: ud.panel };
   if (ud.label) { openEditor(t); return; }
   openPanelSheet(t);
 };
+
+// ---------- 바닥을 톡 누르면 그리로 걸어가기 ----------
+// 길은 ‹ › 와 같아서 안내벽·문은 알아서 돌아간다. 누른 자리에 작은 원이 잠깐 뜬다.
+const tapRing = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.22, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+tapRing.rotation.x = -Math.PI / 2;
+tapRing.renderOrder = 20;
+scene.add(tapRing);
+let tapRingT = 0;
+function walkToFloor(pt) {
+  const hw = ROOM_W / 2 - 0.55;
+  const x = Math.max(-hw, Math.min(hw, pt.x)), z = pt.z;
+  const px = controls.pos.x, pz = controls.pos.z;
+  const dx = x - px, dz = z - pz;
+  if (Math.hypot(dx, dz) < 0.35) return;
+  controls.joy.x = controls.joy.y = 0;
+  controls.walkPath(route(px, pz, x, z), Math.atan2(-dx, -dz)); // 가는 쪽을 보며 선다
+  tapRing.position.set(x, 0.012, z);
+  tapRingT = performance.now();
+  hideHint();
+}
+function tapRingTick() {
+  if (!tapRingT) return;
+  const k = (performance.now() - tapRingT) / 900;
+  if (k >= 1) { tapRing.material.opacity = 0; tapRingT = 0; return; }
+  tapRing.material.opacity = 0.85 * (1 - k);
+  tapRing.scale.setScalar(1 + k * 0.6);
+}
 
 function openPanelSheet(t) {
   const panel = panelFor(t.photoId) || t.panel;
@@ -1347,8 +1375,8 @@ function toast(msg, ms = 1800) {
 }
 
 $('#hint').innerHTML = isTouch
-  ? '왼쪽 아래 조이스틱으로 걷고, 화면을 끌어 둘러보세요.<br>꾹 누르거나 두 손가락을 벌리면 잠깐 확대돼요. 판을 누르면 사진을 걸 수 있어요.'
-  : '<b>W A S D</b> 또는 방향키로 걷고, 마우스를 끌어 둘러보세요. <b>Shift</b> 빠르게.<br><b>휠</b>이나 <b>오른쪽 버튼</b>으로 잠깐 확대. 판을 누르면 사진을 걸 수 있어요.';
+  ? '<b>바닥을 톡</b> 누르면 그리로 걸어가요. 조이스틱으로 걸어도 되고, 화면을 끌어 둘러보세요.<br>꾹 누르거나 두 손가락을 벌리면 잠깐 확대돼요. 판을 누르면 사진을 걸 수 있어요.'
+  : '<b>바닥을 클릭</b>하면 그리로 걸어가요. <b>W A S D</b>·방향키로도 걷고, 마우스를 끌어 둘러보세요. <b>Shift</b> 빠르게.<br><b>휠</b>이나 <b>오른쪽 버튼</b>으로 잠깐 확대. 판을 누르면 사진을 걸 수 있어요.';
 let hintHidden = false;
 function hideHint() {
   if (hintHidden) return;
@@ -1739,7 +1767,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-w'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-x'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -2063,7 +2091,7 @@ function tutorialSteps() {
   const look = isTouch ? '화면을 손가락으로 끌면' : '마우스로 끌면';
   return [
     { title: '어서 오세요', text: '사용법을 함께 둘러봐요. 이곳은 <b>제주 여행 예시 전시실</b>이에요.<br>입구 정면 벽에 전시 이름과 설명이 적혀 있어요. 미술관처럼 먼저 읽고 들어가요.' },
-    { title: '걸어서 들어가기', text: `${walk}로 걸을 수 있어요. ${look} 둘러볼 수 있고요.<br>오른쪽 문을 지나 <b>ROOM 01</b>로 들어가 보세요.`,
+    { title: '걸어서 들어가기', text: `<b>바닥을 톡</b> 누르면 그 자리로 걸어가요. ${walk}로 걸어도 돼요. ${look} 둘러볼 수 있고요.<br>오른쪽 문을 지나 <b>ROOM 01</b>로 들어가 보세요.`,
       task: '오른쪽 문을 지나 <b>ROOM 01</b>로 들어가 보세요', done: () => museumScene.roomIndexAt(controls.pos.z) >= 0 },
     { title: '방 안내벽', text: '방마다 문 앞에 <b>안내벽</b>이 있어요. 이 방이 어떤 방인지 적혀 있어요.<br>벽을 돌아 사진 쪽을 보고 멈추면 오른쪽에 <b>사진 앞으로</b> 버튼이 희미하게 떠요. 눌러 보세요.',
       task: '사진 쪽을 보고 멈춘 뒤, 오른쪽 <b>사진 앞으로</b>를 눌러 보세요', done: atViewingSpot },
@@ -2137,6 +2165,7 @@ function loop(t) {
   snapTick();
   if (loop.n % 20 === 0) updateHD();
   map.update();
+  tapRingTick();
   sharpTick();
   renderer.render(scene, camera);
   requestAnimationFrame(loop);

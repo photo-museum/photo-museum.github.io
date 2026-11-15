@@ -757,6 +757,7 @@ export class MuseumScene {
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(0, 0, zMid);
     floor.renderOrder = 10;
+    floor.userData = { floor: true }; // 바닥을 톡 누르면 그리로 걸어간다
     group.add(floor);
 
     // ----- 천장 -----
@@ -886,7 +887,7 @@ export class MuseumScene {
       const jt = new THREE.Mesh(topGeo, jambMat); jt.rotation.x = Math.PI / 2; jt.position.set(dx, DOOR_H, zc); both(jt);
       const thGeo = keep(meterPlane(DOOR_W, WALL_T));
       const thMat = keep(surfaceMaterial({ map: texOf(R, T.floorMap), tile: [3.2, 3.2], tint: T.floorTint, lightMap: R.black, ambient: T.floorAmb, lmIntensity: 0 }));
-      const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(dx, 0.0005, zc); group.add(th);
+      const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(dx, 0.0005, zc); th.userData = { floor: true }; group.add(th);
     }
 
     // ----- 조명 레일 (스포트라이트 방만) -----
