@@ -5,7 +5,7 @@ import { DEMO as DEMO_ALL, DEMO_VERSION } from './demo.js';
 // 처음 온 사람에게는 예시 전시실 두 개만 보여 준다 (다섯 개 + 시험용은 너무 많다는 사용자 결정).
 // 자동 시험(주소가 pm.test)에서는 예전처럼 다섯 개와 시험용 전시실을 모두 만든다: 시험이 그 전시실들에 기대고 있다.
 export const TESTING = /pm\.test$/.test(location.hostname);
-const FIRST = ['제주, 바람이 머문 자리', '교토, 단풍이 지는 소리'];
+const FIRST = ['교토, 단풍이 지는 소리', '골목의 고양이들'];
 const DEMO = TESTING ? DEMO_ALL : FIRST.map(t => DEMO_ALL.find(d => d.title === t)).filter(Boolean);
 import { WALL_BY, CEIL_BY, FLOOR_BY } from './styles.js';
 import { putImage, clearImages, prepareImage, uid, newPhoto, newRoom, newExhibition, HD } from './store.js';
