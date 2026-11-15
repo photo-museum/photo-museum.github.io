@@ -237,6 +237,18 @@ const desktop = {
     assert((await p.$$('#map .thumb.sel')).length === 0, '옮긴 뒤 고르기 끝');
     await p.click('#undo'); await p.waitForTimeout(700);
     assert(String(await n()) === String(n0), '되돌리기');
+    // 고른 사진 한꺼번에 지우기 → 되돌리기
+    plans = await p.$$('#map .mroom .plan'); ts = await plans[0].$$('.thumb');
+    { const [x1, y1] = await c(ts[0]), [x2, y2] = await c(ts[1]);
+      await p.keyboard.down('Control'); await p.mouse.click(x1, y1); await p.keyboard.up('Control'); await p.waitForTimeout(150);
+      await p.mouse.click(x2, y2); await p.waitForTimeout(150);
+      assert((await p.textContent('#map .seldel')).trim() === '2장 지우기', '지우기 버튼: ' + await p.textContent('#map .seldel'));
+      await p.click('#map .seldel'); await p.waitForTimeout(400);
+      await p.evaluate(() => [...document.querySelectorAll('#sheet button')].find(b => b.textContent.trim() === '2장 지우기').click()); await p.waitForTimeout(800);
+      assert((await n())[0] === n0[0] - 2, '두 장 지움: ' + await n());
+      assert((await p.$$('#map .thumb.sel')).length === 0, '지운 뒤 고르기 끝');
+      await p.click('#undo'); await p.waitForTimeout(700);
+      assert(String(await n()) === String(n0), '지운 것 되돌리기'); }
     plans = await p.$$('#map .mroom .plan'); ts = await plans[0].$$('.thumb');
     const [cx, cy] = await c(ts[0]);
     await p.keyboard.down('Control'); await p.mouse.click(cx, cy); await p.keyboard.up('Control'); await p.waitForTimeout(200);

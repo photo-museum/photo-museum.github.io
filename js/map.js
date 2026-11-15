@@ -200,6 +200,14 @@ export class MuseumMap {
     if (!this.sel) this.sel = new Set();
     for (const t of this.row.querySelectorAll('.thumb')) t.classList.toggle('sel', this.sel.has(t.dataset.pid));
     this.el.classList.toggle('selecting', this.sel.size > 0);
+    // 고른 사진 지우기 버튼 (고르는 동안만 위쪽 줄에 보인다)
+    if (!this._selDel) {
+      const b = this._selDel = document.createElement('button');
+      b.type = 'button'; b.className = 'seldel';
+      b.addEventListener('click', () => { const ids = [...this.sel]; if (ids.length && this.onDeleteMany) this.onDeleteMany(ids, () => { this.sel.clear(); this._syncSel(); }); });
+      this.el.querySelector('.bar .zoom').before(b);
+    }
+    this._selDel.textContent = `${this.sel.size}장 지우기`;
     this._tip();
   }
   _tip() {

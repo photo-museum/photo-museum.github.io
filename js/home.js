@@ -287,7 +287,7 @@ export function initHome(a) {
     const [cx, cy] = toContent(hb.left + hb.width / 2, hb.top + hb.height / 2);
     const [bx, by] = toContent(hb.right, hb.bottom);
     homePop.style.top = (Math.max(cy, by) + 10) + 'px';
-    homePop.style.right = Math.max(12, (a.viewW - cx) - 22) + 'px';
+    homePop.style.right = Math.max(12, (a.viewW - cx) - 34) + 'px'; // 꼬리 가운데(오른쪽에서 34px)가 버튼 가운데에 오게
     homePop.classList.add('show');
     clearTimeout(homePopTimer);
     homePopTimer = setTimeout(hideHomePop, 4500);

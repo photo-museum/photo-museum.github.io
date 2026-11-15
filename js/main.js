@@ -847,6 +847,7 @@ const map = new (R2 ? MuseumMap2 : MuseumMap)({ // 세로 지도 (js/map2.js). �
   onSwap: (a, b) => swapPhotos(a, b),
   onInsert: (pid, ri, beforePid) => insertPhoto(pid, ri, beforePid),
   onInsertMany: (pids, ri, beforePid) => insertPhotos(pids, ri, beforePid),
+  onDeleteMany: (pids, done) => confirmDeletePhotos(pids, done),
   onPhotoTap: (ri, pid) => openPanelSheet({ roomIndex: ri, photoId: pid, panel: panelFor(pid) }),
   onRoomAction: (act, ri) => roomAction(act, ri),
   onAddRoom: () => addRoom('white'),
@@ -949,6 +950,31 @@ function insertPhotos(pids, ri, beforePid) {
   persist();
   rebuild();
   toast(`${moved.length}장을 ROOM ${String(ri + 1).padStart(2, '0')}로 옮겼어요`);
+}
+
+// 지도에서 고른 사진을 한꺼번에 지운다 (판째로). 되돌리기 한 번으로 모두 돌아온다
+function confirmDeletePhotos(pids, done) {
+  const want = new Set(pids);
+  const n = museum.rooms.reduce((s, r) => s + r.photos.filter(p => want.has(p.id)).length, 0);
+  if (!n) return;
+  openSheet([
+    { title: true, label: `고른 사진 ${n}장을 지울까요?\n되돌리기로 다시 살릴 수 있어요` },
+    { label: `${n}장 지우기`, danger: true, fn: () => {
+      pushUndo('사진 여러 장 지우기');
+      const gone = [];
+      for (const r of museum.rooms) {
+        gone.push(...r.photos.filter(p => want.has(p.id)));
+        r.photos = r.photos.filter(p => !want.has(p.id));
+        if (!r.photos.length) r.photos.push(newPhoto()); // 방이 텅 비지 않게 빈 판 하나
+      }
+      persist();
+      forgetPhotos(gone);
+      if (done) done();
+      rebuild();
+      toast(`사진 ${n}장을 지웠어요`);
+    } },
+    { label: '취소', quiet: true },
+  ]);
 }
 
 // 사진 설명 한꺼번에 쓰기 (js/captions.js)

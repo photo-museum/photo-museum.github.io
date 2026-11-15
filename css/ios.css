@@ -260,12 +260,16 @@ body.rotated #home .hstrip .cv { width: 48px; height: 48px; border-radius: 13px;
   border: 1px solid var(--gl-border); background: var(--gl-bg); color: var(--label); font-size: 14px; font-weight: 600; cursor: pointer;
   box-shadow: inset 0 1px 1px rgba(255,255,255,.95), 0 10px 28px rgba(0,0,0,.3);
   -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
-  opacity: 0; transform: translateY(-8px) scale(.92); transform-origin: 85% 0; pointer-events: none;
+  opacity: 0; transform: translateY(-8px) scale(.92); transform-origin: calc(100% - 34px) 0; pointer-events: none;
   transition: opacity .2s ease, transform .4s var(--spring);
 }
 #home-pop svg { font-size: 15px; stroke-width: 2.6; color: var(--accent); }
 #home-pop.show { opacity: 1; transform: none; pointer-events: auto; }
-#home-pop::before { content: ''; position: absolute; top: -6px; right: 18px; width: 12px; height: 12px; background: inherit; border-left: 1px solid var(--gl-border); border-top: 1px solid var(--gl-border); transform: rotate(45deg); border-radius: 3px 0 0 0; }
+/* 꼬리: 마름모를 붙이지 않는다. 몸통과 같은 불투명 색으로, 양옆이 오목하게 흘러내려 몸통에 녹아드는 곡선 한 조각.
+   몸통이 반투명·테두리·안쪽 빛이면 꼬리와 겹치는 자리에 이음매가 보이므로 모두 빼고, 그림자는 덩어리 전체에 한 번만 건다 */
+#home-pop { border: 0; background: #f6f6f8; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; filter: drop-shadow(0 8px 16px rgba(0,0,0,.28)); }
+#home-pop::before { content: ''; position: absolute; top: -8px; right: 21px; width: 26px; height: 9px; background: #f6f6f8;
+  -webkit-clip-path: path('M0 9 C7 9 9 0 13 0 C17 0 19 9 26 9 Z'); clip-path: path('M0 9 C7 9 9 0 13 0 C17 0 19 9 26 9 Z'); }
 /* 표지 띠: 4개만 보이고 나머지는 옆으로 넘겨 본다 */
 #home .hstrip { width: auto; max-width: calc(4 * 56px + 3 * 6px + 12px + 2px); box-sizing: border-box; touch-action: none; scroll-snap-type: none; }
 @media (max-height: 420px) { #home .hstrip { max-width: calc(4 * 48px + 3 * 6px + 12px + 2px); } }
@@ -529,3 +533,7 @@ body.map-open #edit-menu { display: none; }
 :root body #map.v .vplace::after { left: -27px; top: 50%; margin-top: -6px; }
 :root body #map.v .vplace.add::after { background: #2a2a2e; border-style: dashed; }
 :root body #map.v .mroom.v.here::after { border-color: var(--accent); background: var(--accent); }
+
+/* 지도: 고른 사진 지우기 */
+:root body #map .bar .seldel { display: none; }
+:root body #map.selecting .bar .seldel { display: block; font-size: 13px; padding: 0 14px; background: var(--accent); border-color: transparent; color: #fff; }
