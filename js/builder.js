@@ -466,7 +466,7 @@ const NOTE_COLORS = ['#f6e7c8', '#f3d3d0', '#d6e6d2', '#d5e1ef', '#efe2f2', '#ff
 // 모양(GB): card = 흰 카드 / cream = 크림 카드 / text = 종이 없이 벽에 글씨만 / board = 큰 판 한 장
 function makeGuestNotes(entries, FONTS, light = false) {
   const GB = globalThis.__GB || 'text'; // 벽에 글씨만 (쪽지 종이 없음)
-  const W = 5.2, H = 2.0, ppm = 260, S = 1.5;
+  const W = 6.2, H = 2.8, ppm = 260, S = 1.5; // 글씨를 키우려고 판을 넓히고 칸을 줄였다 (6칸×2줄 → 4칸×3줄)
   const CW = Math.round(W * ppm), CH = Math.round(H * ppm);
   const c = document.createElement('canvas');
   c.width = Math.round(CW * S); c.height = Math.round(CH * S);
@@ -474,7 +474,7 @@ function makeGuestNotes(entries, FONTS, light = false) {
   g.scale(S, S);
   const list = entries.slice(-12); // 쓴 순서대로: 오래된 글이 앞, 새 글이 뒤 (12개가 넘으면 최근 12개)
   if (!list.length) list.push({ name: '', text: '첫 방명록을 남겨 주세요 ✦', color: 0, placeholder: true });
-  const cols = 6, cw = CW / cols, rh = CH / 2;
+  const cols = 4, cw = CW / cols, rh = CH / 3;
   if (GB === 'board') {
     g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowBlur = 18; g.shadowOffsetY = 8;
     g.fillStyle = '#f7f4ee'; g.fillRect(24, 24, CW - 48, CH - 48);
@@ -489,7 +489,7 @@ function makeGuestNotes(entries, FONTS, light = false) {
     let seed = 0; for (const ch of (e.id || String(i))) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
     g.save();
     g.translate(x, y);
-    const w = cw * 0.8, h = rh * 0.8;
+    const w = cw * 0.84, h = rh * 0.88;
     let ink = 'rgba(40,34,28,0.9)', ink2 = 'rgba(40,34,28,0.6)';
     if (GB === 'old') {
       g.rotate(((seed % 9) - 4) * 0.012);
@@ -512,10 +512,11 @@ function makeGuestNotes(entries, FONTS, light = false) {
     }
     g.fillStyle = ink;
     g.textBaseline = 'top';
-    g.font = FONTS.text(19);
-    const lines = wrapLines(g, e.text || '', w - 28).slice(0, 6);
-    lines.forEach((l, k) => g.fillText(l, -w / 2 + 14, -h / 2 + 18 + k * 26));
-    if (e.name) { g.font = FONTS.strong(17); g.fillStyle = ink2; g.textAlign = 'right'; g.fillText('— ' + e.name, w / 2 - 12, h / 2 - 28); g.textAlign = 'left'; }
+    g.font = FONTS.text(29);
+    const all = wrapLines(g, e.text || '', w - 28), lines = all.slice(0, 4);
+    if (all.length > 4) lines[3] = lines[3].replace(/.{0,2}$/, '…'); // 길어서 다 못 적은 글 (방명록 창에서는 다 보인다)
+    lines.forEach((l, k) => g.fillText(l, -w / 2 + 14, -h / 2 + 18 + k * 39));
+    if (e.name) { g.font = FONTS.strong(24); g.fillStyle = ink2; g.textAlign = 'right'; g.fillText('— ' + e.name, w / 2 - 12, h / 2 - 34); g.textAlign = 'left'; }
     g.restore();
   });
   const tex = new THREE.CanvasTexture(c);
