@@ -465,7 +465,7 @@ const NOTE_COLORS = ['#f6e7c8', '#f3d3d0', '#d6e6d2', '#d5e1ef', '#efe2f2', '#ff
 // 방명록 쪽지: 한 가지 색, 반듯하게 줄 맞춰 붙인다.
 // 모양(GB): card = 흰 카드 / cream = 크림 카드 / text = 종이 없이 벽에 글씨만 / board = 큰 판 한 장
 function makeGuestNotes(entries, FONTS, light = false) {
-  const GB = globalThis.__GB || 'old';
+  const GB = globalThis.__GB || 'text'; // 벽에 글씨만 (쪽지 종이 없음)
   const W = 5.2, H = 2.0, ppm = 260, S = 1.5;
   const CW = Math.round(W * ppm), CH = Math.round(H * ppm);
   const c = document.createElement('canvas');

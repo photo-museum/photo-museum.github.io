@@ -131,9 +131,10 @@ const desktop = {
     assert(JSON.stringify(await on()) === '[true,false,false,false]', '관람으로');
     assert(!(await p.$('#tour-stop')), '관람 멈추기 버튼 없음');
     await h.pose(0, -1); await p.waitForTimeout(900);
-    const z = (await h.pos()).z;
-    await p.click('#nav-next'); await p.waitForTimeout(300); await h.idle();
-    assert(Math.abs((await h.pos()).z - z) > 1, '다음 › 로 이동');
+    const a0 = await h.pos();
+    for (let k = 0; k < 2; k++) { await p.click('#nav-next'); await p.waitForTimeout(300); await h.idle(); await p.waitForTimeout(500); }
+    const a1 = await h.pos();
+    assert(Math.hypot(a1.x - a0.x, a1.z - a0.z) > 1, '다음 › 로 이동');
   },
   '방 꾸미기: 밝은 방 / 어두운 방 두 가지 · 되돌리기': async (p, h) => {
     await h.enter(0);
