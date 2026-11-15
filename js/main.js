@@ -653,9 +653,10 @@ function route(x0, z0, x1, z1) {
 const navPrev = $('#nav-prev'), navNext = $('#nav-next');
 let navTargets = { prev: null, next: null };
 // 지금 자리에서 이전·다음 자리 (누르는 순간 새로 계산 — 막 도착했을 때도 맞게)
+// 걸어가는 중이면 '가고 있는 자리'를 기준으로: 도착을 기다리지 않고 연달아 눌러 빨리 넘길 수 있다
 function navFromHere() {
   const st = museumStops();
-  const px = controls.pos.x, pz = controls.pos.z;
+  const px = controls.auto ? controls.auto.x : controls.pos.x, pz = controls.auto ? controls.auto.z : controls.pos.z;
   let at = -1, best = 0.6, prev = null, next = null;
   st.forEach((s, i) => { const d = Math.hypot(s.spot.x - px, s.spot.z - pz); if (d < best) { best = d; at = i; } });
   if (at >= 0) { prev = st[at - 1] || null; next = st[at + 1] || null; }
@@ -666,8 +667,9 @@ function navFromHere() {
   return { prev, next };
 }
 function updateNav() {
-  const show = museum && !homeOpen && controls.enabled && !map.isOpen && !sheetOpen() && !controls.auto
-    && Math.hypot(controls.vel.x, controls.vel.z) < 0.15;
+  // 눌러서 걸어가는 중에도 그대로 보여 준다 (연달아 누르게). 조이스틱으로 걷는 동안만 숨긴다.
+  const show = museum && !homeOpen && controls.enabled && !map.isOpen && !sheetOpen()
+    && (controls.auto || Math.hypot(controls.vel.x, controls.vel.z) < 0.15);
   let prev = null, next = null;
   if (show) ({ prev, next } = navFromHere());
   navTargets = { prev, next };
@@ -681,7 +683,7 @@ function goStop(s) {
   controls.joy.x = controls.joy.y = 0; // 조이스틱이 같이 움직이지 않게
   controls.walkPath(route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z), s.spot.yaw);
   controls.pitchT = -0.02;
-  navPrev.classList.remove('show'); navNext.classList.remove('show');
+  stats.navs = (stats.navs || 0) + 1;
   hideHint();
 }
 navPrev.addEventListener('click', () => goStop(navFromHere().prev));

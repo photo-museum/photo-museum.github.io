@@ -2,7 +2,7 @@
 // a: main.js 가 건네는 것들 { isTouch, controls, museumScene, map, editor, stylePanel, gb, stats, sheetOpen(), editMode }
 // 글 쓰는 법: 한 단계에 한 가지만. 한 줄에 한 가지만, 짧게 (<br> 로 줄 나눔). 앞 단계에서 알려 준 것은 다시 말하지 않는다.
 // 두 가지 방법이 있는 것(걷기·확대)은 한 단계에 하나씩 따로 시킨다.
-// 차례: 걷기(톡 → 조이스틱) → 사진 보기 → 확대(꾹 → 벌리기) → 편집(사진 고치기 → 세 버튼) → 지도(열기 → 사진 옮기기 → 방 옮기기 → 방 ✎) → 출구
+// 차례: 걷기(톡 → 조이스틱) → 사진 보기 → 이전·다음 → 확대(꾹 → 벌리기) → 편집(사진 고치기 → 세 버튼) → 지도(열기 → 사진 옮기기 → 방 옮기기 → 방 ✎) → 출구
 import { viewingSpot } from './layout.js';
 
 function atViewingSpot(a) {
@@ -37,6 +37,9 @@ export function tutorialSteps(a) {
     // 사진 보기
     { title: '방 소개와 사진', text: '들어서면 <b>왼쪽 벽</b>에 방 이름과 소개가 있어요.<br><b>사진을 톡</b> 누르면 그 앞으로 걸어가요.',
       task: '아무 사진이나 <b>톡</b> 눌러 그 앞에 서 보세요', done: () => atViewingSpot(a) },
+    // 이전 · 다음 버튼
+    { title: '이전 · 다음', text: '화면 양옆의 <b>‹ 이전</b> / <b>다음 ›</b>을 누르면 사진을 차례로 볼 수 있어요.<br>걸어가는 중에 또 눌러도 돼요.',
+      task: '<b>다음 ›</b>을 두 번 눌러 보세요', done: () => (a.stats.navs || 0) >= seen.nav0 + 2, onEnter: () => { seen.nav0 = a.stats.navs || 0; } },
     // 확대 ①: 꾹 누르기 (컴퓨터: 오른쪽 버튼). 어느 방법으로 확대했는지는 controls.zoomBy
     { title: '확대 ① 꾹 누르기', text: a.isTouch ? '화면을 <b>꾹 누르면</b> 그곳이 커져요.<br>손을 떼면 원래대로 돌아와요.' : '<b>오른쪽 버튼</b>을 누르고 있으면 그곳이 커져요.<br>놓으면 원래대로 돌아와요.',
       task: a.isTouch ? '화면을 <b>꾹 눌러</b> 확대했다가 놓아 보세요' : '<b>오른쪽 버튼</b>을 눌러 확대했다가 놓아 보세요',
