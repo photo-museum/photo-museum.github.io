@@ -1630,7 +1630,7 @@ $('#h-backup').addEventListener('click', () => openBackupMenu());
 // ---------- 백업 · 불러오기 · 공유 ----------
 // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
 // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-const APP_VERSION = '11.15-h'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+const APP_VERSION = '11.15-i'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const ownExhibitions = () => library.exhibitions.filter(e => !e.showcase && !e.tutorial);
 function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -1969,8 +1969,8 @@ function tutorialSteps() {
       task: '오른쪽 위 <b>작은 지도</b>를 눌러 보세요', done: () => map.isOpen && !sheetOpen() },
     { title: '사진 자리 바꾸기', text: '지도에서 방을 누르면 그 방으로 바로 가요.<br>사진을 <b>꾹 눌러</b> 다른 사진 위에 놓으면 두 사진의 자리가 바뀌어요. 다른 방 사진과도 돼요.',
       task: '사진을 꾹 눌러 다른 사진 위에 놓아 보세요', done: () => stats.swaps > seen.swaps0, onEnter: () => { seen.swaps0 = stats.swaps; } },
-    { title: '방 순서 바꾸기', text: '지도를 <b>줄이면</b> 사진은 숨고 방만 보여요. 그때 방을 <b>꾹 눌러 끌면</b> 다른 방 사이에 끼워 넣을 수 있어요. 다시 <b>늘리면</b> 사진이 보여요.',
-      task: isTouch ? '두 손가락을 <b>오므려</b> 방만 보이게 한 뒤, 방을 <b>꾹 눌러</b> 다른 자리로 옮겨 보세요' : '<b>−</b>(또는 휠)로 줄여 방만 보이게 한 뒤, 방을 끌어 다른 자리로 옮겨 보세요',
+    { title: '방 순서 바꾸기', text: '지도를 <b>축소</b>하면 사진은 숨고 방만 보여요. 그때 방을 <b>꾹 눌러 끌면</b> 다른 방 사이에 끼워 넣을 수 있어요. 다시 <b>확대</b>하면 사진이 보여요.',
+      task: isTouch ? '지도를 <b>축소</b>해서(두 손가락 오므리기 또는 <b>−</b>) 방만 보이게 한 뒤, 방을 <b>꾹 눌러</b> 다른 자리로 옮겨 보세요' : '<b>−</b>(또는 휠)로 <b>축소</b>해서 방만 보이게 한 뒤, 방을 끌어 다른 자리로 옮겨 보세요',
       done: () => (stats.reorders || 0) > seen.r0, onEnter: () => { seen.r0 = stats.reorders || 0; } },
     { title: '방 이름과 글씨체', text: '방 오른쪽 위 <b>✎</b>를 누르면 그 방 아이콘들이 펼쳐져요. <b>이름·설명</b>을 누르면 안내벽에 적힐 글을 고칠 수 있어요.<br>창 맨 아래에서 <b>글씨체</b>도 골라 보세요. 저장하면 그 방 글씨가 바뀌어요.',
       task: '방 오른쪽 위 <b>✎</b> → <b>이름·설명</b> → 글씨체 고르고 <b>저장</b>',

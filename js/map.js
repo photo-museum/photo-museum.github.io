@@ -200,8 +200,8 @@ export class MuseumMap {
     this.el.querySelector('.tip').textContent = this.editing
       ? '방 그림을 끌면 순서가 바뀌어요 · 아래쪽을 끌면 넘겨 봐요'
       : this.roomsMode
-        ? '방을 꾹 눌러 끌면 다른 방 사이에 넣어요 · 벌리면 사진이 보여요'
-        : '사진을 꾹 눌러 끌면 자리 바꾸기 · 오므리면 방만 보여요';
+        ? '방을 꾹 눌러 끌면 다른 방 사이에 넣어요 · 확대하면 사진이 보여요'
+        : '사진을 꾹 눌러 끌면 자리 바꾸기 · 축소하면 방만 보여요';
   }
   get roomsMode() { return this.zoom < 0.7; }
   // 확대·축소: 화면에서 (ax: 목록 안 x) 자리를 그대로 두고 바꾼다

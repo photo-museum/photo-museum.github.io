@@ -394,3 +394,10 @@ body.touring .nav small { opacity: 1; }
 :root body.rotated #minimap { top: 12px; right: 14px; }
 :root body #minimap canvas { border-radius: 14px; }
 @media (pointer: coarse) { :root body #hint { top: 62px; } }
+/* 관람·편집 버튼: 작게 (화면을 덜 가리게) */
+:root body #tools { height: 44px; border-radius: 22px; padding: 3px; }
+:root body #tools button { height: 36px; min-width: 50px; border-radius: 18px; padding: 0 10px; flex-direction: row; gap: 5px; font-size: 12px; }
+:root body #tools button svg { font-size: 15px; }
+#edit-menu { bottom: calc(66px + env(safe-area-inset-bottom)); }
+body.rotated #edit-menu { bottom: 66px; }
+body.cap-tight #nav-next, body.rotated.cap-tight #nav-next { right: 150px !important; }
