@@ -1,0 +1,271 @@
+/* ============================================================
+   아이폰 리퀴드 글라스 (iOS 26 느낌)
+   - 화면 글씨: 아이폰 기본 글씨 (SF Pro + Apple SD 산돌고딕). 전시장 벽 글씨는 그대로.
+   - 버튼은 모두 알약·동그라미 유리. 위쪽 테두리에 빛이 맺힌다.
+   - 강조 색은 빨강 하나 (--accent).
+   style.css 뒤에 읽어서 덮어쓴다. 앞 규칙보다 이기도록 ':root body' 를 붙였다.
+   ============================================================ */
+:root {
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+  --accent: #e5484d;
+  --accent-press: #c93b40;
+  --label: #1c1c1e;
+  --label2: rgba(60, 60, 67, .62);
+  --sep: rgba(60, 60, 67, .16);
+  --fill: rgba(118, 118, 128, .14);
+  /* 전시장 위에 뜨는 유리 (사진을 가리지 않게 맑고 어둡게) */
+  --gx-bg: rgba(28, 28, 32, .32);
+  --gx-border: rgba(255, 255, 255, .32);
+  --gx-shadow: inset 0 1px 1px rgba(255, 255, 255, .5), inset 0 -1px 1px rgba(255, 255, 255, .08), 0 8px 24px rgba(0, 0, 0, .28);
+  /* 밝은 판 (시트·메뉴·입력창) */
+  --gl-bg: rgba(248, 248, 250, .78);
+  --gl-border: rgba(255, 255, 255, .85);
+  --gl-shadow: inset 0 1px 1px rgba(255, 255, 255, .95), 0 18px 50px rgba(0, 0, 0, .32);
+  --spring: cubic-bezier(.34, 1.4, .5, 1);
+}
+:root body { font-family: var(--ui); letter-spacing: -0.01em; }
+:root body button { font-family: var(--ui); }
+svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+svg .fill { fill: currentColor; stroke: none; }
+
+/* 유리 공통 */
+:root body #home-btn, :root body #hud .pill, :root body .nav, :root body #goto, :root body #minimap,
+:root body #tools, :root body #tour-stop, :root body #toast, :root body #undo, :root body #guide {
+  background: var(--gx-bg); border: 1px solid var(--gx-border); box-shadow: var(--gx-shadow); color: #fff;
+  -webkit-backdrop-filter: blur(16px) saturate(190%); backdrop-filter: blur(16px) saturate(190%);
+}
+:root body button { transition: transform .35s var(--spring), background-color .25s ease, opacity .3s ease; }
+:root body button:active { transform: scale(.94); }
+
+/* ---------- 위: 홈 버튼 + 제목 알약 ---------- */
+:root body #hud { top: max(12px, env(safe-area-inset-top)); left: 14px; right: auto; justify-content: flex-start; gap: 8px; letter-spacing: 0; text-transform: none; color: #fff; }
+:root body #home-btn { width: 38px; height: 38px; padding: 0; border-radius: 19px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+:root body #home-btn svg { stroke-width: 2.6; }
+:root body #hud .pill { height: 38px; border-radius: 19px; padding: 0 16px; display: flex; align-items: center; gap: 9px; max-width: min(520px, 60vw); }
+:root body #hud #ex-title { margin: 0; flex: 0 1 auto; font-family: var(--ui); font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: #fff; }
+:root body #hud .sep { flex: none; width: 1px; height: 14px; background: rgba(255,255,255,.4); }
+:root body #hud #room { flex: 0 1 auto; max-width: none; font-size: 12px; letter-spacing: 0; color: rgba(255,255,255,.85); }
+body.rotated #hud .pill { max-width: min(420px, 52vw); }
+
+/* ---------- 지도 미리보기 (오른쪽 위) ---------- */
+:root body #minimap { border-radius: 18px; padding: 6px; opacity: .92; }
+:root body #minimap canvas { border-radius: 10px; }
+
+/* ---------- 이전 / 다음 ---------- */
+:root body .nav { width: 46px; height: 46px; border-radius: 23px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+:root body .nav span { display: flex; font-size: 18px; line-height: 1; }
+:root body .nav svg { stroke-width: 2.6; }
+:root body .nav small { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 10.5px; font-weight: 600; letter-spacing: 0; color: rgba(255,255,255,.75); text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+
+/* ---------- 사진 앞으로 ---------- */
+:root body #goto { height: 40px; border-radius: 20px; padding: 0 16px 0 13px; gap: 7px; font-size: 13px; font-weight: 600; letter-spacing: 0; }
+:root body #goto i { display: flex; font-style: normal; font-size: 16px; }
+
+/* ---------- 오른쪽 아래: 관람 · 편집 ---------- */
+:root body #tools { height: 58px; border-radius: 29px; padding: 4px; gap: 2px; align-items: center; right: max(14px, env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); }
+body.rotated #tools { right: 14px; bottom: 14px; }
+:root body #tools button {
+  height: 50px; min-width: 66px; border-radius: 25px; border: 0; padding: 0 14px; background: transparent; color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+:root body #tools button svg { font-size: 20px; }
+:root body #tools button:hover { background: rgba(255,255,255,.1); }
+:root body #tools button.on { background: rgba(255,255,255,.9); color: var(--label); }
+
+/* 편집 메뉴: 편집 버튼 위로 차르륵 올라온다 */
+#edit-menu {
+  position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 30;
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none;
+}
+body.rotated #edit-menu { right: 14px; bottom: 80px; }
+#edit-menu button {
+  display: flex; align-items: center; gap: 12px; min-width: 232px; height: 54px; padding: 0 18px 0 14px; border-radius: 27px;
+  border: 1px solid var(--gl-border); background: var(--gl-bg); color: var(--label); text-align: left; cursor: pointer;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.95), 0 10px 30px rgba(0,0,0,.28);
+  -webkit-backdrop-filter: blur(24px) saturate(190%); backdrop-filter: blur(24px) saturate(190%);
+  opacity: 0; transform: translateY(22px) scale(.92); transform-origin: 85% 100%;
+  transition: opacity .22s ease, transform .45s var(--spring);
+}
+#edit-menu button svg { flex: none; width: 30px; height: 30px; padding: 6px; border-radius: 15px; background: var(--accent); color: #fff; stroke-width: 2.2; }
+#edit-menu button span { display: flex; flex-direction: column; gap: 1px; }
+#edit-menu button b { font-size: 15px; font-weight: 600; }
+#edit-menu button small { font-size: 11.5px; color: var(--label2); }
+#edit-menu.open { pointer-events: auto; }
+#edit-menu.open button { opacity: 1; transform: none; }
+/* 아래(편집 버튼 가까운 것)부터 차례로 */
+#edit-menu.open button:nth-last-child(1) { transition-delay: 0s; }
+#edit-menu.open button:nth-last-child(2) { transition-delay: .035s; }
+#edit-menu.open button:nth-last-child(3) { transition-delay: .07s; }
+#edit-menu.open button:nth-last-child(4) { transition-delay: .105s; }
+#edit-menu.open button:nth-last-child(5) { transition-delay: .14s; }
+@media (max-height: 420px) { #edit-menu button { height: 44px; min-width: 210px; border-radius: 22px; } #edit-menu button small { display: none; } #edit-menu { gap: 6px; } }
+body.home-open #edit-menu, body.style-open #edit-menu { display: none; }
+
+/* ---------- 사진 옆 설명 (사진 앞에 섰을 때) ---------- */
+#cap-side {
+  position: absolute; right: max(22px, env(safe-area-inset-right)); top: 50%; z-index: 3; width: min(250px, 26vw);
+  padding: 16px 18px; border-radius: 22px; pointer-events: none; color: #fff;
+  background: rgba(20, 20, 24, .22); border: 1px solid rgba(255,255,255,.2);
+  -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+  opacity: 0; transform: translate(10px, -50%); transition: opacity .6s ease, transform .6s ease;
+}
+#cap-side.show { opacity: .92; transform: translate(0, -50%); transition-delay: .25s; }
+#cap-side b { display: block; font-size: 19px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
+#cap-side p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: rgba(255,255,255,.86); white-space: pre-line; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
+#cap-side p:empty { display: none; }
+body.home-open #cap-side, body.touring #cap-side.show { }
+body.home-open #cap-side { display: none; }
+
+/* ---------- 알림 · 되돌리기 · 관람 멈추기 ---------- */
+:root body #toast { border-radius: 20px; padding: 9px 16px; font-size: 13px; font-weight: 500; }
+:root body #undo { border-radius: 20px; padding: 9px 16px; font-size: 13px; }
+:root body #tour-stop { border-radius: 20px; padding: 9px 18px; font-size: 13px; font-weight: 600; opacity: .7; }
+:root body #hint { color: rgba(255,255,255,.8); text-shadow: 0 1px 6px rgba(0,0,0,.5); }
+:root body.light-room #hint { color: rgba(30,30,32,.75); text-shadow: none; }
+:root body.light-room #hud { color: #fff; }
+
+/* ---------- 팝업 메뉴 (사진·전시실 메뉴, 확인 창) ---------- */
+:root body #sheet {
+  left: 50%; top: 50%; bottom: auto; width: min(300px, calc(100% - 32px)); max-height: 88%; overflow-y: auto;
+  padding: 6px 0; gap: 0; border-radius: 24px; color: var(--label);
+  background: var(--gl-bg); border: 1px solid var(--gl-border); box-shadow: var(--gl-shadow);
+  -webkit-backdrop-filter: blur(30px) saturate(190%); backdrop-filter: blur(30px) saturate(190%);
+  opacity: 0; transform: translate(-50%, -46%) scale(.9); pointer-events: none;
+  transition: opacity .2s ease, transform .4s var(--spring);
+}
+:root body #sheet.open { opacity: 1; transform: translate(-50%, -50%); pointer-events: auto; }
+:root body #sheet .title { margin: 4px 18px 6px; padding-bottom: 8px; border-bottom: 1px solid var(--sep); font-size: 12.5px; line-height: 1.45; color: var(--label2); text-align: left; }
+:root body #sheet button {
+  width: 100%; min-height: 44px; padding: 10px 18px; border-radius: 0; border: 0; background: transparent; text-align: left;
+  font-size: 15px; font-weight: 400; color: var(--label);
+}
+:root body #sheet button + button { box-shadow: inset 0 1px 0 var(--sep); }
+:root body #sheet button:hover { background: rgba(0,0,0,.04); }
+:root body #sheet button:active { transform: none; background: rgba(0,0,0,.08); }
+:root body #sheet button.danger { color: var(--accent); }
+:root body #sheet button.quiet { color: var(--label); font-weight: 600; box-shadow: inset 0 6px 0 rgba(60,60,67,.08); padding-top: 16px; }
+:root body #sheet.grid { width: min(560px, calc(100% - 32px)); display: grid; grid-template-columns: 1fr 1fr; }
+:root body #sheet.grid button + button { box-shadow: none; }
+:root body #sheet button.theme small { color: var(--label2); }
+:root body #sheet button.theme.on { background: rgba(229,72,77,.1); }
+
+/* ---------- 방 꾸미기: 아래에서 올라오는 시트 ---------- */
+:root body #style-panel {
+  left: 10px; right: 10px; bottom: 8px; border-radius: 28px; padding: 18px 18px 12px; color: var(--label);
+  background: var(--gl-bg); border: 1px solid var(--gl-border); box-shadow: inset 0 1px 1px rgba(255,255,255,.95), 0 -10px 40px rgba(0,0,0,.25);
+  -webkit-backdrop-filter: blur(28px) saturate(190%); backdrop-filter: blur(28px) saturate(190%);
+  transition: transform .5s var(--spring), opacity .25s ease;
+}
+:root body #style-panel::before { content: ''; position: absolute; left: 50%; top: 6px; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: rgba(60,60,67,.3); }
+:root body #style-panel .ttl { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+:root body #style-panel .now, :root body #style-panel .rec { color: var(--label2); opacity: 1; }
+:root body #style-panel .rec { margin-top: 8px; padding: 7px 12px; border-radius: 14px; background: rgba(229,72,77,.09); color: var(--label); }
+:root body #style-panel .tabs { background: var(--fill); padding: 2px; }
+:root body #style-panel .tabs button { color: var(--label); font-weight: 500; }
+:root body #style-panel .tabs button.on { background: #fff; color: var(--label); font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+:root body #style-panel .pick, :root body #style-panel .close, :root body #style-panel .follow { border: 0; background: var(--fill); color: var(--label); }
+:root body #style-panel .close { width: 30px; height: 30px; font-size: 13px; }
+:root body #style-panel .reset { background: var(--accent); color: #fff; border: 0; font-weight: 600; }
+:root body #style-panel .gh { color: var(--label2); opacity: 1; }
+:root body #style-panel .sw i { border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), 0 3px 8px rgba(0,0,0,.12); }
+:root body #style-panel .sw span { color: var(--label); }
+:root body #style-panel .sw.on i { box-shadow: 0 0 0 2.5px #fff, 0 0 0 4.5px var(--accent); }
+:root body #style-panel .sw em { background: var(--accent); color: #fff; }
+
+/* ---------- 글 쓰기 · 방명록 · 대표 사진 고르기: 밝은 판 ---------- */
+:root body #editor .box, :root body #guestbook .box, :root body #cover-pick .box {
+  color: var(--label); background: var(--gl-bg); border: 1px solid var(--gl-border); box-shadow: var(--gl-shadow); border-radius: 26px;
+  -webkit-backdrop-filter: blur(30px) saturate(190%); backdrop-filter: blur(30px) saturate(190%);
+}
+:root body #editor .head, :root body #guestbook .head { font-family: var(--ui); font-size: 17px; font-weight: 700; color: var(--label); }
+:root body #editor label, :root body #editor .fl, :root body #guestbook label { color: var(--label2); letter-spacing: 0; font-weight: 500; }
+:root body #editor input, :root body #editor textarea, :root body #guestbook input, :root body #guestbook textarea {
+  background: rgba(118,118,128,.12); border: 0; border-radius: 12px; color: var(--label); font-family: var(--ui);
+}
+:root body #editor input:focus, :root body #editor textarea:focus, :root body #guestbook input:focus, :root body #guestbook textarea:focus { outline: 2px solid rgba(229,72,77,.45); }
+:root body #editor button, :root body #guestbook .row button { border-radius: 20px; background: var(--accent); color: #fff; border: 0; font-weight: 600; }
+:root body #editor button.quiet, :root body #guestbook .row button.quiet { background: var(--fill); color: var(--label); }
+:root body #editor #ed-fonts button { background: rgba(255,255,255,.7); color: var(--label); border: 1px solid transparent; border-radius: 14px; font-weight: 400; }
+:root body #editor #ed-fonts button.on { border-color: var(--accent); background: rgba(229,72,77,.08); color: var(--label); }
+:root body #editor #ed-fonts button img { filter: invert(1) brightness(.25); }
+:root body #cover-pick .box p { color: var(--label2); }
+:root body #cover-pick .close { background: var(--fill); color: var(--label); border: 0; }
+
+/* ---------- 사용법 안내 ---------- */
+:root body #guide { border-radius: 22px; }
+:root body #guide .lbl { color: #ff9a9d; letter-spacing: 0; }
+:root body #guide-modal .card { color: var(--label); background: var(--gl-bg); border: 1px solid var(--gl-border); box-shadow: var(--gl-shadow); border-radius: 28px; -webkit-backdrop-filter: blur(30px) saturate(190%); backdrop-filter: blur(30px) saturate(190%); }
+:root body #guide-modal .title { font-family: var(--ui); color: var(--label); }
+:root body #guide-modal .text { color: rgba(30,30,32,.82); }
+:root body #guide-modal .text b { color: var(--accent); }
+:root body #guide-modal .count { color: var(--accent); letter-spacing: 0; }
+:root body #guide-modal .dots i { background: rgba(60,60,67,.18); }
+:root body #guide-modal .dots i.past { background: rgba(229,72,77,.45); }
+:root body #guide-modal .dots i.now { background: var(--accent); }
+:root body #guide-modal button { border-radius: 20px; background: var(--accent); color: #fff; border: 0; font-weight: 600; }
+:root body #guide-modal button.quiet { background: var(--fill); color: var(--label); }
+
+/* ---------- 지도 (모양은 시안 고른 뒤 바꿈 · 글씨와 버튼만 맞춤) ---------- */
+:root body #map .bar b { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+:root body #map .bar button { height: 34px; border-radius: 17px; padding: 0 16px; border: 1px solid var(--gx-border); background: rgba(255,255,255,.12); color: #fff; font-weight: 600; box-shadow: var(--gx-shadow); }
+:root body #map .bar button.quiet { width: 34px; padding: 0; }
+:root body #map.editing .bar button[data-act="edit"] { background: var(--accent); border-color: transparent; color: #fff; }
+:root body #map .mroom.here .plan canvas { box-shadow: 0 0 0 2px var(--accent); }
+:root body #map .thumb.over { box-shadow: 0 0 0 2px var(--accent), 0 4px 14px rgba(0,0,0,.6); }
+:root body #map .acts button { border-radius: 14px; }
+
+/* ---------- 홈 (시안 H3): 대표 사진이 화면 가득 ---------- */
+:root body #home { background: #111; padding: 0; gap: 0; color: #fff; display: none; }
+:root body.home-open #home { display: block; }
+#home .hbg3 { position: absolute; inset: 0; overflow: hidden; }
+#home .hbg3 .ph { position: absolute; inset: -4%; background: #222 center / cover no-repeat; opacity: 0; transform: scale(1.06); transition: opacity .7s ease, transform .5s ease; }
+#home .hbg3 .ph.on { opacity: 1; }
+#home .hbg3 .shade { position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,.6) 0%, rgba(0,0,0,.2) 42%, rgba(0,0,0,0) 68%),
+              linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 62%, rgba(0,0,0,.5) 100%); }
+#home .flow { position: absolute; inset: 0; z-index: 1; touch-action: none; cursor: grab; perspective: none; }
+:root body #home header { position: absolute; z-index: 3; left: max(26px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top));
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; }
+#home header .brand { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
+:root body #home .hbtns { display: flex; gap: 8px; pointer-events: auto; }
+:root body #home .hbtns button, :root body #home .hbtns button:not(.main) {
+  width: 38px; height: 38px; padding: 0; border-radius: 19px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff;
+  background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.45); box-shadow: inset 0 1px 1px rgba(255,255,255,.65), 0 8px 22px rgba(0,0,0,.22);
+  -webkit-backdrop-filter: blur(18px) saturate(190%); backdrop-filter: blur(18px) saturate(190%);
+}
+:root body #home .fcap {
+  position: absolute; z-index: 3; left: max(28px, env(safe-area-inset-left)); top: 50%; transform: translateY(-46%); width: min(420px, 46%);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; color: #fff; text-shadow: 0 1px 10px rgba(0,0,0,.35); pointer-events: none;
+}
+#home .fcap .cnt { font-size: 12px; font-weight: 600; opacity: .85; }
+:root body #home .fcap b { font-size: clamp(26px, 4.4vw, 40px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.12; }
+:root body #home .fcap span { font-size: 13.5px; line-height: 1.5; color: rgba(255,255,255,.9); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+:root body #home .fcap .acts { display: flex; gap: 8px; margin-top: 12px; pointer-events: auto; }
+:root body #home .fcap .go { height: 46px; padding: 0 24px; border-radius: 23px; border: 0; background: rgba(255,255,255,.94); color: var(--label); font-size: 15px; font-weight: 600; text-shadow: none; box-shadow: inset 0 1px 1px #fff, 0 8px 22px rgba(0,0,0,.25); }
+:root body #home .fcap .more { width: 46px; height: 46px; padding: 0; border-radius: 23px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff;
+  background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.45); box-shadow: inset 0 1px 1px rgba(255,255,255,.65), 0 8px 22px rgba(0,0,0,.22);
+  -webkit-backdrop-filter: blur(18px) saturate(190%); backdrop-filter: blur(18px) saturate(190%); }
+#home .hstrip {
+  position: absolute; z-index: 3; right: max(18px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); max-width: calc(100% - 40px);
+  display: flex; gap: 6px; padding: 6px; border-radius: 22px; overflow-x: auto; scrollbar-width: none;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.42); box-shadow: inset 0 1px 1px rgba(255,255,255,.6), 0 8px 22px rgba(0,0,0,.22);
+  -webkit-backdrop-filter: blur(18px) saturate(190%); backdrop-filter: blur(18px) saturate(190%);
+}
+#home .hstrip::-webkit-scrollbar { display: none; }
+#home .hstrip .cv { flex: none; width: 56px; height: 56px; border-radius: 15px; border: 0; padding: 0; background: #444 center / cover; opacity: .7; cursor: pointer; color: #fff; }
+#home .hstrip .cv.on { opacity: 1; box-shadow: 0 0 0 2.5px #fff; }
+#home .hstrip .cv.add { background: transparent; border: 1.5px dashed rgba(255,255,255,.6); font-size: 24px; font-weight: 300; display: flex; align-items: center; justify-content: center; opacity: .9; }
+@media (max-height: 420px) { #home .hstrip .cv { width: 48px; height: 48px; border-radius: 13px; } }
+body.rotated #home .hstrip .cv { width: 48px; height: 48px; border-radius: 13px; }
+
+/* ---------- 로딩 ---------- */
+:root body #loading { font-family: var(--ui); }
+:root body #home .fcap b { white-space: normal; overflow: visible; text-overflow: clip; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* 돌린 화면에서는 vw 가 세로 폭이라 % 로 (무대 기준) */
+:root body #cap-side { width: min(260px, 30%); max-height: calc(100% - 160px); overflow: hidden; }
+/* 사진 옆 설명: '다음' 버튼 안쪽에 */
+:root body #cap-side { right: 74px; }
+@media (max-height: 430px) { #cap-side b { font-size: 17px; } #cap-side p { font-size: 13px; line-height: 1.55; } :root body #cap-side { padding: 13px 15px; } }
+body.rotated #cap-side b { font-size: 17px; }
+body.rotated #cap-side p { font-size: 13px; line-height: 1.55; }

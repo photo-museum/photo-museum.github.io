@@ -57,9 +57,18 @@ controls.toNorm = (sx, sy) => { const [cx, cy] = toContent(sx, sy); return [cx /
 
 // 잠깐 확대: 카메라가 보는 화면의 일부만 크게 그린다 (시선은 그대로)
 let lastZoomKey = '';
+// 사진 옆 설명이 떠 있을 때는 화면을 살짝 왼쪽으로 밀어(그림만) 사진과 설명이 나란히 보이게
+let capShift = 0, capShiftGoal = 0;
 function applyZoom() {
   const z = controls.zoom;
+  capShift += (capShiftGoal - capShift) * 0.12;
+  if (Math.abs(capShift - capShiftGoal) < 0.5) capShift = capShiftGoal;
   if (z <= 1.001) {
+    if (capShift > 0.5) {
+      const key = `s${capShift.toFixed(1)},${viewW},${viewH}`;
+      if (key !== lastZoomKey) { lastZoomKey = key; camera.setViewOffset(viewW, viewH, capShift, 0, viewW, viewH); }
+      return;
+    }
     if (lastZoomKey) { camera.clearViewOffset(); lastZoomKey = ''; }
     return;
   }
@@ -473,7 +482,7 @@ function addRoom(theme) {
   persist();
   rebuild();
   const n = museum.rooms.length;
-  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 그 방에서 ◐ 방 꾸미기로 벽·천장·바닥을 고를 수 있어요`, 3800);
+  toast(`새 방(ROOM ${String(n).padStart(2, '0')})을 만들었어요. 그 방에서 편집 → 방 꾸미기로 벽·천장·바닥·조명을 고를 수 있어요`, 3800);
 }
 
 // ---------- 방 꾸미기: 벽 · 천장 · 바닥 · 조명 ----------
@@ -839,6 +848,32 @@ function updateHD() {
     if (hit && hit.object.userData.photoId && !hit.object.userData.empty && !hit.object.userData.label) id = hit.object.userData.photoId;
   }
   museumScene.setHD(id);
+  updateCapSide(t);
+}
+
+// 사진 앞에 서면 오른쪽에 그 사진 설명을 조금 크게, 연하게 띄운다 (벽의 작은 설명판을 읽기 쉽게)
+const capSide = $('#cap-side');
+let capSideId = null;
+function updateCapSide(t) {
+  const moving = Math.hypot(controls.vel.x, controls.vel.z) > 0.25 || !!controls.auto;
+  let photo = null, room = null;
+  if (!moving && !homeOpen && !map.isOpen && !sheetOpen() && controls.zoom < 1.1 && t && t.photoId && t.kind === '사진' && t.d < 0.9 && t.ang < 0.45) {
+    const f = findPhoto(t.photoId);
+    if (f) { room = f.room; photo = room.photos[f.i]; }
+  }
+  const text = photo && (photo.caption || '').trim();
+  const id = text ? photo.id + '|' + text : null;
+  if (id === capSideId) return;
+  capSideId = id;
+  if (!text) { capSide.classList.remove('show'); capShiftGoal = 0; return; }
+  capShiftGoal = viewW * (viewW < 1000 ? 0.17 : 0.12);
+  const [title, ...rest] = text.split('\n');
+  capSide.querySelector('b').textContent = title;
+  capSide.querySelector('b').style.fontFamily = fontFamily(room.font || museum.font);
+  capSide.querySelector('p').textContent = rest.join('\n');
+  capSide.classList.remove('show');
+  void capSide.offsetWidth;
+  capSide.classList.add('show');
 }
 
 // ---------- 지도 ----------
@@ -1090,16 +1125,36 @@ sheet.addEventListener('click', e => {
 });
 
 // ---------- 오른쪽 아래 도구 ----------
+// 오른쪽 아래: [관람] [편집]. 편집을 누르면 할 일들이 위로 차르륵 올라온다.
+const editMenu = $('#edit-menu');
+const editBtn = $('#tools [data-act=edit]');
+function setEditMenu(open) {
+  editMenu.classList.toggle('open', open);
+  editBtn.classList.toggle('on', open);
+  editBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
 $('#tools').addEventListener('click', e => {
   const act = e.target.closest('button')?.dataset.act;
   if (!act) return;
   hideHint();
+  if (act === 'tour') { setEditMenu(false); startTour(); }
+  if (act === 'edit') setEditMenu(!editMenu.classList.contains('open'));
+});
+editMenu.addEventListener('click', e => {
+  const act = e.target.closest('button')?.dataset.act;
+  if (!act) return;
+  setEditMenu(false);
   const ri = currentRoomIndex();
   if (act === 'photos') pickPhotos({ roomIndex: ri });
   if (act === 'room') addRoom('white');
   if (act === 'theme') openStylePanel(Math.max(-1, Math.min(museum.rooms.length, museumScene.roomIndexAt(controls.pos.z))));
-  if (act === 'tour') startTour();
+  if (act === 'map') { map.open(); if (!map.editing) map.el.querySelector('[data-act=edit]').click(); }
+  if (act === 'text') editRoomText(ri);
 });
+// 메뉴 밖을 누르면 닫힌다
+document.addEventListener('pointerdown', e => {
+  if (editMenu.classList.contains('open') && !e.target.closest('#edit-menu, #tools')) setEditMenu(false);
+}, true);
 
 // ---------- 관람 모드 ----------
 // 사진 앞에 차례로 저절로 걸어가 잠시 멈춰 보여 준다. 화면을 만지거나 키를 누르면 멈춘다.
@@ -1297,65 +1352,77 @@ let homeSel = null; // 가운데 있는 전시실 id ('new' 면 새 전시실 �
 const flow = $('#home .flow'), fcap = $('#home .fcap');
 let flowItems = [], flowPos = 0, flowAnim = 0;
 function homeList() { return library.exhibitions.filter(ex => !ex.showcase); }
+// 홈 (시안 H3): 고른 전시실의 대표 사진이 화면 가득, 왼쪽에 큰 제목과 '들어가기',
+// 오른쪽 아래 유리 띠에 전시실 표지들. 화면을 옆으로 밀거나 띠의 표지를 누르면 넘어간다.
+const hstrip = $('#home .hstrip');
+const hbgs = [...document.querySelectorAll('#home .hbg3 .ph')];
+let hbgOn = 0, hbgKey = '';
 function renderHome() {
   const exs = homeList();
   if (!exs.some(ex => ex.id === homeSel) && homeSel !== 'new') homeSel = (exs.find(ex => ex.id === library.lastId) || exs[0] || {}).id || 'new';
-  flow.innerHTML = '';
+  hstrip.innerHTML = '';
   flowItems = [...exs.map(ex => ({ ex })), { add: true }];
   flowItems.forEach((it, i) => {
-    const el = document.createElement('div');
+    const el = document.createElement('button');
+    el.type = 'button';
     el.className = 'cv' + (it.add ? ' add' : '');
     el.setAttribute('role', 'option');
-    if (it.add) el.innerHTML = '<span>+</span>';
+    if (it.add) { el.innerHTML = '<span>+</span>'; el.setAttribute('aria-label', '새 전시실'); }
     else {
       const st = exhibitionStats(it.ex);
-      if (st.cover) thumbURL(st.cover, 900).then(u => { if (u) el.style.backgroundImage = `url("${u}")`; });
+      it.cover = st.cover;
+      if (st.cover) thumbURL(st.cover, 200).then(u => { if (u) el.style.backgroundImage = `url("${u}")`; });
       else { const T = themeOf(it.ex.rooms[0]); el.style.backgroundImage = `linear-gradient(160deg, ${T.mapWall}, ${T.mapFloor})`; }
       el.setAttribute('aria-label', it.ex.title || '이름 없는 전시');
     }
+    el.addEventListener('click', () => { if (i === Math.round(flowPos)) flowOpen(); else flowTo(i); });
     it.el = el;
-    flow.appendChild(el);
+    hstrip.appendChild(el);
   });
   const idx = Math.max(0, flowItems.findIndex(it => (it.add ? 'new' : it.ex.id) === homeSel));
   flowPos = idx;
+  hbgKey = '';
   layoutFlow(false);
 }
-function flowSize() {
-  const H = flow.clientHeight || 260, W = flow.clientWidth || 700;
-  return { S: Math.min(H * 0.78, W * 0.3, 260), W };
+function flowSize() { return { S: Math.max(240, (flow.clientWidth || 800) * 0.45), W: flow.clientWidth || 800 }; }
+// 배경 사진 바꾸기: 두 장을 겹쳐 두고 스르륵 바꾼다
+function setHomeBg(it) {
+  const key = it.add ? 'new' : it.ex.id + ':' + (it.cover ? it.cover.id : '');
+  if (key === hbgKey) return;
+  hbgKey = key;
+  const next = hbgs[1 - hbgOn];
+  const show = css => { next.style.backgroundImage = css; hbgs[hbgOn].classList.remove('on'); next.classList.add('on'); hbgOn = 1 - hbgOn; };
+  if (it.add) show('linear-gradient(160deg, #4a4f58, #23262c)');
+  else if (it.cover) thumbURL(it.cover, 1800).then(u => { if (hbgKey === key) show(u ? `url("${u}")` : 'none'); });
+  else { const T = themeOf(it.ex.rooms[0]); show(`linear-gradient(160deg, ${T.mapWall}, ${T.mapFloor})`); }
 }
-// pos: 실수 (끄는 중엔 사이 값)
+// pos: 실수 (끄는 중엔 사이 값) — 끄는 동안 배경이 손가락을 살짝 따라온다
 function layoutFlow(animate = true) {
-  const { S } = flowSize();
-  const gap1 = S * 0.78, gapN = S * 0.42;
-  // 유리 바닥 선을 표지 아랫단에 맞춘다
-  const fl = $('#home .hbg2 .floor');
-  if (fl && flow.clientHeight) fl.style.top = (flow.offsetTop + flow.clientHeight * 0.8) + 'px';
-  flowItems.forEach((it, i) => {
-    const d = i - flowPos, a = Math.abs(d), sg = Math.sign(d);
-    const x = a < 1 ? d * gap1 : sg * (gap1 + (a - 1) * gapN);
-    const rot = -Math.max(-1, Math.min(1, d)) * 55;
-    const sc = a < 1 ? 1.15 - 0.15 * a : 1;
-    const el = it.el;
-    el.style.width = el.style.height = S + 'px';
-    el.style.transition = animate ? '' : 'none';
-    el.style.transform = `translateX(calc(-50% + ${x}px)) rotateY(${rot}deg) scale(${sc})`;
-    el.style.zIndex = String(100 - Math.round(a * 10));
-    el.style.opacity = a > 4.5 ? 0 : String(Math.max(0.35, 1 - Math.max(0, a - 1) * 0.18));
-    el.classList.toggle('on', a < 0.5);
-  });
-  const sel = flowItems[Math.round(Math.max(0, Math.min(flowItems.length - 1, flowPos)))];
-  if (sel) {
-    homeSel = sel.add ? 'new' : sel.ex.id;
-    if (sel.add) { fcap.querySelector('b').textContent = '새 전시실'; fcap.querySelector('span').textContent = '이름을 정하고 바로 들어가요'; fcap.querySelector('.go').textContent = '만들기 →'; fcap.querySelector('.more').hidden = true; }
-    else {
-      const st = exhibitionStats(sel.ex);
-      fcap.querySelector('b').textContent = sel.ex.title || '이름 없는 전시';
-      fcap.querySelector('b').style.fontFamily = fontFamily(sel.ex.font);
-      if (sel.ex.font) ensureFont(sel.ex.font);
-      fcap.querySelector('span').textContent = `방 ${st.rooms} · 사진 ${st.photos}` + ((sel.ex.intro || '').split('\n')[0] ? ' · ' + sel.ex.intro.split('\n')[0] : '');
-      fcap.querySelector('.go').textContent = '들어가기 →'; fcap.querySelector('.more').hidden = false;
-    }
+  const i = Math.round(Math.max(0, Math.min(flowItems.length - 1, flowPos)));
+  const sel = flowItems[i];
+  const drift = (flowPos - i) * -60;
+  for (const ph of hbgs) { ph.style.transition = animate ? '' : 'opacity .6s ease'; ph.style.transform = `translateX(${drift}px) scale(1.06)`; }
+  flowItems.forEach((it, k) => { it.el.classList.toggle('on', k === i); it.el.setAttribute('aria-selected', k === i ? 'true' : 'false'); });
+  if (!sel) return;
+  setHomeBg(sel);
+  if (sel.el && sel.el.scrollIntoView && animate) sel.el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  homeSel = sel.add ? 'new' : sel.ex.id;
+  const exs = flowItems.length - 1;
+  if (sel.add) {
+    fcap.querySelector('.cnt').textContent = '새 전시실';
+    fcap.querySelector('b').textContent = '새 전시실 만들기';
+    fcap.querySelector('b').style.fontFamily = '';
+    fcap.querySelector('span').textContent = '이름을 정하고 바로 들어가요';
+    fcap.querySelector('.go').textContent = '만들기'; fcap.querySelector('.more').hidden = true;
+  } else {
+    const st = exhibitionStats(sel.ex);
+    fcap.querySelector('.cnt').textContent = `${i + 1} / ${exs} 전시실`;
+    fcap.querySelector('b').textContent = sel.ex.title || '이름 없는 전시';
+    fcap.querySelector('b').style.fontFamily = fontFamily(sel.ex.font);
+    if (sel.ex.font) ensureFont(sel.ex.font);
+    const intro = (sel.ex.intro || '').split('\n')[0];
+    fcap.querySelector('span').textContent = `방 ${st.rooms} · 사진 ${st.photos}` + (intro ? ' · ' + intro : '');
+    fcap.querySelector('.go').textContent = '들어가기'; fcap.querySelector('.more').hidden = false;
   }
 }
 function flowTo(i) {
@@ -1402,20 +1469,13 @@ fcap.querySelector('.more').addEventListener('click', flowMenu);
     const now = performance.now(); d.v = d.v * 0.6 + (mx / Math.max(1, now - d.t)) * 0.4; d.t = now;
     if (d.moved < 6) return;
     const { S } = flowSize();
-    flowPos = Math.max(-0.4, Math.min(flowItems.length - 0.6, d.pos0 - d.dx / (S * 0.6)));
+    flowPos = Math.max(-0.4, Math.min(flowItems.length - 0.6, d.pos0 - d.dx / S));
     layoutFlow(false);
   });
   const end = e => {
     if (!d || e.pointerId !== d.id) return;
     const dd = d; d = null;
-    if (dd.moved < 8 && e.type === 'pointerup') {
-      // 누른 표지
-      const hit = document.elementFromPoint(e.clientX, e.clientY);
-      const i = flowItems.findIndex(it => it.el === (hit && hit.closest && hit.closest('.cv')));
-      if (i < 0) return;
-      if (i === Math.round(flowPos)) flowOpen(); else flowTo(i);
-      return;
-    }
+    if (dd.moved < 8) { flowTo(Math.round(flowPos)); return; } // 배경을 그냥 누른 것
     flowTo(Math.round(flowPos - Math.max(-1.2, Math.min(1.2, dd.v)) * 0.7)); // 휙 넘기면 한 칸 더
   };
   flow.addEventListener('pointerup', end);
@@ -1630,7 +1690,7 @@ async function buildShowcase() {
   }
   const ex = newExhibition('방 스타일 둘러보기');
   ex.intro = `방 스타일 ${SHOWCASE.length}가지를 차례로 이어 붙인 전시실이에요.\n`
-    + '걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 꾸미기에서 벽·천장·바닥을 고를 수 있어요.';
+    + '걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 편집 → 방 꾸미기에서 벽·천장·바닥·조명을 고를 수 있어요.';
   ex.showcase = true;
   ex.rooms = SHOWCASE.map((id, k) => {
     const room = newRoom(0, 'white');
@@ -1735,7 +1795,7 @@ async function startShowcase() {
         for (let n = 0; n < 4; n++) { const P = pics[(k * 2 + n) % pics.length]; room.photos.push({ ...newPhoto(P.imageId, P.aspect), caption: P.caption }); }
         return room;
       });
-      ex.intro = `방 스타일 ${SHOWCASE.length}가지를 차례로 이어 붙인 전시실이에요.\n걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 ◐ 방 꾸미기에서 벽·천장·바닥을 고를 수 있어요.`;
+      ex.intro = `방 스타일 ${SHOWCASE.length}가지를 차례로 이어 붙인 전시실이에요.\n걸어 다니며 마음에 드는 방을 골라 보세요. 내 전시실에서는 오른쪽 아래 편집 → 방 꾸미기에서 벽·천장·바닥·조명을 고를 수 있어요.`;
     }
   }
   persist();
@@ -1801,9 +1861,9 @@ function tutorialSteps() {
       task: '방 아래 <b>이름·설명</b> → 글씨체 고르고 <b>저장</b>',
       editorTip: '맨 아래 <b>글씨체</b>에서 마음에 드는 글씨를 고르고 <b>저장</b>해 보세요.',
       done: () => { if (editorOpen()) seen.ed = true; return seen.ed && !editorOpen(); } },
-    { title: '나만의 전시 꾸미기', text: '지도를 닫으면(✕) 오른쪽 아래에 버튼이 있어요.<br><b>+ 사진</b> 여러 장 한 번에 걸기 · <b>+ 방</b> 새 방 만들기 · <b>◐ 방 꾸미기</b> 벽·천장·바닥 고르기.' },
+    { title: '나만의 전시 꾸미기', text: '지도를 닫으면(✕) 오른쪽 아래에 <b>관람</b>과 <b>편집</b>이 있어요.<br><b>관람</b>은 사진을 차례로 보여 주고, <b>편집</b>을 누르면 사진 넣기 · 방 꾸미기 · 방 만들기가 위로 올라와요.' },
     { title: '출구와 방명록', text: '마지막 방 끝에는 <b>출구</b>가 있어요. 방명록 책상을 누르면 한마디를 남길 수 있고, 남긴 글은 벽에 쪽지로 붙어요. 초록 <b>출구</b> 문을 누르면 홈으로 나가요.' },
-    { title: '다 됐어요 ✦', text: '이제 왼쪽 위 <b>‹ 홈</b>에서 나만의 전시실을 만들어 보세요.<br>이 예시 전시실은 홈에서 지울 수 있고, <b>사용법 둘러보기</b>로 언제든 다시 볼 수 있어요.' },
+    { title: '다 됐어요 ✦', text: '이제 왼쪽 위 <b>‹</b> 버튼(홈)에서 나만의 전시실을 만들어 보세요.<br>이 예시 전시실은 홈에서 지울 수 있고, <b>사용법 둘러보기</b>로 언제든 다시 볼 수 있어요.' },
   ];
 }
 

@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Diphylleia&family=Hahmlet:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/ios.css">
   <script type="importmap">
     { "imports": { "three": "./vendor/three.module.min.js" } }
   </script>
@@ -29,14 +30,14 @@
   <div class="vignette"></div>
 
   <header id="hud">
-    <button id="home-btn" aria-label="홈으로">‹ 홈</button>
-    <span id="ex-title"></span>
-    <span id="room">입구</span>
+    <button id="home-btn" aria-label="홈으로"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+    <div class="pill"><span id="ex-title"></span><i class="sep" aria-hidden="true"></i><span id="room">입구</span></div>
   </header>
 
-  <button id="nav-prev" class="nav" aria-label="이전 사진으로"><small>이전</small><span>‹</span></button>
-  <button id="nav-next" class="nav" aria-label="다음 사진으로"><small>다음</small><span>›</span></button>
-  <button id="goto" aria-label="가까운 사진 앞으로 가기"><i>◎</i><span>사진 앞으로</span></button>
+  <button id="nav-prev" class="nav" aria-label="이전 사진으로"><small>이전</small><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></span></button>
+  <button id="nav-next" class="nav" aria-label="다음 사진으로"><small>다음</small><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span></button>
+  <button id="goto" aria-label="가까운 사진 앞으로 가기"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></i><span>사진 앞으로</span></button>
+  <aside id="cap-side" aria-live="polite"><b></b><p></p></aside>
   <button id="minimap" aria-label="전시장 지도 열기"><canvas></canvas></button>
 
   <p id="hint"></p>
@@ -62,12 +63,17 @@
   <button id="tour-stop" type="button">■ 관람 멈추기</button>
   <button id="undo" type="button" aria-label="되돌리기">↶ 되돌리기 <span></span></button>
 
-  <nav id="tools">
-    <button data-act="tour" class="tour" aria-label="관람 모드: 사진을 차례로 보여 줘요">▶ 관람</button>
-    <button data-act="photos">+ 사진</button>
-    <button data-act="room">+ 방</button>
-    <button data-act="theme" aria-label="이 방 꾸미기">◐ 방 꾸미기</button>
+  <nav id="tools" aria-label="관람과 편집">
+    <button data-act="tour" class="tour" aria-label="관람 모드: 사진을 차례로 보여 줘요"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M8 5.5v13l10.5-6.5z"/></svg><span>관람</span></button>
+    <button data-act="edit" aria-expanded="false" aria-controls="edit-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span>편집</span></button>
   </nav>
+  <div id="edit-menu" role="menu" aria-label="편집">
+    <button role="menuitem" data-act="photos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg><span><b>사진 넣기</b><small>이 방의 빈 판에 걸어요</small></span></button>
+    <button role="menuitem" data-act="theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-1.5-1.2-2-2.4-2H16a2 2 0 0 1-2-2V6.5C14 4.6 13.3 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/></svg><span><b>방 꾸미기</b><small>벽 · 천장 · 바닥 · 조명</small></span></button>
+    <button role="menuitem" data-act="room"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg><span><b>방 만들기</b><small>끝에 새 방을 붙여요</small></span></button>
+    <button role="menuitem" data-act="map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span><b>방 순서·사진 정리</b><small>전시장 지도에서</small></span></button>
+    <button role="menuitem" data-act="text"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg><span><b>이 방 이름·소개</b><small>안내벽 글씨</small></span></button>
+  </div>
 
   <div id="map" role="dialog" aria-label="전시장 지도">
     <div class="bar">
@@ -93,17 +99,18 @@
 
   <div id="sheet" role="dialog" aria-label="메뉴"></div>
   <section id="home" aria-label="전시실 고르기">
-    <div class="hbg2" aria-hidden="true"><i class="g1"></i><i class="g2"></i><i class="g3"></i><span class="floor"></span></div>
+    <div class="hbg3" aria-hidden="true"><div class="ph"></div><div class="ph"></div><div class="shade"></div></div>
+    <div class="flow" aria-hidden="true"></div>
     <header>
-      <div><span class="eyebrow">나만의 사진 전시실</span><h1 class="wordmark"><i>Photo</i> Museum</h1></div>
+      <span class="brand">Photo Museum</span>
       <div class="hbtns">
-        <button id="h-backup" aria-label="백업과 불러오기">⤓ 보관</button>
-        <button id="h-styles"><span class="lg">방 스타일 둘러보기</span><span class="sm">방 스타일</span></button>
-        <button id="h-tour" class="main">✦ <span class="lg">사용법 둘러보기</span><span class="sm">사용법</span></button>
+        <button id="h-backup" aria-label="보관: 백업과 불러오기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></button>
+        <button id="h-styles" aria-label="방 스타일 둘러보기"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path class="fill" d="M12 3a9 9 0 0 0 0 18z"/></svg></button>
+        <button id="h-tour" aria-label="사용법 둘러보기"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.5M12 17h.01"/></svg></button>
       </div>
     </header>
-    <div class="flow" role="listbox" aria-label="전시실"></div>
-    <div class="fcap" aria-live="polite"><b></b><span></span><div class="acts"><button class="go">들어가기 →</button><button class="more" aria-label="전시실 메뉴">⋯</button></div></div>
+    <div class="fcap" aria-live="polite"><small class="cnt"></small><b></b><span></span><div class="acts"><button class="go">들어가기</button><button class="more" aria-label="전시실 메뉴"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="5" cy="12" r="1.8"/><circle class="fill" cx="12" cy="12" r="1.8"/><circle class="fill" cx="19" cy="12" r="1.8"/></svg></button></div></div>
+    <div class="hstrip" role="listbox" aria-label="전시실"></div>
     <div id="cover-pick" role="dialog" aria-label="대표 사진 고르기">
       <div class="box">
         <div class="top"><b class="ttl">대표 사진</b><button class="close" aria-label="닫기">✕</button></div>
