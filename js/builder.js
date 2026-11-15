@@ -764,6 +764,8 @@ export class MuseumScene {
       let C = T.ceilSpec || { map: 'wallWhite', tile: [3, 3], tint: 0xf2ece2, amb: 0.82 };
       // R2: 천장 무늬의 레일 선은 조명 줄과 어긋난다 → 무늬는 민무늬로 하고, 레일은 조명 바로 위에 진짜로 단다 (아래 '조명 레일')
       if (R2 && C.map === 'track') C = { ...C, map: 'wallWhite', tile: [3, 3] };
+      // 무늬 있는 천장(박힌 전등 등): 방 크기에 딱 맞게 무늬 간격을 조금 늘이거나 줄인다 → 벽에서 잘리지 않고 간격이 고르다
+      else if (R2 && C.map !== 'wallWhite') C = { ...C, tile: [ROOM_W / Math.max(1, Math.round(ROOM_W / C.tile[0])), Lr / Math.max(1, Math.round(Lr / C.tile[1]))] };
       ceilMat = keep(surfaceMaterial({ map: texOf(R, C.map), tile: C.tile, tint: C.tint, lightMap: keep(lightTex(lmC.c)), lmSize: [ROOM_W, Lr], ambient: C.amb, lmIntensity: 0 }));
     }
     const ceil = new THREE.Mesh(ceilGeo, ceilMat);

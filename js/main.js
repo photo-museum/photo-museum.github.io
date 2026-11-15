@@ -449,7 +449,7 @@ function editRoomText(ri) {
   openText({
     head: `ROOM ${String(ri + 1).padStart(2, '0')} 이름·소개`,
     title: { label: '방 이름', value: room.name, placeholder: '예) 바다, 아침 7시' },
-    body: { label: '방 설명 (입구 옆 왼쪽 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
+    body: { label: '방 설명 (문 옆 벽에 적혀요)', value: room.intro, placeholder: '이 방에 어떤 사진들이 있는지 적어 주세요' },
     font: { value: room.font, inherit: museum.font || DEFAULT_FONT },
     onSave: (name, intro, font) => {
       pushUndo('방 이름·설명');
@@ -692,7 +692,7 @@ function goStop(s) {
   navPending = s;
   stats.navs = (stats.navs || 0) + 1;
   hideHint();
-  if (R2) { // 시험판 R2: 벽을 따라 한 방향으로만 도니 어지럽지 않다 → 깜빡이지 않고 걸어간다 (걷는 중에 또 누르면 그다음 자리로)
+  if (R2) { // 벽을 따라 한 방향으로만 도니 어지럽지 않다 → 깜빡이지 않고 걸어간다 (걷는 중에 또 누르면 그다음 자리로). 예전 구조(old/)만 깜빡 넘기기
     navPending = null;
     // 같은 방 안에서는 고개를 돌리지 않고 몸만 옆으로 옮긴다. 문을 지나 다른 방으로 갈 때만 가는 쪽을 본다
     const path = route(controls.pos.x, controls.pos.z, s.spot.x, s.spot.z);
@@ -822,7 +822,7 @@ function updateHD() {
 
 
 // ---------- 지도 ----------
-const map = new (R2 ? MuseumMap2 : MuseumMap)({ // 시험판 R2 는 세로 지도 (js/map2.js)
+const map = new (R2 ? MuseumMap2 : MuseumMap)({ // 세로 지도 (js/map2.js). 예전 구조(old/)만 가로 지도
   controls,
   getLayout: () => museumScene.layout,
   getMuseum: () => museum,

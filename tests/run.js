@@ -110,14 +110,14 @@ const desktop = {
     await p.click('#tools [data-act=tour]'); await p.waitForTimeout(300);
     assert(!(await p.evaluate(() => window.__pm.editMode)), '관람으로');
   },
-  '방 소개 글: 왼쪽 벽 · 안내벽 없음': async (p, h) => {
+  '방 소개 글: 문 옆 오른쪽 벽 · 문에서 문으로 곧장': async (p, h) => {
     await h.enter(0);
-    const r = await p.evaluate(() => { const L = window.__pm.museumScene.layout[0]; const st = window.__pm.museumStops(); return { spot: L.introSpot, kinds: st.slice(0, 3).map(s => s.kind), z0: L.zStart, route: window.__pm.route(0, L.zStart - 1, 0, L.zStart - 9).length }; });
-    assert(r.spot.x < 0 && r.kinds[1] === '방 소개', JSON.stringify(r.kinds));
+    const r = await p.evaluate(() => { const L = window.__pm.museumScene.layout[0]; const st = window.__pm.museumStops(); return { spot: L.introSpot, kinds: st.slice(0, 3).map(s => s.kind), z0: L.zStart, route: window.__pm.route(0, L.zStart - 1, 0, L.zStart - 7).length }; });
+    assert(r.spot.x > 0 && r.kinds[1] === '방 소개', JSON.stringify([r.spot, r.kinds]));
     assert(r.route === 1, '방 안에서는 곧장: ' + r.route);
-    await h.pose(0, r.z0 - 1); await p.evaluate(() => { window.__pm.controls.joy.y = -1; }); await p.waitForTimeout(2800);
+    await p.evaluate(z => { const P = window.__pm; P.controls.setPose(P.museumScene.layout[0].doorInX, z, 0); P.controls.joy.y = -1; }, r.z0 - 0.5); await p.waitForTimeout(3200);
     await p.evaluate(() => { window.__pm.controls.joy.y = 0; });
-    assert((await h.pos()).z < r.z0 - 6, '가운데로 곧장 지나감');
+    assert((await p.evaluate(() => window.__pm.museumScene.roomIndexAt(window.__pm.controls.pos.z))) >= 1, '문에서 문으로 곧장 걸으면 다음 방');
   },
   '모드는 관람 / 편집 둘뿐: 켜진 쪽이 하얗고, 관람에도 조이스틱·이전/다음': async (p, h) => {
     await h.enter(0);
@@ -171,27 +171,26 @@ const desktop = {
     assert(await p.evaluate(() => document.querySelector('#editor').classList.contains('open')), '이름·설명 창');
     await p.click('#editor-cancel'); await p.waitForTimeout(300);
     await p.evaluate(() => window.__pm.map.open()); await p.waitForTimeout(500);
-    await p.click('#map .door.exit'); await p.waitForTimeout(500);
+    await p.evaluate(() => document.querySelector('#map .vplace.exit').click()); await p.waitForTimeout(500);
     assert((await h.pos()).room === '출구', '출구로');
     await p.evaluate(() => window.__pm.map.open()); await p.waitForTimeout(500);
-    await p.click('#map .door.lobby'); await p.waitForTimeout(500);
+    await p.evaluate(() => document.querySelector('#map .vplace.lobby').click()); await p.waitForTimeout(500);
     assert((await h.pos()).room === '입구', '입구로');
   },
-  '지도: 축소하면 방 모드 → 방 끌어 순서 바꾸기': async (p, h) => {
-    await h.enter(5);
+  '지도: 방 이름 왼쪽 ≡ 를 끌어 방 순서 바꾸기 · 사진 접기': async (p, h) => {
+    await h.enter(0);
     await p.evaluate(() => window.__pm.map.open()); await p.waitForTimeout(700);
-    const rb = await (await p.$('#map .rooms')).boundingBox();
-    await p.mouse.move(rb.x + rb.width / 2, rb.y + rb.height / 2);
-    for (let i = 0; i < 4; i++) { await p.mouse.wheel(0, 120); await p.waitForTimeout(80); }
-    await p.waitForTimeout(400);
-    assert(await p.evaluate(() => document.querySelector('#map').classList.contains('rooms-mode')), '방 모드');
     const before = await h.names();
-    const cards = await p.$$('#map .mroom .plan');
-    const b1 = await cards[1].boundingBox(), b2 = await cards[2].boundingBox();
-    await p.mouse.move(b1.x + b1.width / 2, b1.y + b1.height / 2); await p.mouse.down();
-    await p.mouse.move(b2.x + b2.width + 30, b1.y + b1.height / 2, { steps: 24 });
-    await p.mouse.up(); await p.waitForTimeout(700);
+    let rooms = await p.$$('#map .mroom.v');
+    const g = await (await rooms[0].$('.grip')).boundingBox(), r1 = await rooms[1].boundingBox();
+    await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2); await p.mouse.down();
+    await p.mouse.move(g.x + g.width / 2, r1.y + r1.height * 0.8, { steps: 20 }); await p.waitForTimeout(150);
+    await p.mouse.up(); await p.waitForTimeout(800);
     assert((await h.names()) !== before, '순서가 바뀌어야: ' + await h.names());
+    await p.evaluate(() => document.querySelector('#map .mroom.v .fold').click()); await p.waitForTimeout(400);
+    assert(await p.evaluate(() => { const c = document.querySelector('#map .mroom.v'); return c.classList.contains('folded') && getComputedStyle(c.querySelector('.plan')).display === 'none'; }), '사진 접힘');
+    await p.evaluate(() => document.querySelector('#map .mroom.v .fold').click()); await p.waitForTimeout(300);
+    await p.click('#undo'); await p.waitForTimeout(600);
     await p.evaluate(() => window.__pm.map.close());
   },
   '지도: 사진을 사진 사이에 끼워 넣기 · 가운데에 놓으면 자리 바꾸기': async (p, h) => {
@@ -241,12 +240,12 @@ const desktop = {
     plans = await p.$$('#map .mroom .plan'); ts = await plans[0].$$('.thumb');
     const [cx, cy] = await c(ts[0]);
     await p.keyboard.down('Control'); await p.mouse.click(cx, cy); await p.keyboard.up('Control'); await p.waitForTimeout(200);
-    const cap = await (await p.$('#map .mroom .cap')).boundingBox();
-    await p.mouse.click(cap.x + 4, cap.y + cap.height + 14); await p.waitForTimeout(300);
+    const tip = await (await p.$('#map .rooms')).boundingBox();
+    await p.mouse.click(tip.x + tip.width - 8, tip.y + 12); await p.waitForTimeout(300); // 방 줄이 아닌 빈 곳
     assert((await p.$$('#map .thumb.sel')).length === 0 && (await p.evaluate(() => window.__pm.map.isOpen)), '빈 곳 → 취소, 지도는 그대로');
     await p.evaluate(() => window.__pm.map.close());
   },
-  '사진 설명 한꺼번에 쓰기 · 되돌리기 / 다음 › 은 깜빡 넘기기': async (p, h) => {
+  '사진 설명 한꺼번에 쓰기 · 되돌리기 / 다음 › 은 고개 안 돌리고 옆으로': async (p, h) => {
     await h.enter(0);
     await p.evaluate(() => window.__pm.openCaptions(0)); await p.waitForTimeout(500);
     const tas = await p.$$('#captions textarea');
@@ -259,11 +258,18 @@ const desktop = {
     assert(!(await p.evaluate(() => document.querySelector('#captions').classList.contains('open'))), '닫힘');
     await p.click('#undo'); await p.waitForTimeout(700);
     assert((await caps())[0] !== '첫째 설명', '되돌리기 한 번에');
-    await h.pose(0, -1); await p.waitForTimeout(900);
-    await p.click('#nav-next');
-    assert(await p.evaluate(() => document.querySelector('#blink').classList.contains('on')), '깜빡');
-    await p.waitForTimeout(700);
-    assert(!(await p.evaluate(() => document.querySelector('#blink').classList.contains('on') || !!window.__pm.controls.auto)), '걷지 않고 바로 도착');
+    const stray = await p.evaluate(async () => {
+      const P = window.__pm, c = P.controls;
+      const st = P.museumStops().filter(s => s.kind === '사진');
+      c.auto = null; c.setPose(st[0].spot.x, st[0].spot.z, st[0].spot.yaw);
+      await new Promise(r => setTimeout(r, 500));
+      document.querySelector('#nav-next').click();
+      if (!c.auto) return 'no-walk';
+      let worst = 0; const t0 = performance.now();
+      while (c.auto && performance.now() - t0 < 6000) { worst = Math.max(worst, Math.abs(Math.atan2(Math.sin(c.yaw - st[0].spot.yaw), Math.cos(c.yaw - st[0].spot.yaw)))); await new Promise(r => requestAnimationFrame(r)); }
+      return Math.hypot(c.pos.x - st[1].spot.x, c.pos.z - st[1].spot.z) < 0.15 ? worst : 'not-arrived';
+    });
+    assert(typeof stray === 'number' && stray < 0.05, '같은 벽 옆 사진으로: 걸어가되 고개는 그대로 (' + stray + ')');
   },
   '출구: 벽 글 고치기 · 방명록 쓰기 버튼': async (p, h) => {
     await h.enter(0);
@@ -301,7 +307,7 @@ const desktop = {
     assert(await p.evaluate(() => getComputedStyle(document.querySelector('#edit-menu')).display === 'none'), '지도에서는 편집 메뉴 숨김');
     const walls = () => p.evaluate(() => window.__pm.museum.rooms.map(r => r.style.wall));
     const w0 = await walls();
-    await p.evaluate(() => document.querySelector('#map .door.add').click()); await p.waitForTimeout(700);
+    await p.evaluate(() => document.querySelector('#map .vplace.add').click()); await p.waitForTimeout(700);
     const w1 = await walls();
     assert(w1.length === w0.length + 1 && w1[w1.length - 1] !== w1[w1.length - 2], '새 방은 앞 방과 다른 색: ' + w1);
     assert(await p.evaluate(() => window.__pm.map.isOpen), '지도는 그대로 열려 있음');
@@ -311,7 +317,7 @@ const desktop = {
     await p.evaluate(want => [...document.querySelectorAll('#sheet button')].find(b => b.textContent.trim() === want).click(), want);
     await p.waitForTimeout(700);
     assert((await walls())[0] !== w1[0], '지도에서 방 꾸미기');
-    const r = await p.evaluate(() => { const e = document.querySelector('#map .rooms').getBoundingClientRect(); return [e.left + 6, e.bottom - 4]; });
+    const r = await p.evaluate(() => { const e = document.querySelector('#map .tip').getBoundingClientRect(); return [e.left + 6, e.top + e.height / 2]; });
     await p.mouse.click(r[0], r[1]); await p.waitForTimeout(700);
     assert(await p.evaluate(() => window.__pm.map.isOpen), '빈 곳을 눌러도 안 닫힘');
     await p.click('#map [data-act=close]'); await p.waitForTimeout(400);
@@ -387,23 +393,30 @@ const phone = {
     assert(b.zoom < 1.05, '확대 안 됨 ' + b.zoom);
     assert(Math.hypot(b.x - a.x, b.z - a.z) > 0.5 && Math.abs(b.yaw - a.yaw) > 0.3, '걷고 돌았어야');
   },
-  '휴대폰: 지도 오므려 방 모드 → 방 꾹 눌러 옮기기': async (p, h, ctx) => {
-    await h.enter(5);
-    await p.evaluate(() => { window.__pm.map.zoom = 1; window.__pm.map.open(); }); await p.waitForTimeout(900);
+  '휴대폰: 지도에서 ≡ 를 손가락으로 끌어 방 순서 바꾸기 · 위아래로 밀어 넘기기': async (p, h, ctx) => {
+    await h.enter(0);
+    await p.evaluate(() => window.__pm.map.open()); await p.waitForTimeout(900);
     const cdp = await ctx.newCDPSession(p);
     const t = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
-    const rb = await (await p.$('#map .rooms')).boundingBox();
-    const cx = rb.x + rb.width / 2, cy = rb.y + rb.height / 2;
-    await t('touchStart', [{ x: cx, y: cy - 150, id: 1 }, { x: cx, y: cy + 150, id: 2 }]);
-    for (let i = 1; i <= 10; i++) { await t('touchMove', [{ x: cx, y: cy - 150 + i * 11, id: 1 }, { x: cx, y: cy + 150 - i * 11, id: 2 }]); await p.waitForTimeout(40); }
-    await t('touchEnd', []); await p.waitForTimeout(500);
-    assert(await p.evaluate(() => document.querySelector('#map').classList.contains('rooms-mode')), '방 모드');
-    const before = await h.names();
-    const b1 = await (await p.$$('#map .mroom .plan'))[1].boundingBox();
-    const x = b1.x + b1.width / 2, y = b1.y + b1.height / 2;
-    await t('touchStart', [{ x, y, id: 3 }]); await p.waitForTimeout(600);
-    for (let i = 1; i <= 12; i++) { await t('touchMove', [{ x, y: y + i * 18, id: 3 }]); await p.waitForTimeout(30); }
+    const mid = async el => { const b = await el.boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    let rooms = await p.$$('#map .mroom.v');
+    const [ax, ay] = await mid(rooms[0]), [bx, by] = await mid(rooms[1]);
+    const len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / len, uy = (by - ay) / len; // 화면에서 '지도 아래쪽'
+    // 빈 곳(방 이름 줄)을 잡고 위로 밀면 목록이 넘어간다
+    const s0 = await p.evaluate(() => document.querySelector('#map .rooms').scrollTop);
+    const [hx, hy] = await mid(await rooms[1].$('.rhd span'));
+    await t('touchStart', [{ x: hx, y: hy, id: 1 }]);
+    for (let i = 1; i <= 8; i++) { await t('touchMove', [{ x: hx - ux * i * 10, y: hy - uy * i * 10, id: 1 }]); await p.waitForTimeout(25); }
     await t('touchEnd', []); await p.waitForTimeout(700);
+    assert((await p.evaluate(() => document.querySelector('#map .rooms').scrollTop)) > s0, '위로 밀면 넘어감');
+    await p.evaluate(() => { document.querySelector('#map .rooms').scrollTop = 0; }); await p.waitForTimeout(200);
+    const before = await h.names();
+    rooms = await p.$$('#map .mroom.v');
+    const [gx, gy] = await mid(await rooms[0].$('.grip'));
+    await t('touchStart', [{ x: gx, y: gy, id: 3 }]); await p.waitForTimeout(150);
+    const far = len * 1.3;
+    for (let i = 1; i <= 14; i++) { await t('touchMove', [{ x: gx + ux * far * i / 14, y: gy + uy * far * i / 14, id: 3 }]); await p.waitForTimeout(30); }
+    await t('touchEnd', []); await p.waitForTimeout(800);
     assert((await h.names()) !== before, '순서 바뀜');
     await p.evaluate(() => window.__pm.map.close());
   },
