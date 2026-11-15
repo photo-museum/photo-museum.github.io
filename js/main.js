@@ -1087,8 +1087,9 @@ tapRing.renderOrder = 20;
 scene.add(tapRing);
 let tapRingT = 0;
 function walkToFloor(pt) {
-  const hw = ROOM_W / 2 - 0.55;
-  const x = Math.max(-hw, Math.min(hw, pt.x)), z = pt.z;
+  const rm = [museumScene.layout.lobby, ...museumScene.layout, museumScene.layout.exit].find(r => pt.z <= r.zStart + WALL_T && pt.z >= r.zEnd - WALL_T) || {};
+  const w = rm.width || ROOM_W, mx = rm.cx || 0; // 방마다 폭이 다를 수 있다 (R2)
+  const x = Math.max(mx - w / 2 + 0.55, Math.min(mx + w / 2 - 0.55, pt.x)), z = pt.z;
   const px = controls.pos.x, pz = controls.pos.z;
   const dx = x - px, dz = z - pz;
   if (Math.hypot(dx, dz) < 0.35) return;

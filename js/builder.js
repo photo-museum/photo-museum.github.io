@@ -130,7 +130,8 @@ function meterPlane(w, h) {
 
 // 문 구멍이 있는 끝벽 (uv = 미터, x 0..W)
 // doorU: 벽 모양 안에서 문 가운데 위치 (0 ~ ROOM_W)
-function endWallGeometry(withDoor, doorU = ROOM_W / 2) {
+const ROOM_W0 = ROOM_W; // 기본 방 폭 (buildRoom 안에서는 그 방의 폭을 ROOM_W 라는 이름으로 쓴다)
+function endWallGeometry(withDoor, doorU = ROOM_W0 / 2, ROOM_W = ROOM_W0) {
   const s = new THREE.Shape();
   s.moveTo(0, 0); s.lineTo(ROOM_W, 0); s.lineTo(ROOM_W, ROOM_H); s.lineTo(0, ROOM_H); s.lineTo(0, 0);
   if (withDoor) {
@@ -686,6 +687,15 @@ export class MuseumScene {
     const { length: Lr, zStart, zEnd } = room;
     const zMid = (zStart + zEnd) / 2;
     const group = new THREE.Group();
+    // R2: 방마다 폭(width)과 가운데(cx)가 다르다. 아래는 모두 '방 가운데가 x=0' 인 좌표로 짓고, 묶음을 cx 만큼 옮긴다.
+    const room0 = room, cx = room.cx || 0, c0 = this.colliders.length;
+    const ROOM_W = room.width || ROOM_W0;
+    if (cx) {
+      room = { ...room, doorInX: (room.doorInX || 0) - cx, doorOutX: (room.doorOutX || 0) - cx,
+        panels: room.panels.map(p => ({ ...p, x: p.x - cx, orig: p })),
+        introSpot: room.introSpot && { ...room.introSpot, x: room.introSpot.x - cx } };
+      group.position.x = cx;
+    }
     const disposables = [];
     const keep = (...xs) => { disposables.push(...xs); return xs[0]; };
     // 바닥 반사를 쓰지 않으므로 거울 세계에는 아무것도 넣지 않는다
@@ -802,12 +812,12 @@ export class MuseumScene {
     // 시작 벽 (방 안쪽을 보며 +z 쪽에 있음 → -z 를 향해야 함)
     // 시작 벽은 180도 돌아 있어서 벽 모양 좌표 u = ROOM_W/2 - x
     const inU = ROOM_W / 2 - (room.doorInX || 0), outU = ROOM_W / 2 + (room.doorOutX || 0);
-    const startGeo = keep(endWallGeometry(room.doorIn, inU));
+    const startGeo = keep(endWallGeometry(room.doorIn, inU, ROOM_W));
     const startWall = new THREE.Mesh(startGeo, endMat(room.doorIn, inU, false, 'F'));
     startWall.rotation.y = Math.PI; startWall.position.set(ROOM_W / 2, 0, zStart);
     both(startWall);
     // 끝 벽 (+z 를 향함)
-    const endGeo = keep(endWallGeometry(room.doorOut, outU));
+    const endGeo = keep(endWallGeometry(room.doorOut, outU, ROOM_W));
     const endWall = new THREE.Mesh(endGeo, endMat(room.doorOut, outU, room.exit ? 'exit' : !!room.lobby, 'B'));
     endWall.position.set(-ROOM_W / 2, 0, zEnd);
     both(endWall);
@@ -935,8 +945,9 @@ export class MuseumScene {
       C.push([-hw, zEnd, hw, zEnd]);
     }
 
+    if (cx) for (let i = c0; i < C.length; i++) { C[i][0] += cx; C[i][2] += cx; } // 충돌 벽도 제자리로
     this.root.add(group);
-    this.rooms.push({ layout: room, group, disposables });
+    this.rooms.push({ layout: room0, group, disposables });
   }
 
   buildPanel(room, p, group, keep, T) {
@@ -952,7 +963,7 @@ export class MuseumScene {
     const mesh = new THREE.Mesh(geo, mats);
     mesh.position.set(p.x, p.y, p.z);
     mesh.rotation.y = p.rotY;
-    mesh.userData = { roomIndex: room.index, photoIndex: p.index, photoId: p.photo.id, panel: p, empty };
+    mesh.userData = { roomIndex: room.index, photoIndex: p.index, photoId: p.photo.id, panel: p.orig || p, empty };
     group.add(mesh);
     if (p.photo.caption && p.photo.caption.trim()) {
       const label = makeLabel(p.photo.caption, !!themeOf(room).light, fontsFor(room.font));

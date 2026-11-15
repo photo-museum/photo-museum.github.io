@@ -120,40 +120,47 @@ export function viewingSpot(panel, dist = 2.4) {
 }
 
 // ---------- R2: 벽 따라 한 바퀴 ----------
+// 사진이 많아지면 방은 문에서 먼 쪽(왼쪽, -x)으로 깊어진다. 문에서 문까지(z)는 늘 같은 길이라, 바쁜 사람은 문에서 문으로 곧장 지나간다.
+//  · 오른쪽 벽(x = +ROOM_W/2)은 모든 방이 같은 줄. 방마다 width(폭)와 cx(가운데 x)가 다르다.
+//  · 안쪽 벽(L)에는 1~2장, 나머지는 들어온 문 옆 벽(F)과 나가는 문 옆 벽(B)에 반씩.
 const R2_GAP = 1.5;      // 같은 벽 사진 사이
 const R2_END = 1.5;      // 벽 끝(모서리)에서 사진까지
-const R2_MIN_LEN = 8.5;  // 방 길이(문에서 문까지) 최소
+const R2_LEN = 8.5;      // 방 길이(문에서 문까지): 늘 같다
 function layoutRoomR2(museum, room, ri, z) {
   const ps = room.photos.map((photo, index) => ({ photo, index, ...panelSize(displayAspect(photo)) }));
   const n = ps.length;
-  // 문 옆 벽에서 쓸 수 있는 폭: 왼쪽 모서리 ~ 문 왼쪽
-  const uMin = -ROOM_W / 2 + R2_END, uMax = DOOR_X - DOOR_W / 2 - 1.0;
-  const fits = list => list.reduce((s, p) => s + p.w, 0) + R2_GAP * (list.length - 1) <= uMax - uMin;
-  let nF = n >= 5 ? 2 : n >= 1 ? 1 : 0, nB = n >= 5 ? 2 : n >= 2 ? 1 : 0;
-  if (nF === 2 && !fits(ps.slice(0, 2))) nF = 1;
-  if (nB === 2 && !fits(ps.slice(n - 2))) nB = 1;
-  const F = ps.slice(0, nF), Lw = ps.slice(nF, n - nB), B = ps.slice(n - nB);
   const span = list => list.reduce((s, p) => s + p.w, 0) + R2_GAP * Math.max(0, list.length - 1);
-  const length = Math.max(R2_MIN_LEN, span(Lw) + R2_END * 2);
+  const length = R2_LEN;
+  let nL = n >= 6 ? 2 : n >= 3 ? 1 : 0;
+  const nF = Math.ceil((n - nL) / 2);
+  if (nL === 2 && span(ps.slice(nF, nF + 2)) > length - R2_END * 2) nL = 1; // 안쪽 벽에 두 장이 안 들어가면 한 장만
+  const nB = n - nF - nL;
+  const F = ps.slice(0, nF), Lw = ps.slice(nF, nF + nL), B = ps.slice(n - nB);
+  // 문 옆 벽: 문 왼쪽(uMax)에서 왼쪽 모서리까지. 긴 쪽에 맞춰 방 폭을 정한다
+  const right = ROOM_W / 2, uMax = DOOR_X - DOOR_W / 2 - 1.0;
+  const width = Math.max(ROOM_W, Math.max(span(F), span(B)) + R2_END + (right - uMax));
+  const left = right - width, cx = right - width / 2;
+  const uMin = left + R2_END;
   const zStart = z, zEnd = z - length;
   const d = PANEL_GAP + PANEL_D / 2;
   const panels = [];
   const put = (p, wall, x, zz, rotY, sAlong) => panels.push({ photo: p.photo, index: p.index, wall, w: p.w, h: p.h, x, y: PANEL_CY, z: zz, rotY, sAlong });
-  // F: 문 쪽에서 왼쪽으로 (x 가 줄어든다), 쓸 수 있는 폭의 가운데에
+  // F: 문 쪽에서 안쪽으로 (x 가 줄어든다). 남는 폭은 양옆으로 고르게
   let u = (uMin + uMax) / 2 + span(F) / 2;
   for (const p of F) { put(p, 'F', u - p.w / 2, zStart - d, Math.PI, 0); u -= p.w + R2_GAP; }
-  // L: 들어온 쪽에서 안쪽으로
+  // L(안쪽 벽): 들어온 쪽에서 나가는 쪽으로
   let s = (length - span(Lw)) / 2;
-  for (const p of Lw) { put(p, 'L', -(ROOM_W / 2 - d), zStart - (s + p.w / 2), Math.PI / 2, s + p.w / 2); s += p.w + R2_GAP; }
-  // B: 왼쪽에서 문 쪽으로 (x 가 늘어난다)
+  for (const p of Lw) { put(p, 'L', left + d, zStart - (s + p.w / 2), Math.PI / 2, s + p.w / 2); s += p.w + R2_GAP; }
+  // B: 안쪽에서 문 쪽으로 (x 가 늘어난다)
   u = (uMin + uMax) / 2 - span(B) / 2;
   for (const p of B) { put(p, 'B', u + p.w / 2, zEnd + d, 0, length); u += p.w + R2_GAP; }
   return {
     index: ri, id: room.id, theme: room.theme || 'white', style: room.style, zStart, zEnd, length, panels,
+    width, cx,
     name: room.name || '', intro: room.intro || '',
     font: room.font || museum.font || null,
     doorIn: true, doorOut: true, doorInX: DOOR_X, doorOutX: DOOR_X,
     // 방 소개 글: 문 바로 옆 오른쪽 벽. 감상 자리는 그 앞 2.7m
-    introWall: 'R', introSpot: { x: ROOM_W / 2 - 2.7, z: zStart - Math.min(INTRO_S + 0.4, length / 2), yaw: -Math.PI / 2 },
+    introWall: 'R', introSpot: { x: right - 2.7, z: zStart - length / 2, yaw: -Math.PI / 2 },
   };
 }

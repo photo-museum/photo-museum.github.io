@@ -11,7 +11,8 @@ const colorsOf = r => { const T = themeOf(r); return { floor: T.mapFloor, wall: 
 function drawRoom(g, r, s, ox, oy, { current = false } = {}) {
   const C = colorsOf(r);
   const x0 = ox - r.zStart * s, x1 = ox - r.zEnd * s;
-  const y0 = oy - ROOM_W / 2 * s, y1 = oy + ROOM_W / 2 * s;
+  const rw = r.width || ROOM_W, rc = r.cx || 0; // R2: 방마다 폭이 다르다
+  const y0 = oy + (rc - rw / 2) * s, y1 = oy + (rc + rw / 2) * s;
   g.fillStyle = C.floor;
   g.fillRect(x0, y0, x1 - x0, y1 - y0);
   if (current) { g.fillStyle = 'rgba(255,225,170,0.07)'; g.fillRect(x0, y0, x1 - x0, y1 - y0); }
@@ -165,7 +166,9 @@ export class MuseumMap {
     this._last = key;
     const W = 104, H = 56, s = 4.2;
     const g = fitCanvas(this.miniCanvas, W, H);
-    const ox = W / 2 + c.pos.z * s, oy = H / 2;
+    // R2 는 방이 옆으로 깊어서, 작은 지도가 내 위치를 위아래로도 따라간다
+    const deep = layout.some(r => r.cx);
+    const ox = W / 2 + c.pos.z * s, oy = deep ? H / 2 - c.pos.x * s : H / 2;
     for (const r of [layout.lobby, ...layout, layout.exit]) {
       if (ox - r.zStart * s > W || ox - r.zEnd * s < 0) continue;
       drawRoom(g, r, s, ox, oy);
