@@ -103,14 +103,6 @@ function getShared(maxAniso) {
       side: new THREE.MeshBasicMaterial({ color: 0xa8833e }),
       bottom: new THREE.MeshBasicMaterial({ color: 0x3a2c18 }),
     },
-    edgesBlack: {
-      top: new THREE.MeshBasicMaterial({ color: 0x2c2c2c }),
-      side: new THREE.MeshBasicMaterial({ color: 0x161616 }),
-      bottom: new THREE.MeshBasicMaterial({ color: 0x080808 }),
-    },
-    ceilingCove: surfaceMaterial({ map: plaster, tile: [3, 3], tint: 0x3c3c3f, lightMap: black, ambient: 0.4, lmIntensity: 0 }),
-    ceilingNight: surfaceMaterial({ map: plaster, tile: [3, 3], tint: 0x1e2436, lightMap: black, ambient: 0.4, lmIntensity: 0 }),
-    ceilingLouver: surfaceMaterial({ map: louver, tile: [0.6, 0.6], tint: 0xffffff, lightMap: black, ambient: 1.0, lmIntensity: 0 }),
     edgesDark: {
       top: new THREE.MeshBasicMaterial({ color: 0x8c8274 }),
       side: new THREE.MeshBasicMaterial({ color: 0x3e3933 }),
@@ -124,14 +116,7 @@ function getShared(maxAniso) {
     fixtureMat: new THREE.MeshBasicMaterial({ color: 0x141414 }),
     fixtureGeo: new THREE.CylinderGeometry(0.055, 0.065, 0.2, 14),
     stemGeo: new THREE.BoxGeometry(0.02, 0.12, 0.02),
-    // 빛나는 천장: 1.2m 격자, 스스로 밝다
-    ceilingGrid: surfaceMaterial({ map: grid, tile: [1.2, 1.2], tint: 0xffffff, lightMap: black, ambient: 1.05, lmIntensity: 0 }),
-    benchTop: new THREE.MeshBasicMaterial({ color: 0xd8b07c }),
-    benchSide: new THREE.MeshBasicMaterial({ color: 0xbb8f5d }),
-    benchEnd: new THREE.MeshBasicMaterial({ color: 0xa57b4d }),
-    benchBottom: new THREE.MeshBasicMaterial({ color: 0x3a3128 }),
     ceilingWhite: surfaceMaterial({ map: wallWhite, tile: [3.0, 3.0], tint: 0xffffff, lightMap: black, ambient: 0.8, lmIntensity: 0 }),
-    ceilingDark: surfaceMaterial({ map: wood, tile: [1.0, 3.2], tint: 0x8c8274, lightMap: black, ambient: 0.3, lmIntensity: 0 }),
   };
   return shared;
 }
@@ -449,25 +434,6 @@ function paintEdgeAO(L, edges) {
   g.restore();
 }
 
-const BENCH = { w: 0.55, h: 0.44, l: 2.4 };
-// 방 길이에 맞춰 벤치 위치 (방 시작에서 거리 s). 문 앞은 비운다.
-function benchSpots(Lr) {
-  const n = Math.max(1, Math.floor((Lr - 4) / 9));
-  const out = [];
-  for (let i = 0; i < n; i++) out.push({ x: 0, s: Lr * (i + 1) / (n + 1) });
-  return out;
-}
-// 바닥 빛 무늬 G 채널에 벤치 그림자
-function paintFloorShadow(L, b) {
-  const { g, ppm, c } = L;
-  const X = (b.x + ROOM_W / 2) * ppm, Y = c.height - b.s * ppm;
-  g.save();
-  g.shadowColor = 'rgba(0,0,0,0.7)';
-  g.shadowBlur = 0.18 * ppm;
-  g.fillStyle = 'rgba(0,0,0,0.7)';
-  g.fillRect(X - (BENCH.w / 2 + 0.04) * ppm, Y - (BENCH.l / 2 + 0.04) * ppm, (BENCH.w + 0.08) * ppm, (BENCH.l + 0.08) * ppm);
-  g.restore();
-}
 
 // ---------- 출구 방: 인사 글, 출구 문, 방명록 ----------
 const EXIT_DOOR = { x: 2.35, w: 1.1, h: 2.3 };
@@ -552,7 +518,7 @@ export class MuseumScene {
   constructor(renderer, scene) {
     this.renderer = renderer;
     this.scene = scene;
-    this.rooms = [];          // { layout, group, mirror, disposables }
+    this.rooms = [];          // { layout, group, disposables }
     this.colliders = [];      // [x1, z1, x2, z2]
     this.pickables = [];
     this.textureCache = new Map(); // imageId -> Promise<Texture>
@@ -560,9 +526,7 @@ export class MuseumScene {
     this.photoJobs = [];           // 판마다 사진 붙이기/떼기
     this.activeRoom = 0;
     this.root = new THREE.Group();
-    this.mirrorRoot = new THREE.Group();
-    this.mirrorRoot.scale.y = -1;   // 바닥 아래로 뒤집힌 세계 = 바닥 반사
-    scene.add(this.mirrorRoot, this.root);
+    scene.add(this.root);
     this.res = getShared(renderer.capabilities.getMaxAnisotropy());
     ANISO = renderer.capabilities.getMaxAnisotropy();
     MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
@@ -605,7 +569,6 @@ export class MuseumScene {
   clear() {
     for (const r of this.rooms) {
       this.root.remove(r.group);
-      this.mirrorRoot.remove(r.mirror);
       for (const d of r.disposables) d.dispose();
     }
     this.rooms = [];
@@ -713,7 +676,6 @@ export class MuseumScene {
     const { length: Lr, zStart, zEnd } = room;
     const zMid = (zStart + zEnd) / 2;
     const group = new THREE.Group();
-    const mirror = new THREE.Group();
     const disposables = [];
     const keep = (...xs) => { disposables.push(...xs); return xs[0]; };
     // 바닥 반사를 쓰지 않으므로 거울 세계에는 아무것도 넣지 않는다
@@ -726,8 +688,6 @@ export class MuseumScene {
     if (T.skyGlow) { paintSkyGlow(lmL); paintSkyGlow(lmR); }
     if (T.cove) { paintCove(lmL); paintCove(lmR); }
     if (T.uplight) { paintUplights(lmL, Lr); paintUplights(lmR, Lr); }
-    const benches = T.benches ? benchSpots(Lr) : [];
-    for (const b of benches) paintFloorShadow(lmF, b);
     for (const p of room.panels) {
       const s = p.sAlong;
       const lit = T.spots || T.wash;
@@ -905,19 +865,6 @@ export class MuseumScene {
       }
     }
 
-    // ----- 나무 벤치 (방 가운데 줄) -----
-    for (const b of benches) {
-      const geo = keep(new THREE.BoxGeometry(BENCH.w, BENCH.h, BENCH.l));
-      // 면 순서: +x, -x, +y, -y, +z, -z
-      const mats = [R.benchSide, R.benchSide, R.benchTop, R.benchBottom, R.benchEnd, R.benchEnd];
-      const mesh = new THREE.Mesh(geo, mats);
-      mesh.position.set(b.x, BENCH.h / 2, zStart - b.s);
-      both(mesh);
-      const z0 = zStart - b.s - BENCH.l / 2, z1 = zStart - b.s + BENCH.l / 2;
-      const x0 = b.x - BENCH.w / 2, x1 = b.x + BENCH.w / 2;
-      this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
-    }
-
     // ----- 빛줄기: 천장 가장자리를 따라 빛나는 띠 -----
     if (T.cove) {
       const stripGeo = keep(new THREE.BoxGeometry(0.05, 0.03, Lr - 0.3));
@@ -954,7 +901,7 @@ export class MuseumScene {
     }
 
     // ----- 사진 판 -----
-    for (const p of room.panels) this.buildPanel(room, p, group, mirror, keep, T);
+    for (const p of room.panels) this.buildPanel(room, p, group, keep, T);
 
     // ----- 충돌 벽 (x,z 선분) -----
     const hw = ROOM_W / 2;
@@ -972,11 +919,10 @@ export class MuseumScene {
     }
 
     this.root.add(group);
-    this.mirrorRoot.add(mirror);
-    this.rooms.push({ layout: room, group, mirror, disposables });
+    this.rooms.push({ layout: room, group, disposables });
   }
 
-  buildPanel(room, p, group, mirror, keep, T) {
+  buildPanel(room, p, group, keep, T) {
     const R = this.res;
     const geo = keep(new THREE.BoxGeometry(p.w, p.h, PANEL_D));
     const empty = !p.photo.imageId;
@@ -1134,7 +1080,6 @@ export class MuseumScene {
       // 문이 일직선이라 여러 칸 너머까지 보인다 → 네 칸까지 그려 둔다 (먼 문 너머가 검게 비었다 나타나는 깜빡임 없애기)
       const v = Math.abs(r.layout.index - i) <= 4;
       r.group.visible = v;
-      r.mirror.visible = false; // 바닥 반사는 쓰지 않는다
     }
   }
 
