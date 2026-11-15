@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import {
   ROOM_W, ROOM_H, WALL_T, DOOR_W, DOOR_H, PANEL_D, PANEL_GAP, layoutMuseum,
-  INTRO_S, INTRO_W, INTRO_H, INTRO_CY, panelNormal, R2 } from './layout.js';
+  INTRO_S, INTRO_W, INTRO_H, INTRO_CY, panelNormal, R2, guestDesk } from './layout.js';
 import { fontsFor } from './fonts.js';
 import {
   concreteTexture, woodSlatsTexture, plasterTexture, oakFloorTexture, lightGridTexture,
@@ -426,7 +426,7 @@ const EXIT_DOOR = { x: 2.35, w: 1.1, h: 2.3 };
 const GB_DESK = { w: 1.2, h: 0.95, d: 0.6, s: 3.4 }; // s: 방 시작에서 거리
 
 export const EXIT_TITLE = '관람해 주셔서 고맙습니다';
-export const EXIT_NOTE = '앞의 방명록에 한마디 남겨 주세요';
+export const EXIT_NOTE = R2 ? '아래 방명록에 한마디 남겨 주세요' : '앞의 방명록에 한마디 남겨 주세요';
 function makeExitText(museum, FONTS, light = false) {
   const ppm = 300, S = 1.7, CW = Math.round(3.6 * ppm), CH = Math.round(1.5 * ppm);
   const c = document.createElement('canvas');
@@ -623,11 +623,11 @@ export class MuseumScene {
     both(sign);
     this.pickables.push(sign);
     // 방명록 책상과 펼친 책
-    const dz = zStart - GB_DESK.s;
+    const gd = guestDesk(room), dz = gd.z, gx = gd.x; // 방명록 책상 (layout.js guestDesk)
     const wood = keep(new THREE.MeshBasicMaterial({ color: 0x3b2d23 }));
     const woodTop = keep(new THREE.MeshBasicMaterial({ color: 0x5a4434 }));
     const desk = new THREE.Mesh(keep(new THREE.BoxGeometry(GB_DESK.w, GB_DESK.h, GB_DESK.d)), [wood, wood, woodTop, wood, wood, wood]);
-    desk.position.set(0, GB_DESK.h / 2, dz);
+    desk.position.set(gx, GB_DESK.h / 2, dz);
     desk.userData = { guestbook: true };
     both(desk);
     this.pickables.push(desk);
@@ -642,11 +642,11 @@ export class MuseumScene {
     const btex = keep(new THREE.CanvasTexture(bc)); btex.colorSpace = THREE.SRGBColorSpace; btex.anisotropy = MAX_ANISO;
     const book = new THREE.Mesh(keep(new THREE.PlaneGeometry(0.62, 0.39)), keep(new THREE.MeshBasicMaterial({ map: btex, toneMapped: false })));
     book.rotation.x = -Math.PI / 2 + 0.35;
-    book.position.set(0, GB_DESK.h + 0.05, dz + 0.02);
+    book.position.set(gx, GB_DESK.h + 0.05, dz + 0.02);
     book.userData = { guestbook: true };
     both(book);
     this.pickables.push(book);
-    const x0 = -GB_DESK.w / 2, x1 = GB_DESK.w / 2, z0 = dz - GB_DESK.d / 2, z1 = dz + GB_DESK.d / 2;
+    const x0 = gx - GB_DESK.w / 2, x1 = gx + GB_DESK.w / 2, z0 = dz - GB_DESK.d / 2, z1 = dz + GB_DESK.d / 2;
     this.colliders.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
     // 방명록 쪽지 (왼쪽 벽)
     const notes = makeGuestNotes(this.museum.guestbook || [], F, !!themeOf(room).light);

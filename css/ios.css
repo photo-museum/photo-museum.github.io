@@ -517,15 +517,15 @@ body.map-open #edit-menu { display: none; }
 :root body #map .bar .foldall { display: none; }
 :root body #map.v .bar .foldall { display: block; font-size: 13px; padding: 0 14px; }
 
-/* 세로 지도: 입구 → 방들 → 출구를 잇는 선 (왼쪽 세로줄 + 방마다 점) */
-:root body #map.v .rooms { padding-left: 34px; }
-:root body #map.v .mroom.v::before, :root body #map.v .vplace::before { content: ''; display: block; position: absolute; left: -19px; top: -6px; bottom: -6px; width: 3px; height: auto; border-radius: 2px; background: rgba(255,255,255,.32); }
-:root body #map.v .mroom.v::after, :root body #map.v .vplace::after { content: ''; display: block; position: absolute; left: -24px; right: auto; top: 9px; width: 13px; height: 13px; box-sizing: border-box; border-radius: 50%; background: #1c1c1e; border: 3px solid rgba(255,255,255,.75); }
+/* 세로 지도: 입구 → 방들 → 출구를 잇는 선. 선은 하나(.vline, map2.js 가 높이를 잰다), 점은 줄마다 같은 자리 */
+:root body #map.v .rooms { padding-left: 36px; }
+#map.v .vline { position: absolute; left: 15px; width: 2px; border-radius: 1px; background: rgba(255,255,255,.4); pointer-events: none; }
+:root body #map.v .mroom.v::before, :root body #map.v .vplace::before { display: none; content: none; }
+:root body #map.v .mroom.v::after, :root body #map.v .vplace::after { content: ''; display: block; position: absolute; right: auto; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; background: #2a2a2e; border: 2px solid rgba(255,255,255,.85); }
+/* 점의 가운데가 선(왼쪽 16px)에 오게: 방 줄은 테두리가 없고, 버튼은 테두리 1px 만큼 안쪽이 밀려 있다 */
+:root body #map.v .mroom.v::after { left: -26px; top: 9px; }
+:root body #map.v .mroom.v.folded::after { top: 15px; }
 :root body #map.v .vplace { position: relative; overflow: visible; }
-:root body #map.v .vplace::after { top: 50%; margin-top: -6.5px; }
-:root body #map.v .vplace.lobby::before { top: 50%; }
-:root body #map.v .vplace.exit::before { bottom: 50%; }
-:root body #map.v .vplace.add::before { background: repeating-linear-gradient(180deg, rgba(255,255,255,.32) 0 5px, transparent 5px 9px); }
-:root body #map.v .vplace.add::after { border-style: dashed; background: transparent; }
-:root body #map.v .mroom.v.here::after { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 4px rgba(229,72,77,.3); }
-:root body #map.v .mroom.v.drag::before { visibility: hidden; }
+:root body #map.v .vplace::after { left: -27px; top: 50%; margin-top: -6px; }
+:root body #map.v .vplace.add::after { background: #2a2a2e; border-style: dashed; }
+:root body #map.v .mroom.v.here::after { border-color: var(--accent); background: var(--accent); }

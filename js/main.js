@@ -4,7 +4,7 @@ import { WALL_BY, CEIL_BY, FLOOR_BY, PRESETS, simplifyStyles, presetOf, styleOf 
 import { initCaptions } from './captions.js';
 import { MuseumMap2 } from './map2.js';
 import { WalkControls } from './controls.js';
-import { viewingSpot, LOBBY_L, ROOM_W, WALL_T, R2 } from './layout.js';
+import { viewingSpot, LOBBY_L, ROOM_W, WALL_T, R2, guestDesk } from './layout.js';
 import { MuseumMap } from './map.js';
 import { Guide } from './guide.js';
 import { Music } from './music.js';
@@ -400,7 +400,7 @@ function ensureMuseumGlyphs() {
   const exFont = m.font || DEFAULT_FONT;
   const byFont = new Map();
   const add = (id, t) => { if (t) byFont.set(id, (byFont.get(id) || '') + t); };
-  const fixed = '0123456789ROOMMyphotomuseum→—·관람해주셔서고맙습니다앞의방명록에한마디남겨주세요벽을눌러이전시에대한설명을적어이름과';
+  const fixed = '0123456789ROOMMyphotomuseum→—·관람해주셔서고맙습니다앞의아래방명록에한마디남겨주세요벽을눌러이전시에대한설명을적어이름과';
   add(exFont, fixed + (m.title || '') + (m.intro || '') + (m.exitTitle || '') + (m.exitNote || '') + (m.guestbook || []).map(g => g.text + g.name).join(''));
   for (const r of m.rooms) {
     const f = r.font || exFont;
@@ -560,9 +560,9 @@ function bestSpot() {
 
 // 출구 방: 방명록 책상 앞, 인사 글 앞
 function exitSpots(ex) {
-  const dz = ex.zStart - 3.4;
+  const gd = guestDesk(ex);
   return [
-    { kind: '방명록', cx: 0, cz: dz, spot: { x: 0, z: dz + 1.5, yaw: 0 } },
+    { kind: '방명록', cx: gd.x, cz: gd.z, spot: gd.spot },
   ];
 }
 
@@ -633,7 +633,7 @@ function museumStops() {
       if (p.photo.imageId) out.push({ kind: '사진', photoId: p.photo.id, spot: viewingSpot(p) });
     }
   }
-  if (L.exit) out.push({ kind: '방명록', spot: { x: 0, z: L.exit.zStart - 3.4 + 1.5, yaw: 0 } });
+  if (L.exit) out.push({ kind: '방명록', spot: guestDesk(L.exit).spot });
   return out;
 }
 // 지금 자리에서 목표까지: 방 사이는 문을 지나간다
@@ -783,8 +783,8 @@ function updateGoto() {
   const L = museumScene.layout;
   let nearDesk = false;
   if (L && L.exit && controls.enabled && !map.isOpen && !sheetOpen() && !gb.classList.contains('open')) {
-    const dz = L.exit.zStart - 3.4; // 책상 자리 (builder GB_DESK.s)
-    nearDesk = Math.hypot(controls.pos.x, controls.pos.z - dz) < 3.2 && controls.pos.z < L.exit.zStart + 0.5;
+    const gd = guestDesk(L.exit); // 책상 자리
+    nearDesk = Math.hypot(controls.pos.x - gd.x, controls.pos.z - gd.z) < 3.2 && controls.pos.z < L.exit.zStart + 0.5;
   }
   gbCta.classList.toggle('show', nearDesk);
   if (nearDesk && t && t.kind === '방명록') t = null; // 같은 자리를 두 번 말하지 않게
@@ -1370,7 +1370,7 @@ function enterExhibition(ex, fresh = false) {
   const layout = rebuild(0, true);
   const pose = fresh ? null : loadPose(ex.id);
   const last = layout[layout.length - 1];
-  if (pose && pose.z <= 0 && pose.z >= last.zEnd && Math.abs(pose.x) < 3.4) controls.setPose(pose.x, pose.z, pose.yaw);
+  if (pose && pose.z <= 0 && pose.z >= last.zEnd && pose.x < ROOM_W / 2 - 0.1 && pose.x > -200) controls.setPose(pose.x, pose.z, pose.yaw); // 방이 왼쪽으로 깊을 수 있다
   else { controls.setPose(0, -1.0, 0); controls.pitchT = controls.pitch = 0.04; }
   museumScene.setActiveRoom(museumScene.roomIndexAt(controls.pos.z));
   $('#ex-title').textContent = ex.title;

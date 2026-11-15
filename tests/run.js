@@ -273,9 +273,13 @@ const desktop = {
   },
   '출구: 벽 글 고치기 · 방명록 쓰기 버튼': async (p, h) => {
     await h.enter(0);
+    // 방명록 책상은 출구 문 왼쪽, 인사 글 아래 벽에 붙어 있다: 마지막 '다음 ›' 자리가 그 앞이고, 가까이 가면 '방명록 쓰기'
+    const desk = await p.evaluate(() => { const P = window.__pm, L = P.museumScene.layout, st = P.museumStops(), s = st[st.length - 1]; P.controls.setPose(s.spot.x, s.spot.z, s.spot.yaw); return { kind: s.kind, x: s.spot.x, dz: s.spot.z - L.exit.zEnd }; });
+    assert(desk.kind === '방명록' && desk.x < 1.5 && desk.dz < 2.2, '책상은 출구 문 왼쪽 벽 쪽: ' + JSON.stringify(desk));
+    await p.waitForTimeout(1200);
+    assert(await p.evaluate(() => document.querySelector('#gb-cta').classList.contains('show')), '방명록 쓰기 버튼');
     await p.evaluate(() => { const L = window.__pm.museumScene.layout; const c = window.__pm.controls; c.setPose(-0.6, L.exit.zStart - 1.0, 0); c.pitch = c.pitchT = 0.25; });
     await p.waitForTimeout(1500);
-    assert(await p.evaluate(() => document.querySelector('#gb-cta').classList.contains('show')), '방명록 쓰기 버튼');
     const pt = await p.evaluate(() => { let v = null; window.__pm.museumScene.pickables.forEach(o => { if (o.userData.wallText === 'exit') { v = o.getWorldPosition(o.position.clone()); v.project(window.__pm.camera); } });
       return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; });
     await p.evaluate(() => window.__pm.setEditMode(true, true));
@@ -284,6 +288,7 @@ const desktop = {
     await p.evaluate(() => window.__pm.setEditMode(false));
     await p.fill('#ed-title', '와 주셔서 고마워요'); await p.click('#editor-save'); await p.waitForTimeout(700);
     assert((await p.evaluate(() => window.__pm.museum.exitTitle)) === '와 주셔서 고마워요', '저장');
+    await p.evaluate(() => { const P = window.__pm, st = P.museumStops(), s = st[st.length - 1]; P.controls.setPose(s.spot.x, s.spot.z, s.spot.yaw); }); await p.waitForTimeout(1200);
     await p.click('#gb-cta'); await p.waitForTimeout(400);
     assert(await p.evaluate(() => document.querySelector('#guestbook').classList.contains('open')), '방명록 창');
     await p.click('#gb-close');

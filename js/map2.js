@@ -124,6 +124,13 @@ export class MuseumMap2 extends MuseumMap {
     });
     place('exit', '출구', '<path d="M14 4h5v16h-5"/><path d="M10 8l4 4-4 4M3 12h11"/>').addEventListener('click', () => { this.close(); this.onGoPlace && this.onGoPlace('exit'); });
     this._syncSel();
+    // 연결선: 입구 가운데에서 출구 가운데까지 곧은 선 하나 (방을 접거나 줄이 바뀌어도 끊기지 않게 높이를 재서 그린다)
+    const line = document.createElement('i');
+    line.className = 'vline';
+    const a = row.querySelector('.vplace.lobby'), z = row.querySelector('.vplace.exit');
+    line.style.top = (a.offsetTop + a.offsetHeight / 2) + 'px';
+    line.style.height = (z.offsetTop + z.offsetHeight / 2 - (a.offsetTop + a.offsetHeight / 2)) + 'px';
+    row.prepend(line);
     if (keepScroll) { row.scrollTop = scroll; return; }
     const cur = this._cards()[here];
     row.scrollTop = cur ? Math.max(0, cur.offsetTop - 44) : 0;
