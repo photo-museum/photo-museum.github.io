@@ -167,7 +167,8 @@ function layoutRoomR2(museum, room, ri, z) {
 
 // 방명록 책상 자리와 그 앞에 서는 자리. 정식 구조: 출구 문 왼쪽, 인사 글 바로 아래 (끝 벽에 붙여서). 예전 구조: 출구 방 가운데.
 export function guestDesk(exit) {
-  if (R2) { const x = 0, z = exit.zEnd + 0.33; return { x, z, spot: { x, z: z + 1.5, yaw: 0 } }; }
+  // 정식 구조: x 는 인사 글 가운데 (builder buildExit 의 글 자리와 같게)
+  if (R2) { const x = -0.6, z = exit.zEnd + 0.33; return { x, z, spot: { x, z: z + 1.5, yaw: 0 } }; }
   const z = exit.zStart - 3.4;
   return { x: 0, z, spot: { x: 0, z: z + 1.5, yaw: 0 } };
 }

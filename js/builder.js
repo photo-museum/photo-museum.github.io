@@ -891,6 +891,23 @@ export class MuseumScene {
       const th = new THREE.Mesh(thGeo, thMat); th.rotation.x = -Math.PI / 2; th.position.set(dx, 0.0005, zc); th.userData = { floor: true }; group.add(th);
     }
 
+    // ----- 바닥 화살표: 문 앞에서 어느 쪽으로 가는지 (R2) -----
+    //  · 들어온 문 안쪽: 첫 사진 쪽(문 옆 벽을 따라 왼쪽)  · 나가는 문 앞: 문 쪽(다음 방)
+    if (R2 && !room.exit) {
+      const ac = document.createElement('canvas'); ac.width = 256; ac.height = 128;
+      const ag = ac.getContext('2d');
+      ag.strokeStyle = T.light ? 'rgba(40,36,32,0.5)' : 'rgba(240,232,220,0.5)';
+      ag.lineWidth = 13; ag.lineCap = 'round'; ag.lineJoin = 'round';
+      ag.beginPath(); ag.moveTo(28, 64); ag.lineTo(224, 64); ag.moveTo(172, 22); ag.lineTo(228, 64); ag.lineTo(172, 106); ag.stroke();
+      const atex = keep(new THREE.CanvasTexture(ac)); atex.colorSpace = THREE.SRGBColorSpace; atex.anisotropy = MAX_ANISO;
+      const amat = keep(new THREE.MeshBasicMaterial({ map: atex, transparent: true, depthWrite: false, toneMapped: false }));
+      const ageo = keep(new THREE.PlaneGeometry(1.1, 0.55));
+      // dir: 0 = +x, π = -x, π/2 = 앞(-z)
+      const arrow = (x, z, dir) => { const m = new THREE.Mesh(ageo, amat); m.rotation.x = -Math.PI / 2; m.rotation.z = dir; m.position.set(x, 0.006, z); m.renderOrder = 2; group.add(m); };
+      if (room.doorIn && room.panels.some(p => p.wall === 'F')) arrow((room.doorInX || 0) - 1.6, zStart - 1.3, Math.PI);
+      if (room.doorOut) arrow(room.doorOutX || 0, zEnd + 1.3, Math.PI / 2);
+    }
+
     // ----- 조명 레일 (스포트라이트 방만) -----
     if (T.spots && T.rails !== false && !room.lobby && !room.exit) {
       if (R2) {
