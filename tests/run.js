@@ -293,18 +293,19 @@ const desktop = {
     await p.waitForFunction(n => window.__pm.library.exhibitions.length >= n, n0, { timeout: 60000 });
     fs.unlinkSync(fp);
   },
-  '사용법: 해 봐야 넘어감 (6번: 방 꾸미기 열고 닫기)': async (p, h) => {
+  '사용법: 해 봐야 넘어감 (방 꾸미기 열고 닫기) · 걷기·확대는 방법마다 따로': async (p, h) => {
     await h.home();
     await p.evaluate(() => window.__pm.startTutorial());
     await p.waitForFunction(() => !document.body.classList.contains('home-open') && window.__pm.guide.steps, null, { timeout: 120000 });
     await p.waitForTimeout(1500);
     const g = () => p.evaluate(() => window.__pm.guide.i);
-    await p.evaluate(() => { const G = window.__pm.guide; G.i = 4; G.next(); }); await p.waitForTimeout(300);
+    await p.evaluate(() => { const G = window.__pm.guide; G.i = 6; G.next(); }); await p.waitForTimeout(300);
     await p.evaluate(() => document.querySelector('#guide-modal [data-g=go]').click()); await p.waitForTimeout(1500);
-    assert((await g()) === 5, '기다려도 그대로');
+    assert((await g()) === 7, '기다려도 그대로');
+    assert((await p.evaluate(() => window.__pm.guide.steps.length)) === 15, '15단계');
     await p.evaluate(() => window.__pm.openStylePanel(0)); await p.waitForTimeout(500);
     await p.evaluate(() => document.querySelector('#style-panel .close').click()); await p.waitForTimeout(1300);
-    assert((await g()) === 6, '방 꾸미기 열고 닫으면 다음');
+    assert((await g()) === 8, '방 꾸미기 열고 닫으면 다음');
     await p.evaluate(() => window.__pm.guide.stop());
     await h.home();
   },

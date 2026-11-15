@@ -868,7 +868,7 @@ function insertPhoto(pid, ri, beforePid) {
   if (k < 0) k = room.photos.length;
   room.photos.splice(k, 0, ph);
   if (!A.room.photos.length) A.room.photos.push(newPhoto()); // 방이 텅 비지 않게 빈 판 하나
-  stats.swaps++;
+  stats.inserts = (stats.inserts || 0) + 1; // 사이에 끼워 넣기
   persist();
   rebuild();
   toast(A.room === room ? '사진 순서를 바꿨어요' : `ROOM ${String(ri + 1).padStart(2, '0')}에 넣었어요`);

@@ -77,7 +77,7 @@ export class WalkControls {
       const [mx, my] = this.toNorm((a.x + b.x) / 2, (a.y + b.y) / 2);
       a.pinched = b.pinched = true;
       pinch = { d0, z0: this.zoom, P: this._pointAt(mx, my) };
-      this.zoomHold = true;
+      this.zoomHold = true; this.zoomBy = 'pinch';
     };
     // 두 손가락으로 벌릴 때 손가락 하나가 왼쪽 조이스틱에 걸쳐도 걷지 않고 확대로 본다.
     // 하지만 '걸으면서 둘러보기'(조이스틱 + 화면을 같이 짚기)와 헷갈리면 안 된다.
@@ -118,7 +118,7 @@ export class WalkControls {
           a.blocked = true;
           this.joyBlocked = true;
           this.joy.x = this.joy.y = 0;
-          this.zoomHold = true;
+          this.zoomHold = true; this.zoomBy = 'pinch';
           // 정하기 전 잠깐 돌아간 시선은 되돌린다 (확대하려던 것이었으니)
           this.yawT = jp.yawT; this.pitchT = jp.pitchT;
           this.pos.x = jp.pos.x; this.pos.z = jp.pos.z; this.vel.x = this.vel.z = 0;
@@ -164,7 +164,7 @@ export class WalkControls {
           this.zoom = this.zoomGoal = tgt ? Math.max(1, Math.min(ZOOM_MAX, tgt.zoom)) : Math.max(this.zoom, 2.5);
           this.zoomAt = { x: 0.5, y: 0.5 };
           p.anchor = { fx: nx, fy: ny };
-          this.zoomHold = true;
+          this.zoomHold = true; this.zoomBy = 'hold';
           p.right = true;
           if (navigator.vibrate) navigator.vibrate(10);
         }, 420);
@@ -172,7 +172,7 @@ export class WalkControls {
       if (e.button === 2) { // 오른쪽 버튼을 누르고 있는 동안 확대
         const [nx, ny] = this.toNorm(e.clientX, e.clientY);
         this._zoomAround(nx, ny, Math.max(this.zoom, 2.5));
-        this.zoomHold = true;
+        this.zoomHold = true; this.zoomBy = 'hold';
         ptrs.get(e.pointerId).right = true;
       }
     });
@@ -185,7 +185,7 @@ export class WalkControls {
       const [nx, ny] = this.toNorm(e.clientX, e.clientY);
       this._zoomAround(nx, ny, this.zoom * Math.exp(-e.deltaY * k));
       clearTimeout(this._wheelT);
-      this.zoomHold = true;
+      this.zoomHold = true; this.zoomBy = 'pinch';
       this._wheelT = setTimeout(() => { if (![...ptrs.values()].some(p => p.right)) this.zoomHold = false; }, 900);
     }, { passive: false });
     el.addEventListener('pointermove', e => {
