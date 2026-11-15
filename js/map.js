@@ -136,10 +136,11 @@ export class MuseumMap {
     this._last = '';
     this.mini.addEventListener('click', () => this.open());
     this.el.querySelector('[data-act="close"]').addEventListener('click', () => this.close());
-    this.editBtn.addEventListener('click', () => this.setEditing(!this.editing));
+    if (this.editBtn) this.editBtn.addEventListener('click', () => this.setEditing(!this.editing));
     this.el.addEventListener('click', e => {
       if (e.target.closest('.acts button')) {
         const b = e.target.closest('button');
+        b.closest('.mroom').classList.remove('acts-open');
         this.onRoomAction(b.dataset.act, +b.closest('.mroom').dataset.i);
         return;
       }
@@ -191,7 +192,7 @@ export class MuseumMap {
   setEditing(on) {
     this.editing = on;
     this.el.classList.toggle('editing', on);
-    this.editBtn.textContent = on ? '완료' : '편집';
+    if (this.editBtn) this.editBtn.textContent = on ? '완료' : '편집';
     this._tip();
     if (!on) this._commitOrder();
   }
@@ -225,6 +226,18 @@ export class MuseumMap {
     const here = layout.findIndex(r => c.pos.z <= r.zStart + 0.2 && c.pos.z >= r.zEnd - 0.2);
     this.row.innerHTML = '';
     this._tip();
+    // 입구·출구: 누르면 그곳으로 바로
+    const door = (kind) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'door ' + kind;
+      b.setAttribute('aria-label', kind === 'lobby' ? '입구로 가기' : '출구로 가기');
+      b.innerHTML = kind === 'lobby'
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V9l9-6 9 6v12"/></svg><small>입구</small>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5"/><path d="M10 8l4 4-4 4M3 12h11"/></svg><small>출구</small>';
+      b.addEventListener('click', () => { this.close(); this.onGoPlace && this.onGoPlace(kind); });
+      return b;
+    };
+    this.row.appendChild(door('lobby'));
     // 크기: 높이에 맞추고, 가장 긴 방도 한 화면에 들어가게. 방이 많으면 옆으로 넘겨 본다.
     const rw = this.row.clientWidth || 600;
     const rh = this.row.clientHeight || 260;
@@ -285,30 +298,42 @@ export class MuseumMap {
       cap.innerHTML = `<b>${label(i)}</b>`;
       cap.firstChild.after(nm);
       cap.insertAdjacentHTML('beforeend', `<span>${themeOf(r).label} · 사진 ${hung}${i === here ? ' · 지금 여기' : ''}</span>`);
+      // 방마다 편집 버튼 (오른쪽 위). 누르면 방 안에 아이콘이 펼쳐진다 — 평소엔 숨김
+      const eb = document.createElement('button');
+      eb.type = 'button'; eb.className = 'redit'; eb.setAttribute('aria-label', `${label(i)} 편집`);
+      eb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>';
+      eb.addEventListener('click', e => { e.stopPropagation(); this._toggleActs(card); });
       const acts = document.createElement('div');
       acts.className = 'acts';
-      acts.innerHTML = `<button data-act="rename">이름·설명</button><button data-act="fill">+ 사진 넣기</button>`
-        + `<button data-act="clear" class="quiet"${hung ? '' : ' disabled'}>모두 내리기</button>`
-        + `<button data-act="delete" class="quiet"${layout.length > 1 ? '' : ' disabled'}>방 지우기</button>`;
+      const ic = {
+        rename: '<path d="M5 6h14M5 12h14M5 18h9"/>',
+        fill: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M12 9v6M9 12h6"/>',
+        clear: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9 12h6"/>',
+        delete: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+      };
+      const act = (k, t, dis) => `<button data-act="${k}"${dis ? ' disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ic[k]}</svg><small>${t}</small></button>`;
+      acts.innerHTML = act('rename', '이름·설명') + act('fill', '사진 넣기') + act('clear', '모두 내리기', !hung) + act('delete', '방 지우기', layout.length <= 1);
+      plan.append(eb, acts);
       if (rooms) cap.querySelector('span').textContent = `사진 ${hung}`;
-      card.append(plan, cap, acts);
+      card.append(plan, cap);
       this.row.appendChild(card);
     });
+    this.row.appendChild(door('exit'));
     // 입구·출구 아이콘을 방 카드 가운데 높이에 맞춘다
     const c0 = this.row.querySelector('.mroom');
     if (c0) this.row.style.setProperty('--door-y', (c0.querySelector('.plan').offsetHeight / 2 - c0.offsetHeight / 2) + 'px');
     if (keepScroll) { this.row.scrollLeft = scroll; return; }
     // 지금 있는 방이 보이게
-    const cur = this.row.children[here];
+    const cur = this._cards()[here];
     if (cur) this.row.scrollLeft = Math.max(0, cur.offsetLeft - rw / 2 + cur.offsetWidth / 2);
   }
 
   _relabel() {
-    [...this.row.children].forEach((card, i) => { card.querySelector('b').textContent = label(i); });
+    this._cards().forEach((card, i) => { card.querySelector('.cap b').textContent = label(i); });
   }
 
   _commitOrder() {
-    const ids = [...this.row.children].map(c => c.dataset.id);
+    const ids = this._cards().map(c => c.dataset.id);
     if (ids.join() !== (this._order || []).join()) {
       this._order = ids;
       this.onReorder(ids);
@@ -437,6 +462,10 @@ export class MuseumMap {
         if (dd.roomLift && !this.editing) this._commitOrder(); // 방 모드에서 옮긴 것은 바로 저장
         return;
       }
+      if (dd.moved < 10 && e.type === 'pointerup' && this.row.querySelector('.acts-open')) {
+        for (const c of this._cards()) c.classList.remove('acts-open'); // 펼친 편집 아이콘만 닫는다
+        return;
+      }
       if (dd.moved < 10 && e.type === 'pointerup') {
         if (!dd.card) return;
         if (dd.thumb) { this.onPhotoTap(+dd.card.dataset.i, dd.thumb.dataset.pid); return; }
@@ -510,9 +539,15 @@ export class MuseumMap {
     if (t) this.onSwap(d.thumb.dataset.pid, t.dataset.pid);
   }
 
+  _toggleActs(card) {
+    const open = !card.classList.contains('acts-open');
+    for (const c of this._cards()) c.classList.remove('acts-open');
+    if (open) card.classList.add('acts-open');
+  }
+  _cards() { return [...this.row.querySelectorAll(':scope > .mroom')]; }
   _dragStep(d) {
     const row = this.row;
-    const cards = [...row.children];
+    const cards = this._cards();
     const visual = d.left0 + d.dx + (row.scrollLeft - d.scroll0); // 끌리는 방의 왼쪽 (row 좌표)
     // 손가락이 옆 방 가운데를 넘어가면 자리를 바꾼다 (카드가 커도 조금만 끌면 되게)
     const center = d.f0 + d.dx + row.offsetLeft + row.scrollLeft;
@@ -525,7 +560,7 @@ export class MuseumMap {
     }
     if (cards.indexOf(d.card) !== idx) {
       const before = new Map(others.map(c => [c, c.offsetLeft]));
-      const ref = others[idx] || null;
+      const ref = others[idx] || this.row.querySelector(':scope > .door.exit');
       row.insertBefore(d.card, ref);
       // 다른 방들은 부드럽게 미끄러지기
       for (const c of others) {
