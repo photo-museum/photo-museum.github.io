@@ -894,7 +894,7 @@ export class MuseumScene {
 
     // ----- 바닥 화살표: 문 앞에서 어느 쪽으로 가는지 (R2) -----
     //  · 들어온 문 안쪽: 첫 사진 쪽(문 옆 벽을 따라 왼쪽)  · 나가는 문 앞: 문 쪽(다음 방)
-    if (R2 && !room.exit) {
+    if (R2) {
       const ac = document.createElement('canvas'); ac.width = 256; ac.height = 128;
       const ag = ac.getContext('2d');
       ag.strokeStyle = T.light ? 'rgba(40,36,32,0.5)' : 'rgba(240,232,220,0.5)';
@@ -907,6 +907,7 @@ export class MuseumScene {
       const arrow = (x, z, dir) => { const m = new THREE.Mesh(ageo, amat); m.rotation.x = -Math.PI / 2; m.rotation.z = dir; m.position.set(x, 0.006, z); m.renderOrder = 2; group.add(m); };
       if (room.doorIn && room.panels.some(p => p.wall === 'F')) arrow((room.doorInX || 0) - 1.6, zStart - 1.3, Math.PI);
       if (room.doorOut) arrow(room.doorOutX || 0, zEnd + 1.3, Math.PI / 2);
+      if (room.exit) arrow(EXIT_DOOR.x, zEnd + 1.3, Math.PI / 2); // 출구 방: 나가는 문 앞
     }
 
     // ----- 조명 레일 (스포트라이트 방만) -----
