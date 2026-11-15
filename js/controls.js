@@ -14,6 +14,7 @@ const BOB_X = 0.008;    // 좌우 흔들림
 const ZOOM_MAX = 5;     // 최대 확대
 const LOOK_TOUCH = 0.0078; // 손가락으로 끌 때 돌아가는 정도 (조금만 끌어도 많이 돌게)
 const LOOK_MOUSE = 0.0040; // 마우스로 끌 때
+const LOOK_DIR = -1;       // 끄는 방향과 고개 방향: -1 = 끄는 쪽을 본다, 1 = 화면을 잡아끈다(예전)
 const ZOOM_BACK = 12;   // 손을 떼면 원래대로 돌아오는 빠르기
 
 export class WalkControls {
@@ -217,8 +218,10 @@ export class WalkControls {
       }
       const touch = e.pointerType === 'touch';
       const k = (touch ? LOOK_TOUCH : LOOK_MOUSE) / this.zoom; // 확대 중엔 천천히 둘러보기
-      this.yawT += dx * k;
-      this.pitchT = Math.max(-1.1, Math.min(1.1, this.pitchT + dy * k));
+      // 끄는 쪽으로 고개가 돈다: 오른쪽으로 끌면 오른쪽을, 위로 끌면 위를 본다.
+      // (처음에는 반대였다: 화면을 잡아끄는 느낌. 써 본 사람들이 불편하다고 해서 뒤집음. 되돌리려면 LOOK_DIR = 1)
+      this.yawT += LOOK_DIR * dx * k;
+      this.pitchT = Math.max(-1.1, Math.min(1.1, this.pitchT + LOOK_DIR * dy * k));
       if (p.moved > 6) this.auto = null;
     });
     const end = e => {
