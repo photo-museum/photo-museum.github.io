@@ -574,7 +574,9 @@ body.home-open #people, body.map-open #people, body.style-open #people, body:has
 body.rotated #chat-btn { top: 12px; right: 210px; }
 #chat-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 #chat-btn i { position: absolute; right: 1px; top: 1px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: none; }
-#chat-btn.new i { display: block; }
+/* 새 대화가 오면: 말풍선 아이콘 안을 빨갛게 칠한다 (작은 점 대신) */
+#chat-btn.new i { display: none; }
+#chat-btn.new svg { fill: var(--accent); stroke: var(--accent); }
 body.home-open #chat-btn, body.map-open #chat-btn, body.style-open #chat-btn, body:has(#loading:not(.done)) #chat-btn,
 body.home-open #chat-live, body.map-open #chat-live { display: none; }
 #chat-live { position: absolute; z-index: 2; left: max(14px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 50px); max-width: min(46%, 360px); display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
