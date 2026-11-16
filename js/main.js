@@ -1524,10 +1524,21 @@ async function startTogether(ex) {
   if (museum !== ex || homeOpen) return;
   await together.join(id, name, !GUEST_ID);
 }
-peopleBtn.addEventListener('click', async () => {
+// 사람 수를 누르면: 지금 들어와 있는 사람들 이름이 세로로. 맨 위는 나 (누르면 이름 바꾸기)
+peopleBtn.addEventListener('click', () => {
   if (!museum || !together.active) return;
-  const ex = museum, name = await askName(true);
-  if (museum === ex && together.active) together.join(GUEST_ID || ex.share.id, name, !GUEST_ID);
+  const list = together.people;
+  const rename = async () => {
+    const ex = museum, name = await askName(true);
+    if (museum === ex && together.active) together.join(GUEST_ID || ex.share.id, name, !GUEST_ID);
+  };
+  openSheet([
+    { title: true, label: `지금 같이 보는 사람 ${list.length}명` },
+    ...list.map(p => p.me
+      ? { label: `${p.name} (나)${p.owner ? ' · 전시 주인' : ''}  ✎ 이름 바꾸기`, fn: rename }
+      : { label: `${p.name}${p.owner ? ' · 전시 주인' : ''}`, quiet: true }),
+    { label: '닫기', quiet: true },
+  ]);
 });
 
 // ---------- 공유 (js/share.js) ----------

@@ -68,6 +68,14 @@ const SHOTS = process.env.SHOTS || '';
       assert(g.peers.length === 1 && g.peers[0].name === '주인장' && g.peers[0].owner === true, '손님이 보는 주인: ' + JSON.stringify(g.peers));
       assert(o.peers.length === 1 && o.peers[0].name === '친구' && o.peers[0].owner === false, '주인이 보는 손님: ' + JSON.stringify(o.peers));
     });
+    await step('사람 수를 누르면 이름 목록: 맨 위는 나(이름 바꾸기), 그 아래 다른 사람', async () => {
+      await guest.click('#people'); await guest.waitForTimeout(400);
+      const items = await guest.evaluate(() => [...document.querySelectorAll('#sheet button')].map(b => b.textContent.trim()));
+      assert(/2명/.test(await guest.textContent('#sheet .title')) && /^친구 \(나\)/.test(items[0]) && /이름 바꾸기/.test(items[0]) && /^주인장 · 전시 주인$/.test(items[1]), JSON.stringify(items));
+      await guest.evaluate(() => document.querySelectorAll('#sheet button')[0].click());
+      await guest.waitForFunction(() => document.querySelector('#namebox').classList.contains('open'), null, { timeout: 5000 });
+      await guest.fill('#nb-name', '친구'); await guest.click('#namebox button'); await guest.waitForTimeout(300);
+    });
     await step('위치와 바라보는 방향이 따라옴 (부드럽게 이어서)', async () => {
       await owner.evaluate(() => window.__pm.controls.setPose(1.5, -3.2, 0.6));
       // 가는 동안의 중간 자리가 찍혀야 한다 (순간 이동이 아니라 이어서 움직임)

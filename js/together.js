@@ -257,6 +257,14 @@ export function initTogether(a) {
     join, leave, tick, setLight, say, myId,
     get active() { return !!ch; }, get live() { return live; },
     get count() { return ch ? Math.max(1, names.size) : 0; },
+    // 지금 들어와 있는 사람들: 내가 맨 앞, 그다음 주인, 나머지는 이름 순
+    get people() {
+      if (!ch) return [];
+      const mine = { name: (me && me.name) || '관람객', owner: !!(me && me.owner), me: true };
+      const others = [...names.entries()].filter(([id]) => id !== myId).map(([, n]) => ({ name: n.name || '관람객', owner: n.owner, me: false }))
+        .sort((x, y) => (y.owner - x.owner) || x.name.localeCompare(y.name, 'ko'));
+      return [mine, ...others];
+    },
     get peers() { return [...peers.entries()].map(([id, p]) => ({ id, name: p.name, owner: p.owner, visible: p.group.visible, said: p.said || null, x: p.cur ? p.cur.x : null, z: p.cur ? p.cur.z : null, yaw: p.cur ? p.cur.yaw : null })); },
   };
 }

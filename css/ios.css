@@ -601,3 +601,8 @@ body.home-open #chat-live, body.map-open #chat-live { display: none; }
 #chatbox input { flex: 1; min-width: 0; height: 42px; padding: 0 14px; border: 0; border-radius: 21px; background: rgba(255,255,255,.78); color: var(--label); font: 400 16px var(--ui); }
 #chatbox input:focus { outline: 2px solid rgba(229,72,77,.45); }
 #chatbox .row button { height: 42px; padding: 0 18px; border: 0; border-radius: 21px; background: var(--accent); color: #fff; font: 600 15px var(--ui); cursor: pointer; }
+
+/* 같이 관람: 대화 버튼 · 사람 수 · 작은 지도 사이를 같은 간격(8px)으로. 두 버튼을 한 줄에 묶어 작은 지도 왼쪽에 붙인다 (사람 수 칸의 폭이 달라져도 간격은 그대로) */
+#tg-bar { position: absolute; z-index: 2; top: max(12px, env(safe-area-inset-top)); right: calc(max(14px, env(safe-area-inset-right)) + 118px + 8px); display: flex; align-items: center; gap: 8px; }
+body.rotated #tg-bar { top: 12px; right: 140px; }
+:root body #tg-bar > button { position: relative; top: auto; right: auto; flex: none; }
