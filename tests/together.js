@@ -15,7 +15,7 @@ const SHOTS = process.env.SHOTS || '';
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const errs = [];
   const open = async (who, name) => {
-    const ctx = await browser.newContext({ viewport: { width: 844, height: 390 } });
+    const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: SHOTS ? 2 : 1 });
     await ctx.route(BASE + '**', route => {
       let u = new URL(route.request().url()).pathname;
       if (u.endsWith('/')) u += 'index.html';
@@ -96,16 +96,24 @@ const SHOTS = process.env.SHOTS || '';
       await guest.evaluate(() => document.querySelector('#chatbox .close').click());
       assert(await owner.evaluate(() => window.__pm.controls.enabled), '창을 닫으면 다시 걸을 수 있음');
     });
-    if (SHOTS) {
-      await owner.evaluate(() => { window.__pm.openChat(); document.querySelector('#chat-input').value = '여기 단풍 진짜 예뻤어. 다음에 같이 가자'; document.querySelector('#chatbox form').requestSubmit(); document.querySelector('#chatbox .close').click(); });
+    if (SHOTS) { // 화면 찍기 (SHOTS=<폴더>)
+      const say = (pg, t) => pg.evaluate(t => { window.__pm.openChat(); document.querySelector('#chat-input').value = t; document.querySelector('#chatbox form').requestSubmit(); document.querySelector('#chatbox .close').click(); }, t);
       await owner.evaluate(() => window.__pm.controls.setPose(0.4, -4.4, Math.PI * 0.85));
       await guest.evaluate(() => { const c = window.__pm.controls; c.setPose(0, -1.2, 0); c.pitch = c.pitchT = 0; });
-      await guest.waitForTimeout(2500);
-      await guest.screenshot({ path: path.join(SHOTS, 'together-guest.jpg'), type: 'jpeg', quality: 85 });
+      await guest.waitForTimeout(2200);
+      await say(owner, '여기 단풍 진짜 예뻤어. 다음에 같이 가자');
+      await guest.waitForTimeout(1300);
+      await guest.screenshot({ path: path.join(SHOTS, 'together-guest.jpg'), type: 'jpeg', quality: 88 });
+      await guest.evaluate(() => { window.__pm.openChat(); document.querySelector('#chat-input').value = '좋아! 가을에 가자'; document.querySelector('#chatbox form').requestSubmit(); });
+      await guest.waitForTimeout(700);
+      await guest.screenshot({ path: path.join(SHOTS, 'together-chat.jpg'), type: 'jpeg', quality: 88 });
+      await guest.evaluate(() => document.querySelector('#chatbox .close').click());
       await guest.evaluate(() => window.__pm.controls.setPose(-0.6, -3.6, -Math.PI / 2));
       await owner.evaluate(() => { const c = window.__pm.controls; c.setPose(2.6, -3.6, Math.PI / 2); c.pitch = c.pitchT = 0; });
-      await owner.waitForTimeout(2500);
-      await owner.screenshot({ path: path.join(SHOTS, 'together-owner.jpg'), type: 'jpeg', quality: 85 });
+      await owner.waitForTimeout(1200);
+      await say(guest, '나 여기 있어');
+      await owner.waitForTimeout(1300);
+      await owner.screenshot({ path: path.join(SHOTS, 'together-owner.jpg'), type: 'jpeg', quality: 88 });
     }
     await step('가만히 있어도 사라지지 않음 (10초 뒤에도 보임)', async () => {
       await guest.waitForTimeout(10000);
