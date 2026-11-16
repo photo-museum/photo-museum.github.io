@@ -1444,11 +1444,53 @@ function enterExhibition(ex, fresh = false) {
 // ---------- 같이 관람 (js/together.js) ----------
 // 공유 중인 전시실(주인) · 초대 링크(손님)에서만 켜진다. 그 밖에서는 아무 일도 하지 않는다.
 const peopleBtn = $('#people');
+const chatBtn = $('#chat-btn'), chatbox = $('#chatbox'), chatLog = $('#chatbox .log'), chatLive = $('#chat-live');
 const together = initTogether({ THREE, scene, controls, wake, onCount: n => {
-  peopleBtn.hidden = n === 0;
+  peopleBtn.hidden = chatBtn.hidden = n === 0;
   peopleBtn.querySelector('b').textContent = String(n || 1);
   document.body.classList.toggle('together', n > 0);
+  if (n === 0) { closeChat(); chatLog.innerHTML = '<p class="empty">아직 대화가 없어요. 먼저 말을 걸어 보세요.</p>'; chatLive.innerHTML = ''; chatBtn.classList.remove('new'); }
+}, onChat: m => {
+  // 대화창에 쌓고, 창이 닫혀 있으면 화면 왼쪽 위에 잠깐 보여 준다 (말한 사람이 등 뒤에 있어 말풍선이 안 보일 수도 있으니)
+  const line = () => { const p = document.createElement('p'); if (m.mine) p.className = 'mine'; if (m.owner) p.classList.add('owner'); const b = document.createElement('b'); b.textContent = m.mine ? '나' : m.name; p.append(b, document.createTextNode(m.text)); return p; };
+  const e = chatLog.querySelector('.empty'); if (e) e.remove();
+  chatLog.appendChild(line());
+  while (chatLog.children.length > 100) chatLog.firstChild.remove();
+  chatLog.scrollTop = chatLog.scrollHeight;
+  if (m.mine || chatbox.classList.contains('open')) return;
+  chatBtn.classList.add('new');
+  const l = line(); chatLive.appendChild(l);
+  while (chatLive.children.length > 3) chatLive.firstChild.remove();
+  setTimeout(() => l.classList.add('out'), 5500); setTimeout(() => l.remove(), 6200);
 } });
+// 대화창 (돌리지 않은 화면: 자판이 편하게). 열려 있는 동안은 걷지 않는다
+let chatWas = true;
+function openChat() {
+  if (!together.active || chatbox.classList.contains('open')) return;
+  chatbox.classList.add('open'); chatBtn.classList.remove('new'); chatLive.innerHTML = '';
+  chatWas = controls.enabled; controls.enabled = false; controls.joy.x = controls.joy.y = 0; controls.keys.clear();
+  chatLog.scrollTop = chatLog.scrollHeight;
+  setTimeout(() => $('#chat-input').focus(), 60);
+}
+function closeChat() {
+  if (!chatbox.classList.contains('open')) return;
+  chatbox.classList.remove('open'); $('#chat-input').blur();
+  controls.enabled = chatWas && !map.isOpen && !homeOpen;
+}
+chatBtn.addEventListener('click', openChat);
+chatbox.querySelector('.close').addEventListener('click', closeChat);
+chatbox.addEventListener('click', e => { if (e.target === chatbox) closeChat(); });
+chatbox.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') closeChat(); });
+chatbox.querySelector('form').addEventListener('submit', e => {
+  e.preventDefault();
+  const input = $('#chat-input');
+  if (!input.value.trim()) return;
+  if (together.say(input.value)) input.value = '';
+  else if (!together.live) toast('연결 중이에요. 잠시 뒤에 다시 보내 주세요', 2200);
+  input.focus();
+});
+// 컴퓨터: Enter 로 대화창 열기
+window.addEventListener('keydown', e => { if (e.key === 'Enter' && together.active && !homeOpen && controls.enabled && !sheetOpen() && !/^(INPUT|TEXTAREA|BUTTON)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); openChat(); } });
 // 이름: 한 번 적으면 이 기기에 기억한다. force 면 다시 묻는다 (사람 수 표시를 눌러 이름 바꾸기)
 const namebox = $('#namebox');
 function askName(force) {
@@ -1725,4 +1767,4 @@ start().catch(e => {
 });
 
 // 디버그/테스트용
-window.__pm = { music, openCaptions, share, shareMenu, persist, together, applyPreset, setEditMode, get editMode() { return editMode; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };
+window.__pm = { music, openCaptions, share, shareMenu, persist, together, openChat, applyPreset, setEditMode, get editMode() { return editMode; }, undoStack, controls, museumScene, get museum() { return museum; }, camera, renderer, hangPhotos, addRoom, openStylePanel, applyStyle, map, guide, startTutorial, startShowcase, museumStops, route, goToRoom, reorderRooms, swapPhotos, roomAction, clearRoom, deleteRoom, get library() { return library; }, enterExhibition, openHome, editRoomText };

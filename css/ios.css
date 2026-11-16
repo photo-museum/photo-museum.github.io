@@ -565,3 +565,39 @@ body.home-open #people, body.map-open #people, body.style-open #people, body:has
 #namebox input:focus { outline: 2px solid rgba(229,72,77,.45); }
 #namebox .row { display: flex; justify-content: flex-end; }
 #namebox button { height: 42px; padding: 0 22px; border: 0; border-radius: 21px; background: var(--accent); color: #fff; font: 600 15px var(--ui); cursor: pointer; }
+
+/* 같이 관람: 대화 */
+#chat-btn { position: absolute; z-index: 2; top: max(12px, env(safe-area-inset-top)); right: calc(max(14px, env(safe-area-inset-right)) + 196px);
+  width: 34px; height: 34px; padding: 0; border-radius: 17px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;
+  background: var(--gx-bg); border: 1px solid var(--gx-border); box-shadow: var(--gx-shadow);
+  -webkit-backdrop-filter: blur(16px) saturate(190%); backdrop-filter: blur(16px) saturate(190%); }
+body.rotated #chat-btn { top: 12px; right: 210px; }
+#chat-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+#chat-btn i { position: absolute; right: 1px; top: 1px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: none; }
+#chat-btn.new i { display: block; }
+body.home-open #chat-btn, body.map-open #chat-btn, body.style-open #chat-btn, body:has(#loading:not(.done)) #chat-btn,
+body.home-open #chat-live, body.map-open #chat-live { display: none; }
+#chat-live { position: absolute; z-index: 2; left: max(14px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 50px); max-width: min(46%, 360px); display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
+#chat-live p, #chatbox .log p { margin: 0; font-size: 14px; line-height: 1.4; word-break: break-word; }
+#chat-live p { align-self: flex-start; padding: 6px 12px; border-radius: 15px; color: #fff; background: rgba(20,20,22,.62); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: opacity .6s ease; }
+#chat-live p.out { opacity: 0; }
+#chat-live b, #chatbox .log b { font-weight: 700; margin-right: 6px; }
+#chat-live p.owner b, #chatbox .log p.owner b { color: #ff8a8d; }
+#chatbox { position: fixed; inset: 0; z-index: 30; display: none; align-items: flex-end; justify-content: center; padding: 10px; background: rgba(0,0,0,.35); }
+#chatbox.open { display: flex; }
+#chatbox .box { width: min(520px, 100%); max-height: min(70dvh, 460px); display: flex; flex-direction: column; gap: 8px; padding: 14px 14px 12px; box-sizing: border-box;
+  color: var(--label); background: var(--gl-bg); border: 1px solid var(--gl-border); box-shadow: var(--gl-shadow); border-radius: 24px;
+  -webkit-backdrop-filter: blur(30px) saturate(190%); backdrop-filter: blur(30px) saturate(190%); font-family: var(--ui); }
+#chatbox .top { display: flex; align-items: center; gap: 8px; }
+#chatbox .top b { font-size: 16px; font-weight: 700; }
+#chatbox .top span { flex: 1; font-size: 12px; color: var(--label2); }
+#chatbox .close { width: 30px; height: 30px; border: 0; border-radius: 15px; background: var(--fill); color: var(--label); font-size: 13px; cursor: pointer; }
+#chatbox .log { flex: 1; min-height: 60px; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 6px; padding: 4px 2px; }
+#chatbox .log p { align-self: flex-start; max-width: 88%; padding: 7px 12px; border-radius: 15px; background: rgba(255,255,255,.7); }
+#chatbox .log p.mine { align-self: flex-end; background: var(--accent); color: #fff; }
+#chatbox .log p.mine b { display: none; }
+#chatbox .log p.empty { align-self: center; background: none; color: var(--label2); font-size: 13px; }
+#chatbox .row { display: flex; gap: 8px; margin: 0; }
+#chatbox input { flex: 1; min-width: 0; height: 42px; padding: 0 14px; border: 0; border-radius: 21px; background: rgba(255,255,255,.78); color: var(--label); font: 400 16px var(--ui); }
+#chatbox input:focus { outline: 2px solid rgba(229,72,77,.45); }
+#chatbox .row button { height: 42px; padding: 0 18px; border: 0; border-radius: 21px; background: var(--accent); color: #fff; font: 600 15px var(--ui); cursor: pointer; }

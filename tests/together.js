@@ -80,7 +80,24 @@ const SHOTS = process.env.SHOTS || '';
       await guest.evaluate(() => window.__pm.controls.setPose(-1.2, -2.0, 0));
       await owner.waitForFunction(() => { const p = window.__pm.together.peers[0]; return p && Math.hypot(p.x + 1.2, p.z + 2.0) < 0.1; }, null, { timeout: 10000 });
     });
+    await step('대화: 손님이 말하면 주인 화면에 (머리 위 말풍선 · 왼쪽 위 한 줄 · 대화창), 주인이 답하면 손님에게', async () => {
+      assert(!(await owner.evaluate(() => document.querySelector('#chat-btn').hidden)), '대화 버튼');
+      await guest.click('#chat-btn');
+      await guest.fill('#chat-input', '이 사진 어디서 찍었어?');
+      await guest.click('#chatbox .row button');
+      await owner.waitForFunction(() => window.__pm.together.peers[0] && window.__pm.together.peers[0].said === '이 사진 어디서 찍었어?', null, { timeout: 10000 });
+      const o = await owner.evaluate(() => ({ live: document.querySelector('#chat-live').textContent, log: document.querySelector('#chatbox .log').textContent, dot: document.querySelector('#chat-btn').classList.contains('new') }));
+      assert(/친구/.test(o.live) && /어디서 찍었어/.test(o.live) && /어디서 찍었어/.test(o.log) && o.dot, JSON.stringify(o));
+      assert((await guest.evaluate(() => document.querySelector('#chatbox .log p.mine').textContent)).includes('어디서 찍었어'), '내가 한 말은 대화창에');
+      await owner.evaluate(() => window.__pm.openChat()); await owner.fill('#chat-input', '교토!'); await owner.keyboard.press('Enter');
+      await guest.waitForFunction(() => window.__pm.together.peers[0] && window.__pm.together.peers[0].said === '교토!' && /교토!/.test(document.querySelector('#chatbox .log').textContent), null, { timeout: 10000 });
+      assert(await guest.evaluate(() => document.querySelector('#chatbox .log p.owner') !== null), '주인 표시');
+      await owner.evaluate(() => document.querySelector('#chatbox .close').click());
+      await guest.evaluate(() => document.querySelector('#chatbox .close').click());
+      assert(await owner.evaluate(() => window.__pm.controls.enabled), '창을 닫으면 다시 걸을 수 있음');
+    });
     if (SHOTS) {
+      await owner.evaluate(() => { window.__pm.openChat(); document.querySelector('#chat-input').value = '여기 단풍 진짜 예뻤어. 다음에 같이 가자'; document.querySelector('#chatbox form').requestSubmit(); document.querySelector('#chatbox .close').click(); });
       await owner.evaluate(() => window.__pm.controls.setPose(0.4, -4.4, Math.PI * 0.85));
       await guest.evaluate(() => { const c = window.__pm.controls; c.setPose(0, -1.2, 0); c.pitch = c.pitchT = 0; });
       await guest.waitForTimeout(2500);
