@@ -212,7 +212,9 @@ body.home-open #edit-menu, body.style-open #edit-menu { display: none; }
 #home .flow { position: absolute; inset: 0; z-index: 1; touch-action: none; cursor: grab; perspective: none; }
 :root body #home header { position: absolute; z-index: 3; left: max(26px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top));
   display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; }
-#home header .brand { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
+/* 홈 로고: 앱 아이콘과 같은 글씨 (프리텐다드 Bold, 대문자, 넓은 자간. 시안 L1). 로고 글자만 담은 작은 글꼴 파일을 써서 어느 기기에서나 같게 보인다 (tools/make-icons.py) */
+@font-face { font-family: 'PMLogo'; font-weight: 700; font-display: swap; src: url('../assets/fonts/pretendard-logo.woff2') format('woff2'); }
+#home header .brand { font-family: 'PMLogo', 'Pretendard', var(--ui); font-size: 15px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
 :root body #home .hbtns { display: flex; gap: 8px; pointer-events: auto; }
 :root body #home .hbtns button, :root body #home .hbtns button:not(.main) {
   width: 38px; height: 38px; padding: 0; border-radius: 19px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff;
