@@ -8,7 +8,7 @@ export function initBackup(a) {
   // ---------- 백업 · 불러오기 · 공유 ----------
   // 사진은 이 기기 브라우저 안에만 저장된다. 아이폰 Safari 는 오래 안 쓰면 지울 수도 있어서
   // (1) 홈 화면 앱으로 설치하면 더 안전하고 (2) 백업 파일로 저장해 두면 언제든 되살릴 수 있다.
-  const APP_VERSION = '11.20-b'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
+  const APP_VERSION = '11.20-c'; // 배포할 때마다 바꾼다 (휴대폰에 새 버전이 들어왔는지 보관 메뉴에서 확인)
   const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const ownExhibitions = () => a.library.exhibitions.filter(e => !e.showcase && !e.tutorial);
   function dateTag() { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
@@ -22,7 +22,9 @@ export function initBackup(a) {
       { title: true, label: `보관 · ${backupAge()} · 버전 ${APP_VERSION}${globalThis.PM_R2 ? ' · 시험판 저장 공간' : globalThis.PM_CLASSIC ? ' · 예전 구조' : ''}` },
       { label: '⤓ 모든 전시실을 백업 파일로 저장', fn: () => exportExhibitions(ownExhibitions(), `MyMuseum-백업-${dateTag()}.pmbk`, true) },
       { label: '⤒ 백업 파일에서 불러오기', fn: () => importPick() },
-      { label: isStandalone() ? '✓ 홈 화면 앱으로 쓰고 있어요' : '홈 화면에 앱으로 추가하는 법', fn: () => installHelp() },
+      // 앱 설치하기: 크롬(안드로이드·컴퓨터)은 누르면 바로 설치 창이 뜬다. 설치 창을 띄울 수 없는 곳(아이폰 Safari 등)은 방법을 알려 준다
+      isStandalone() ? { label: '✓ 앱으로 쓰고 있어요', quiet: true }
+        : { label: '앱 설치하기', fn: () => installApp() },
       { label: '닫기', quiet: true },
     ]);
   }
@@ -56,12 +58,23 @@ export function initBackup(a) {
       toast(`전시실 ${added}개를 불러왔어요${replaced ? ` · ${replaced}개는 백업 내용으로 바꿨어요` : ''}`, 4000);
     } catch (e) { console.error(e); toast(e.message || '불러오지 못했어요', 4000); }
   });
+  async function installApp() {
+    if (!deferredInstall) { installHelp(); return; }
+    const ev = deferredInstall;
+    deferredInstall = null; // 한 번만 쓸 수 있다
+    try {
+      ev.prompt();
+      const r = await ev.userChoice;
+      toast(r && r.outcome === 'accepted' ? '앱을 설치했어요\n홈 화면(또는 앱 목록)에서 열 수 있어요' : '설치를 취소했어요', 3200);
+    } catch (e) { installHelp(); }
+  }
+  window.addEventListener('appinstalled', () => { deferredInstall = null; });
   function installHelp() {
     const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     openSheet([
       { title: true, label: ios
         ? '1. 먼저 아래에서 백업 파일을 저장해요\n2. Safari 공유 버튼(□↑) → "홈 화면에 추가"\n3. 새 앱을 열고 보관에서 백업 파일을 불러와요\n(앱과 Safari 는 저장 공간이 따로예요)'
-        : '브라우저 메뉴 → "앱 설치" 또는 "홈 화면에 추가"\n설치한 앱은 사진을 더 오래 보관해요' },
+        : '지금은 설치 창을 바로 띄울 수 없어요\n크롬 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"를 눌러 주세요\n이미 설치했다면 앱 목록에서 열 수 있어요' },
       ...(deferredInstall ? [{ label: '지금 설치하기', fn: () => { deferredInstall.prompt(); deferredInstall = null; } }] : []),
       { label: '먼저 백업 파일 저장', fn: () => exportExhibitions(ownExhibitions(), `MyMuseum-백업-${dateTag()}.pmbk`, true) },
       { label: '닫기', quiet: true },
