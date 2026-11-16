@@ -345,6 +345,10 @@ const desktop = {
     await p.click('#home .fcap .go'); await p.waitForTimeout(1500);
     const m = () => p.evaluate(() => ({ playing: window.__pm.music.playing, enabled: window.__pm.music.enabled }));
     assert((await m()).playing, '재생');
+    // 아이폰이 아니면 Web Audio 를 거치지 않고 audio.volume 으로만 (지직거림 방지). 스르륵 0.32 까지 올라온다
+    await p.waitForTimeout(1500);
+    const v = await p.evaluate(() => ({ ctx: !!window.__pm.music.ctx, vol: +window.__pm.music.audio.volume.toFixed(2) }));
+    assert(!v.ctx && Math.abs(v.vol - 0.32) < 0.02, 'Web Audio 없이 볼륨만: ' + JSON.stringify(v));
     await p.click('#music-btn'); await p.waitForTimeout(300);
     assert(!(await m()).enabled && !(await m()).playing, '끔');
     await p.click('#music-btn'); await p.waitForTimeout(300);

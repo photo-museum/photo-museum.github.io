@@ -1,7 +1,9 @@
 // 전시를 보는 동안 잔잔한 클래식 (저작권 없는 연주: assets/music/CREDITS.md)
 // - 전시실에 들어가면 작은 소리로 스르륵 켜지고, 홈으로 나오거나 다른 앱으로 가면 멈춘다.
 // - ♪ 버튼으로 끄고 켜며, 끈 것은 기억한다.
-// - 아이폰은 audio.volume 을 바꿀 수 없어서 Web Audio 의 gain 으로 소리 크기를 정한다.
+// - 소리 크기: 아이폰·아이패드는 audio.volume 을 바꿀 수 없어서 Web Audio 의 gain 을 쓴다 (넉넉한 버퍼로).
+//   그 밖(안드로이드·컴퓨터)은 Web Audio 를 거치지 않고 audio.volume 만 쓴다.
+//   (Web Audio 로 돌리면 3D 화면을 그리느라 바쁠 때 소리 버퍼가 비어 '지직' 하는 일이 있어서. 음악 파일 자체는 검사해 보니 깨끗했다)
 
 export const TRACKS = [
   { file: 'assets/music/gymnopedie1.mp3', title: '짐노페디 1번', who: '에릭 사티' },
@@ -12,6 +14,7 @@ export const TRACKS = [
 ];
 
 const VOLUME = 0.32;   // 전시장 배경으로 작게
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const FADE = 1.6;      // 초
 
 export class Music {
@@ -19,6 +22,7 @@ export class Music {
     this.onChange = onChange || (() => {});
     this.audio = new Audio();
     this.audio.preload = 'none';
+    if (!IOS) this.audio.volume = 0;
     this.audio.crossOrigin = 'anonymous';
     this.audio.addEventListener('ended', () => this.next());
     this.audio.addEventListener('error', () => { if (this.playing && (this._skips = (this._skips || 0) + 1) < TRACKS.length) setTimeout(() => this.next(), 400); });
@@ -32,11 +36,11 @@ export class Music {
   get track() { return TRACKS[this.i]; }
   // 첫 소리는 사용자가 누른 순간에 시작해야 한다 (휴대폰 자동 재생 막힘)
   _graph() {
-    if (this.ctx) return;
+    if (this.ctx || !IOS) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     try {
-      this.ctx = new AC();
+      this.ctx = new AC({ latencyHint: 'playback' }); // 반응이 조금 늦어도 끊기지 않게 버퍼를 넉넉히
       const src = this.ctx.createMediaElementSource(this.audio);
       this.gain = this.ctx.createGain();
       this.gain.gain.value = 0;
@@ -49,7 +53,17 @@ export class Music {
       g.cancelScheduledValues(t);
       g.setValueAtTime(g.value, t);
       g.linearRampToValueAtTime(to, t + sec);
-    } else this.audio.volume = to;
+      return;
+    }
+    // audio.volume 을 조금씩 바꿔 스르륵 (1초에 30번)
+    clearInterval(this._ft);
+    const from = this.audio.volume, t0 = performance.now(), ms = sec * 1000;
+    if (ms <= 0) { this.audio.volume = to; return; }
+    this._ft = setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / ms);
+      try { this.audio.volume = from + (to - from) * k; } catch (e) {}
+      if (k >= 1) clearInterval(this._ft);
+    }, 33);
   }
   _load() {
     const want = new URL(this.track.file, document.baseURI).href;
