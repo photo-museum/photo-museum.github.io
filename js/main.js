@@ -259,9 +259,11 @@ function pickPhotos(job) {
     });
   });
   input.addEventListener('cancel', () => input.remove());
-  // 사진 고르는 창(안드로이드·구글 포토)은 이 앱이 아니라 휴대폰의 것이라 모양을 바꿀 수 없다.
-  // 가로 화면이면 사진이 한 줄밖에 안 보여서, 앱으로 설치해 쓰는 휴대폰에서는 고르는 동안만 화면을 세로로 돌린다 (고르고 나면 다시 가로).
-  // 브라우저에서는 화면 방향을 정할 수 없어서, 처음 한 번 '세워서 고르면 더 많이 보여요'라고만 알려 준다.
+  // 사진 고르는 창(안드로이드·구글 포토)은 이 앱이 아니라 휴대폰의 것이라 모양을 바꿀 수 없다. 가로면 사진이 한 줄밖에 안 보인다.
+  // 그 창은 앱 위에 아래에서 올라오는 창이라 앱의 화면 방향을 따라간다.
+  //  · 고르는 동안만 화면을 세로로 돌려 본다 (되는 곳: 설치한 앱 일부). 고르고 나면 원래대로.
+  //  · 안 되는 곳에서는 '휴대폰을 세워서 고르세요'라고 알려 준다. 설치한 앱이 가로로 묶여 있으면 세워도 안 돌아가서, manifest 의 방향 고정은 풀었다 (orientation: any. 세로로 들면 앱이 화면을 알아서 돌려 그린다).
+  const tip = () => { if (isTouch && innerWidth > innerHeight) toast('휴대폰을 세워서 고르면\n사진이 한 화면에 더 많이 보여요', 2600); };
   const restore = () => { if (pickerTurned) { pickerTurned = false; try { screen.orientation.unlock(); } catch (e) {} } };
   input.addEventListener('change', restore);
   input.addEventListener('cancel', restore);
@@ -270,14 +272,14 @@ function pickPhotos(job) {
   if (isTouch && standalone && screen.orientation && screen.orientation.lock && !/^portrait/.test(screen.orientation.type)) {
     screen.orientation.lock('portrait')
       .then(() => { pickerTurned = true; })
-      .catch(() => {})
+      .catch(() => tip())
       .finally(() => input.click());
     return;
   }
-  if (isTouch && !pickerTipShown && innerWidth > innerHeight) { pickerTipShown = true; toast('휴대폰을 세워서 고르면\n사진이 한 화면에 더 많이 보여요', 2600); }
+  tip();
   input.click();
 }
-let pickerTurned = false, pickerTipShown = false;
+let pickerTurned = false;
 
 // 정한 판부터 빈 판을 차례로 채우고, 남는 사진은 판을 새로 만들어 단다 (벽이 길어짐)
 async function hangPhotos(job, files) {

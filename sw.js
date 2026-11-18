@@ -1,6 +1,6 @@
 // 오프라인에서도 열리도록 앱 파일을 보관한다.
 // 늘 새 버전을 먼저 받아 보고(네트워크 먼저), 안 되면 보관해 둔 것을 쓴다.
-const CACHE = 'pm-v2';
+const CACHE = 'pm-v3'; // manifest 를 바꿨을 때도 올린다
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k); // 예전 보관본 지우기
